@@ -1,7 +1,7 @@
 // convex/encounters.ts
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
 // Save a complete encounter from voice recording (facts + diagnosis)
@@ -253,6 +253,16 @@ export const saveVoiceConsultation = mutation({
     } else {
       console.log(`[SaveVoiceConsultation] ⏭️  Skipping billing extraction (orgId: ${args.orgId}, facts: ${args.facts.length})`);
     }
+
+    // Audit log: encounter create/update is a PHI event
+    await ctx.runMutation(internal.auditLogs.log, {
+      orgId: args.orgId,
+      userId: args.providerId,
+      action: args.encounterId ? 'update' : 'create',
+      resourceType: 'encounter',
+      resourceId: encounterId,
+      metadata: JSON.stringify({ recordingId, factCount: args.facts.length }),
+    });
 
     return { encounterId, recordingId }; // Return both IDs for tracking
   },
@@ -572,6 +582,16 @@ export const saveGeneratedDocuments = mutation({
       generatedDocuments: newDocs,
       lastGeneratedAt: timestamp,
       updatedAt: timestamp,
+    });
+
+    // Audit log: document generation is a PHI access event
+    await ctx.runMutation(internal.auditLogs.log, {
+      orgId: encounter.orgId,
+      userId: encounter.providerId,
+      action: 'generate',
+      resourceType: 'document',
+      resourceId: args.encounterId,
+      metadata: JSON.stringify({ docTypes: Object.keys(newDocs).filter(k => !!newDocs[k]) }),
     });
 
     return { success: true };

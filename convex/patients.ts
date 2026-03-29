@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { requirePatientAccess } from "./permissions";
 import type { Id } from "./_generated/dataModel";
 
@@ -58,7 +59,7 @@ export const createPatient = mutation({
       throw new Error("Unable to create or find provider record");
     }
 
-    return await ctx.db.insert("patients", {
+    const patientId = await ctx.db.insert("patients", {
       name: args.name,
       mrn: args.mrn,
       dateOfBirth: args.dateOfBirth,
@@ -76,6 +77,16 @@ export const createPatient = mutation({
       updatedAt: timestamp,
       medicalHistory: [],
     });
+
+    await ctx.runMutation(internal.auditLogs.log, {
+      orgId: args.orgId,
+      userId: args.providerId,
+      action: 'create',
+      resourceType: 'patient',
+      resourceId: patientId,
+    });
+
+    return patientId;
   },
 });
 
