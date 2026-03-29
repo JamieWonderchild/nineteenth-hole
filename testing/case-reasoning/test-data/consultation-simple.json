@@ -1,0 +1,106 @@
+{
+  "_id": "test_consultation_simple",
+  "_creationTime": 1710777600000,
+  "patientId": "test_patient_max",
+  "providerId": "test_vet_001",
+  "orgId": "test_org_001",
+  "status": "finalized",
+  "createdAt": "2026-03-18T10:00:00.000Z",
+  "updatedAt": "2026-03-18T10:15:00.000Z",
+  "lastGeneratedAt": "2026-03-18T10:15:00.000Z",
+  "facts": [
+    {
+      "id": "fact_001",
+      "text": "Max is a 3-year-old male Labrador Retriever weighing 28 kg",
+      "group": "signalment"
+    },
+    {
+      "id": "fact_002",
+      "text": "Chief complaint: Acute vomiting since yesterday evening",
+      "group": "chief-complaint"
+    },
+    {
+      "id": "fact_003",
+      "text": "Vomited 5 times in the last 24 hours, partially digested food",
+      "group": "history"
+    },
+    {
+      "id": "fact_004",
+      "text": "Decreased appetite, not eating breakfast this morning",
+      "group": "history"
+    },
+    {
+      "id": "fact_005",
+      "text": "No known toxin exposure, no recent diet changes",
+      "group": "history"
+    },
+    {
+      "id": "fact_006",
+      "text": "Temperature: 38.9°C (102°F), Heart Rate: 110 bpm, Respiratory Rate: 24/min",
+      "group": "vitals"
+    },
+    {
+      "id": "fact_007",
+      "text": "Physical exam: Mild abdominal discomfort on palpation, otherwise normal",
+      "group": "physical-exam"
+    }
+  ],
+  "recordings": [
+    {
+      "_id": "test_recording_001",
+      "consultationId": "test_consultation_simple",
+      "interactionId": "corti_interaction_001",
+      "status": "finalized",
+      "phase": "initial",
+      "duration": 180,
+      "createdAt": "2026-03-18T10:00:00.000Z",
+      "facts": [
+        {
+          "id": "fact_001",
+          "text": "Max is a 3-year-old male Labrador Retriever weighing 28 kg",
+          "group": "signalment"
+        },
+        {
+          "id": "fact_002",
+          "text": "Chief complaint: Acute vomiting since yesterday evening",
+          "group": "chief-complaint"
+        },
+        {
+          "id": "fact_003",
+          "text": "Vomited 5 times in the last 24 hours, partially digested food",
+          "group": "history"
+        },
+        {
+          "id": "fact_004",
+          "text": "Decreased appetite, not eating breakfast this morning",
+          "group": "history"
+        },
+        {
+          "id": "fact_005",
+          "text": "No known toxin exposure, no recent diet changes",
+          "group": "history"
+        },
+        {
+          "id": "fact_006",
+          "text": "Temperature: 38.9°C (102°F), Heart Rate: 110 bpm, Respiratory Rate: 24/min",
+          "group": "vitals"
+        },
+        {
+          "id": "fact_007",
+          "text": "Physical exam: Mild abdominal discomfort on palpation, otherwise normal",
+          "group": "physical-exam"
+        }
+      ]
+    }
+  ],
+  "vetNotes": {
+    "diagnosis": "Acute gastroenteritis, likely dietary indiscretion",
+    "treatmentPlan": "Supportive care: NPO for 12 hours, then bland diet. Maropitant 1mg/kg SC for antiemetic. Monitor for 24h, recheck if vomiting continues."
+  },
+  "generatedDocuments": {
+    "soapNote": {
+      "content": "S: 3yo MN Labrador presented for acute vomiting...",
+      "generatedAt": "2026-03-18T10:15:00.000Z"
+    }
+  }
+}

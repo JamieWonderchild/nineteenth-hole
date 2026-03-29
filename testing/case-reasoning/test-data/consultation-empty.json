@@ -1,0 +1,14 @@
+{
+  "_id": "test_consultation_empty",
+  "_creationTime": 1710777600000,
+  "patientId": "test_patient_unknown",
+  "providerId": "test_vet_001",
+  "orgId": "test_org_001",
+  "status": "draft",
+  "createdAt": "2026-03-18T11:00:00.000Z",
+  "updatedAt": "2026-03-18T11:00:00.000Z",
+  "facts": [],
+  "recordings": [],
+  "vetNotes": null,
+  "generatedDocuments": null
+}

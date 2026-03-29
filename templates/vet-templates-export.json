@@ -1,0 +1,219 @@
+{
+  "templates": [
+    {
+      "key": "vet-sick-visit",
+      "name": "Sick Visit",
+      "description": "Illness presentations, acute symptoms, diagnostic workups",
+      "sections": [
+        {
+          "key": "vet-signalment",
+          "name": "Patient Information",
+          "prompt": "Extract patient signalment: species, breed, age, sex (intact/neutered), weight, and name. Format as a concise one-line summary. Example: \"Max, 7-year-old male neutered Labrador Retriever, 32kg\""
+        },
+        {
+          "key": "vet-chief-complaint",
+          "name": "Presenting Complaint",
+          "prompt": "Summarize the primary reason for the visit in 1-2 sentences from the pet owner's perspective. Include duration of symptoms. Use objective language. Example: \"Owner reports 3-day history of vomiting and decreased appetite.\""
+        },
+        {
+          "key": "vet-history",
+          "name": "History",
+          "prompt": "Document relevant history as bullet points. Include:\n- Onset and progression of current symptoms\n- Associated clinical signs\n- Changes in appetite, water intake, urination, defecation\n- Previous similar episodes\n- Current medications and supplements\n- Vaccination status\n- Relevant travel or exposure history"
+        },
+        {
+          "key": "vet-physical-exam",
+          "name": "Physical Examination",
+          "prompt": "Document physical examination findings using standard veterinary terminology. Include:\n- General appearance and mentation\n- Vital signs: temperature, heart rate, respiratory rate\n- Body condition score (1-9)\n- Hydration status\n- Abnormalities by body system\n\nFormat as a structured list. Note normal findings as \"WNL\" (within normal limits) where appropriate."
+        },
+        {
+          "key": "vet-diagnostics",
+          "name": "Diagnostics",
+          "prompt": "List diagnostic tests performed or recommended. Format each as:\n- Test name\n- Result (if available)\n- Interpretation\n\nIf no diagnostics were performed, state \"No diagnostics performed at this visit\" or list recommended tests with rationale."
+        },
+        {
+          "key": "vet-assessment",
+          "name": "Assessment",
+          "prompt": "Provide clinical assessment including:\n1. Most likely diagnosis or top differential diagnoses ranked by probability\n2. Brief reasoning based on history and examination findings\n3. Rule-outs to consider\n\nUse standard veterinary diagnostic terminology."
+        },
+        {
+          "key": "vet-plan",
+          "name": "Treatment Plan",
+          "prompt": "Document the treatment plan. Include:\n- Medications: drug name, dose (mg/kg), route, frequency, duration\n- Procedures performed\n- Dietary recommendations\n- Activity restrictions\n- Monitoring instructions\n- Hospitalization if applicable\n\nFormat medications as: \"Drug 10mg/kg PO BID x 7 days\""
+        },
+        {
+          "key": "vet-client-instructions",
+          "name": "Discharge Instructions",
+          "prompt": "Write clear discharge instructions for the pet owner in plain language. Include:\n- How to give medications\n- What to feed and when\n- Activity level (rest, leash walks only, etc.)\n- Warning signs that need immediate veterinary attention\n- When to return for recheck\n\nAvoid medical jargon. Be specific and actionable."
+        }
+      ]
+    },
+    {
+      "key": "vet-wellness-exam",
+      "name": "Wellness Exam",
+      "description": "Routine wellness checks, annual exams, preventive care",
+      "sections": [
+        {
+          "key": "vet-wellness-signalment",
+          "name": "Patient Information",
+          "prompt": "Extract patient signalment: species, breed, age, sex (intact/neutered), weight, and name. Note weight change from previous visit if mentioned. Format as one-line summary."
+        },
+        {
+          "key": "vet-wellness-history",
+          "name": "Wellness History",
+          "prompt": "Document preventive care and lifestyle history. Include:\n- Current diet (brand, amount, frequency)\n- Exercise and activity level\n- Dental care at home\n- Indoor/outdoor status\n- Other pets in household\n- Any owner concerns or questions\n\nFormat as bullet points."
+        },
+        {
+          "key": "vet-wellness-exam",
+          "name": "Physical Examination",
+          "prompt": "Document complete nose-to-tail physical examination. Include findings for:\n- Eyes, ears, nose\n- Oral cavity and dental grade (0-4)\n- Lymph nodes\n- Heart and lungs (auscultation)\n- Abdominal palpation\n- Musculoskeletal\n- Skin and coat\n- Body condition score (1-9)\n\nNote abnormalities clearly. Use \"WNL\" for normal findings."
+        },
+        {
+          "key": "vet-vaccinations",
+          "name": "Vaccinations",
+          "prompt": "Document vaccines for this visit:\n- Vaccines administered today (name, manufacturer if mentioned, site)\n- Vaccines due but declined (with reason)\n- Vaccines due at next visit\n\nFor dogs: DHPP, Rabies, Bordetella, Leptospirosis, Lyme, Canine Influenza\nFor cats: FVRCP, Rabies, FeLV"
+        },
+        {
+          "key": "vet-preventives",
+          "name": "Parasite Prevention",
+          "prompt": "Document parasite prevention status:\n- Heartworm test: date and result\n- Heartworm prevention: product and compliance\n- Flea/tick prevention: product and compliance\n- Intestinal parasite control\n- Fecal test: date and result if mentioned\n\nNote any gaps in prevention or compliance concerns."
+        },
+        {
+          "key": "vet-wellness-recommendations",
+          "name": "Recommendations",
+          "prompt": "Summarize wellness recommendations discussed:\n- Dental care needs (dental grade, cleaning recommended?)\n- Weight management if applicable\n- Age-appropriate screening tests (senior bloodwork, etc.)\n- Spay/neuter recommendation if intact\n- Next wellness visit timing\n\nBe specific and actionable."
+        }
+      ]
+    },
+    {
+      "key": "vet-surgery",
+      "name": "Surgery",
+      "description": "Pre-operative, post-operative, surgical procedures",
+      "sections": [
+        {
+          "key": "vet-surgery-signalment",
+          "name": "Patient Information",
+          "prompt": "Extract patient signalment: species, breed, age, sex, weight, name. Include ASA classification if mentioned (I-V). Note any pre-existing conditions relevant to anesthesia."
+        },
+        {
+          "key": "vet-surgical-indication",
+          "name": "Surgical Indication",
+          "prompt": "Document the reason for surgery:\n- Pre-operative diagnosis\n- Clinical findings supporting surgical decision\n- Diagnostic results (radiographs, ultrasound, bloodwork)\n- Urgency (elective, urgent, emergency)"
+        },
+        {
+          "key": "vet-preop-exam",
+          "name": "Pre-operative Assessment",
+          "prompt": "Document pre-anesthetic evaluation:\n- Physical examination findings\n- Pre-operative bloodwork results (PCV, TP, chemistry, etc.)\n- NPO status confirmed\n- ASA classification (I-V)\n- Anesthetic risk factors identified\n- Owner consent obtained"
+        },
+        {
+          "key": "vet-anesthesia",
+          "name": "Anesthesia Record",
+          "prompt": "Document anesthetic protocol:\n- Premedication: drugs, doses, route, time\n- Induction: drugs, doses, route, time\n- Maintenance: agent and percentage\n- IV fluids: type and rate\n- Monitoring: HR, RR, SpO2, BP, temperature\n- Any complications or interventions\n\nFormat drugs as: \"Drug 0.1mg/kg IV\""
+        },
+        {
+          "key": "vet-procedure",
+          "name": "Surgical Procedure",
+          "prompt": "Document the surgical procedure:\n- Procedure name\n- Surgical approach\n- Intraoperative findings\n- Technique description\n- Materials used (suture type and size, implants)\n- Estimated blood loss\n- Complications if any\n- Surgery duration\n\nUse standard surgical terminology."
+        },
+        {
+          "key": "vet-recovery",
+          "name": "Recovery",
+          "prompt": "Document anesthetic recovery:\n- Extubation time\n- Recovery quality (smooth, rough, dysphoric)\n- Time to sternal recumbency\n- Time to standing\n- Post-op vital signs\n- Pain assessment score\n- Immediate post-op medications given"
+        },
+        {
+          "key": "vet-postop-instructions",
+          "name": "Post-operative Instructions",
+          "prompt": "Write discharge instructions for surgical patient in plain language:\n- Incision care (keep dry, monitor for swelling/discharge)\n- E-collar use (duration)\n- Activity restriction (duration and specifics)\n- Medication schedule\n- Feeding instructions (when to resume, any changes)\n- Signs of complications requiring immediate attention\n- Suture removal or recheck date\n\nBe specific with timeframes."
+        }
+      ]
+    },
+    {
+      "key": "vet-recheck",
+      "name": "Recheck",
+      "description": "Follow-up visits, progress evaluations, chronic disease monitoring",
+      "sections": [
+        {
+          "key": "vet-recheck-signalment",
+          "name": "Patient Information",
+          "prompt": "Extract patient signalment with current weight. Calculate and note weight change from previous visit if mentioned (gained/lost X kg)."
+        },
+        {
+          "key": "vet-recheck-reason",
+          "name": "Reason for Recheck",
+          "prompt": "Document the recheck context:\n- Original diagnosis or procedure\n- Date of initial visit or procedure\n- Treatments prescribed at last visit\n- Expected recheck interval"
+        },
+        {
+          "key": "vet-progress",
+          "name": "Progress Update",
+          "prompt": "Document owner's report since last visit:\n- Symptom improvement, worsening, or no change\n- Medication compliance (missed doses?)\n- Appetite and energy level\n- Any new concerns or symptoms\n- Side effects from medications if any"
+        },
+        {
+          "key": "vet-recheck-exam",
+          "name": "Examination Findings",
+          "prompt": "Document focused physical examination relevant to the condition being monitored. Compare findings to previous visit where applicable. Note improvement, no change, or worsening of specific findings."
+        },
+        {
+          "key": "vet-recheck-assessment",
+          "name": "Assessment",
+          "prompt": "Evaluate treatment response:\n- Improving / Stable / Worsening\n- Diagnosis confirmed or revised\n- Any new findings requiring attention\n- Overall prognosis update"
+        },
+        {
+          "key": "vet-recheck-plan",
+          "name": "Updated Plan",
+          "prompt": "Document plan going forward:\n- Medications: continue / discontinue / modify (specify changes)\n- Additional diagnostics if needed\n- Next recheck timing\n- Criteria for resolution\n- When to escalate or return sooner"
+        }
+      ]
+    },
+    {
+      "key": "vet-emergency",
+      "name": "Emergency",
+      "description": "Urgent/critical cases, trauma, acute distress",
+      "sections": [
+        {
+          "key": "vet-emergency-signalment",
+          "name": "Patient Information",
+          "prompt": "Extract patient signalment: species, breed, age, sex, weight, name. Flag any known pre-existing conditions relevant to emergency treatment (heart disease, epilepsy, etc.)."
+        },
+        {
+          "key": "vet-triage",
+          "name": "Triage Assessment",
+          "prompt": "Document initial triage:\n- Presenting emergency complaint\n- Vital signs on arrival (T, HR, RR, BP if obtained)\n- Triage category: Critical (red) / Urgent (orange) / Stable (green)\n- Immediate interventions performed (oxygen, IV catheter, etc.)\n- Time of arrival"
+        },
+        {
+          "key": "vet-emergency-history",
+          "name": "Emergency History",
+          "prompt": "Document concise emergency history - focus on critical information:\n- Time of symptom onset\n- Circumstances or possible cause (toxin, trauma, collapse)\n- Progression since onset\n- Any home treatment attempted\n- Last known normal\n- Relevant medical history"
+        },
+        {
+          "key": "vet-emergency-exam",
+          "name": "Emergency Examination",
+          "prompt": "Document rapid emergency assessment:\n- Mentation (BAR, QAR, obtunded, stuporous, comatose)\n- Airway: patent/obstructed\n- Breathing: rate, effort, lung sounds\n- Circulation: HR, pulse quality, CRT, mucous membrane color\n- Major trauma or abnormalities\n- Pain assessment"
+        },
+        {
+          "key": "vet-stabilization",
+          "name": "Stabilization",
+          "prompt": "Document emergency interventions in chronological order:\n- IV access (catheter size, location)\n- Fluid resuscitation (type, bolus amounts, rate)\n- Oxygen support (method, flow rate)\n- Emergency medications (drug, dose, route, time)\n- Procedures (thoracocentesis, abdominocentesis, etc.)"
+        },
+        {
+          "key": "vet-emergency-diagnostics",
+          "name": "Emergency Diagnostics",
+          "prompt": "Document point-of-care and emergency diagnostics:\n- PCV/TS, blood glucose, BUN (Azostick), lactate\n- Blood gas if performed\n- Radiographs: findings\n- FAST ultrasound: findings\n- Other tests\n\nInclude critical values and interpretation."
+        },
+        {
+          "key": "vet-emergency-assessment",
+          "name": "Assessment & Prognosis",
+          "prompt": "Document emergency assessment:\n- Working diagnosis\n- Differential diagnoses for this presentation\n- Prognosis: Good / Fair / Guarded / Poor / Grave\n- Communication with owner: condition, prognosis, costs discussed"
+        },
+        {
+          "key": "vet-emergency-plan",
+          "name": "Emergency Plan",
+          "prompt": "Document emergency plan:\n- Hospitalization: yes/no, level of care needed\n- Continued monitoring parameters\n- Treatment orders\n- Surgery required: yes/no, urgency\n- Referral consideration\n- Estimate provided to owner: amount, approved/declined"
+        }
+      ]
+    }
+  ],
+  "agent": {
+    "key": "vet-template-selector",
+    "name": "Veterinary Template Selector",
+    "prompt": "You are a veterinary documentation assistant. Your task is to analyze encounter transcripts and extracted facts to select the most appropriate documentation template.\n\n## Available Templates\n\n1. **vet-wellness-exam** - Routine wellness checks, annual exams, preventive care\n2. **vet-sick-visit** - Illness presentations, acute symptoms, diagnostic workups\n3. **vet-emergency** - Urgent/critical cases, trauma, acute distress\n4. **vet-surgery** - Pre-operative, post-operative, surgical procedures\n5. **vet-recheck** - Follow-up visits, progress evaluations, chronic disease monitoring\n\n## Selection Criteria\n\nAnalyze the facts and transcript for:\n\n- **Chief complaint / reason for visit** - Primary indicator of template type\n- **Procedures mentioned** - Surgery, dental work, vaccinations\n- **Symptom patterns** - Acute vs chronic, single system vs multi-system\n- **Visit context** - New problem, follow-up, routine, emergency\n- **Tone/urgency** - Routine vs urgent language\n\n## Output Format\n\nReturn JSON:\n```json\n{\n  \"selectedTemplate\": \"template-key\",\n  \"confidence\": \"high|medium|low\",\n  \"reasoning\": \"Brief explanation of why this template fits\",\n  \"alternativeTemplate\": \"optional-second-choice\"\n}\n```\n\n## Examples\n\n**Input facts:** \"Routine annual exam\", \"Vaccines due\", \"Weight stable\", \"No concerns from owner\"\n**Output:** {\"selectedTemplate\": \"vet-wellness-exam\", \"confidence\": \"high\", \"reasoning\": \"Annual exam with vaccinations, no illness indicators\"}\n\n**Input facts:** \"Vomiting for 2 days\", \"Not eating\", \"Lethargic\", \"Dehydrated\"\n**Output:** {\"selectedTemplate\": \"vet-sick-visit\", \"confidence\": \"high\", \"reasoning\": \"Acute GI symptoms requiring diagnostic workup\"}\n\n**Input facts:** \"Post-spay recheck\", \"Incision healing well\", \"Sutures intact\"\n**Output:** {\"selectedTemplate\": \"vet-recheck\", \"confidence\": \"high\", \"reasoning\": \"Follow-up visit for surgical recovery monitoring\"}"
+  }
+}

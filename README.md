@@ -1,21 +1,43 @@
-# health-platform
+# [PRODUCT_NAME] Assistant
 
-> Ambient AI clinical workflow platform for emergency medicine and hospitalist physicians.
-> Name TBD — placeholder repo.
+AI-powered veterinary encounter assistant. Streamlines the encounter workflow with voice recording, AI-extracted clinical facts, and automated document generation.
 
-## Vision
+**Live:** [vetrinair.com](https://vetrinair.com)
 
-The full visit lifecycle in one tool: ambient recording → SOAP note → shift handoff → patient companion → billing codes → Epic push. Every competitor stops at the note. We don't.
+---
+
+## What it does
+
+- **Record encounters** — stream audio to Corti AI, get structured clinical facts in real-time
+- **Generate documents** — SOAP notes, discharge instructions, prescriptions, referrals, and more
+- **Owner Companion** — shareable AI chat for pet owners after each visit
+- **Case Reasoning** — AI-assisted differential diagnosis and drug interaction checking
+- **Billing** — auto-extract billable items from recordings, catch missed charges, generate invoices
+
+---
 
 ## Stack
 
-- Next.js 15 + React 19
-- Convex (database + realtime)
-- Clerk (auth + organizations)
-- Corti (AI / ambient documentation)
-- Stripe (billing)
-- Vercel (hosting)
+Next.js 15 · React 19 · TypeScript · Tailwind CSS · Convex · Clerk · Corti AI · Stripe · Vercel
 
-## Plan
+---
 
-See [PLAN.md](./PLAN.md) for the full phased implementation plan.
+## Docs
+
+See [`docs/`](docs/README.md) for full documentation:
+
+- [Architecture Overview](docs/architecture/overview.md)
+- [Database Schema](docs/architecture/database-schema.md)
+- [Corti Integration](docs/integrations/corti.md)
+- [Getting Started](docs/guides/getting-started.md)
+- [Deployment](docs/guides/deployment.md)
+
+---
+
+## Quick Start
+
+```bash
+npm install
+cp .env.example .env.local  # fill in dev credentials
+npm run dev                  # → localhost:3000
+```
