@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from 'convex/_generated/api';
@@ -19,6 +19,7 @@ import {
   Check,
   Download,
   Hospital,
+  Copy,
 } from 'lucide-react';
 import { AppLink } from '@/components/navigation/AppLink';
 import { toast } from '@/hooks/use-toast';
@@ -64,6 +65,7 @@ export default function DocumentsPage() {
   );
 
   const saveDocsMutation = useMutation(api.encounters.saveGeneratedDocuments);
+  const setEpicIdsMutation = useMutation(api.encounters.setEpicIds);
 
   // Map of dbKey → doc data for generated docs
   const generatedDocs = useMemo(() => {
@@ -124,6 +126,8 @@ export default function DocumentsPage() {
   const [isGeneratingMultiple, setIsGeneratingMultiple] = useState(false);
   const [isPushingToEpic, setIsPushingToEpic] = useState(false);
   const [epicPushedKeys, setEpicPushedKeys] = useState<Set<string>>(new Set());
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const fhirWindowRef = useRef<Window | null>(null);
 
   // Auto-select: prefer selectedKey if it's a valid dbKey, otherwise first generated doc
   const activeKey = selectedKey && ALL_DOC_TYPES.some(d => d.dbKey === selectedKey)
@@ -328,12 +332,9 @@ export default function DocumentsPage() {
   const handlePushToEpic = useCallback(async (docKey: string, sections: { key: string; title: string; content: string }[], label: string) => {
     const epicPatientId = encounter?.epicPatientId as string | undefined;
     if (!epicPatientId) {
-      // Redirect to SMART launch so the provider connects their Epic session
-      window.open('/fhir-launch', '_blank', 'width=700,height=600');
-      toast({
-        title: 'Connect to Epic first',
-        description: 'A window has opened to link your Epic account.',
-      });
+      const popup = window.open('/fhir-launch', '_blank', 'width=700,height=600');
+      if (popup) fhirWindowRef.current = popup;
+      toast({ title: 'Connect to Epic first', description: 'A window has opened to link your Epic account.' });
       return;
     }
 
@@ -354,7 +355,8 @@ export default function DocumentsPage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Unknown error' }));
         if (res.status === 401) {
-          window.open('/fhir-launch', '_blank', 'width=700,height=600');
+          const popup = window.open('/fhir-launch', '_blank', 'width=700,height=600');
+          if (popup) fhirWindowRef.current = popup;
           throw new Error('Session expired — reconnect to Epic via the opened window.');
         }
         throw new Error(err.error || `Push failed (${res.status})`);
@@ -371,7 +373,41 @@ export default function DocumentsPage() {
     } finally {
       setIsPushingToEpic(false);
     }
-  }, [encounter, encounterId]);
+  }, [encounter]);
+
+  // Listen for postMessage from the Epic OAuth popup
+  useEffect(() => {
+    const handler = async (event: MessageEvent) => {
+      if (event.data?.type !== 'fhir-connected') return;
+      const { patientId, encounterId: epicEncounterId } = event.data as { patientId?: string; encounterId?: string };
+      if (!patientId) return;
+      try {
+        await setEpicIdsMutation({
+          encounterId: encounterId as Id<'encounters'>,
+          epicPatientId: patientId,
+          ...(epicEncounterId ? { epicEncounterId } : {}),
+        });
+        toast({ title: 'Epic connected', description: 'Patient context saved. You can now push documents.' });
+      } catch (err) {
+        console.error('[fhir-connected] Failed to save Epic IDs:', err);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [encounterId, setEpicIdsMutation]);
+
+  // Copy document content to clipboard
+  const handleCopy = useCallback(async (docKey: string, sections: { key: string; title: string; content: string }[], label: string) => {
+    const text = sections.map((s) => `${s.title}\n${'─'.repeat(s.title.length)}\n${s.content}`).join('\n\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(docKey);
+      toast({ title: `${label} copied to clipboard` });
+      setTimeout(() => setCopiedKey(null), 2000);
+    } catch {
+      toast({ title: 'Copy failed', description: 'Could not access clipboard', variant: 'destructive' });
+    }
+  }, []);
 
   if (encounter === undefined || detail === undefined) {
     return (
@@ -554,6 +590,19 @@ export default function DocumentsPage() {
                         >
                           <Download className="h-3.5 w-3.5" />
                           Export
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className={`gap-1.5 text-xs ${copiedKey === activeKey ? 'text-green-600' : 'text-muted-foreground'}`}
+                          onClick={() => activeDoc && activeDocType && handleCopy(activeKey!, activeDoc.sections, activeDocType.label)}
+                        >
+                          {copiedKey === activeKey ? (
+                            <Check className="h-3.5 w-3.5" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                          {copiedKey === activeKey ? 'Copied' : 'Copy'}
                         </Button>
                         <Button
                           size="sm"

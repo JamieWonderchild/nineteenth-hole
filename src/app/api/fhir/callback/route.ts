@@ -68,6 +68,9 @@ export async function GET(request: NextRequest) {
     if (tokenSet.patient) {
       redirectUrl.searchParams.set('patient', tokenSet.patient);
     }
+    if (tokenSet.encounter) {
+      redirectUrl.searchParams.set('encounter', tokenSet.encounter);
+    }
 
     const response = NextResponse.redirect(redirectUrl);
 

@@ -11,6 +11,7 @@ export default function FhirLaunchPage() {
   const connected = searchParams.get('connected') === '1';
   const error = searchParams.get('error');
   const patientId = searchParams.get('patient');
+  const encounterId = searchParams.get('encounter');
   const [isConnecting, setIsConnecting] = useState(false);
 
   // If this page is opened as an EHR-embedded SMART launch,
@@ -21,7 +22,7 @@ export default function FhirLaunchPage() {
     if (connected) {
       // Auto-close this tab if it was opened as a popup
       if (window.opener) {
-        window.opener.postMessage({ type: 'fhir-connected', patientId }, '*');
+        window.opener.postMessage({ type: 'fhir-connected', patientId, encounterId }, '*');
         window.close();
       }
     }

@@ -1642,6 +1642,23 @@ export const migrateDiagnosisResults = mutation({
   },
 });
 
+// Persist Epic FHIR IDs after SMART launch
+export const setEpicIds = mutation({
+  args: {
+    encounterId: v.id("encounters"),
+    epicPatientId: v.optional(v.string()),
+    epicEncounterId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const encounter = await ctx.db.get(args.encounterId);
+    if (!encounter) throw new Error("Encounter not found");
+    const patch: Record<string, string | undefined> = { updatedAt: new Date().toISOString() };
+    if (args.epicPatientId !== undefined) patch.epicPatientId = args.epicPatientId;
+    if (args.epicEncounterId !== undefined) patch.epicEncounterId = args.epicEncounterId;
+    await ctx.db.patch(args.encounterId, patch);
+  },
+});
+
 // One-time migration: finalized → published
 export const migrateFinalized = mutation({
   handler: async (ctx) => {
