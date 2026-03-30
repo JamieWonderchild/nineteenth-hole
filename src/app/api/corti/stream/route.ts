@@ -70,7 +70,7 @@ export async function POST() {
           encounter: {
             identifier: `provider-encounter-${Date.now()}`,
             status: 'in-progress',
-            type: 'encounter',
+            type: 'consultation',
             period: { startedAt: new Date().toISOString() },
           },
         }),
