@@ -269,10 +269,43 @@ export class CortiClient {
 
   // Medical Coding
   async predictCodes(text: string): Promise<MedicalCode[]> {
-    return this.request<MedicalCode[]>('/codes/predict-codes', {
+    await this.authenticate();
+
+    const response = await fetch(`${this.getApiBaseUrl()}/v2/tools/coding/`, {
       method: 'POST',
-      body: JSON.stringify({ text }),
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        'Content-Type': 'application/json',
+        'Tenant-Name': this.config.tenant,
+      },
+      body: JSON.stringify({
+        system: ['icd10cm-outpatient', 'cpt'],
+        context: [{ type: 'text', text }],
+      }),
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`predictCodes failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json() as {
+      codes: Array<{ system: string; code: string; display: string; evidences?: unknown[] }>;
+    };
+
+    const systemMap: Record<string, MedicalCode['system']> = {
+      'icd10cm-outpatient': 'ICD-10-CM',
+      'icd10cm-inpatient': 'ICD-10-CM',
+      'icd10pcs': 'ICD-10-PCS',
+      'cpt': 'CPT',
+    };
+
+    return (data.codes || []).map((c) => ({
+      code: c.code,
+      system: systemMap[c.system] ?? (c.system as MedicalCode['system']),
+      description: c.display,
+      confidence: c.evidences?.length ? Math.min(1, c.evidences.length * 0.25) : 0.5,
+    }));
   }
 
   // Templates
