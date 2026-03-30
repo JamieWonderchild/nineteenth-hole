@@ -258,18 +258,7 @@ export const listAllUsers = action({
         const userMemberships = memberships.filter((m: any) => m.userId === userId);
         const provider = vetsByUserId.get(userId) as any;
 
-        // If we have provider record, use it
-        if (provider?.name && provider?.email) {
-          return {
-            userId,
-            name: provider.name,
-            email: provider.email,
-            orgCount: userMemberships.length,
-            source: "vet_record" as const,
-          };
-        }
-
-        // Otherwise, try to fetch from Clerk
+        // Always try Clerk first — provider record may have stale placeholder data
         if (clerkSecretKey) {
           try {
             const response = await fetch(
@@ -317,7 +306,18 @@ export const listAllUsers = action({
           }
         }
 
-        // Fallback to unknown
+        // Fall back to provider record if Clerk unavailable
+        if (provider?.name && provider?.email) {
+          return {
+            userId,
+            name: provider.name,
+            email: provider.email,
+            orgCount: userMemberships.length,
+            source: "vet_record" as const,
+          };
+        }
+
+        // Last resort
         return {
           userId,
           name: "Unknown User",
