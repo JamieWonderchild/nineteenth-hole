@@ -8,11 +8,13 @@ import type { Id } from 'convex/_generated/dataModel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { DollarSign, Trash2, AlertCircle, CheckCircle2, RotateCcw, Loader2 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { DollarSign, Trash2, AlertCircle, CheckCircle2, RotateCcw, Loader2, Plus, X } from 'lucide-react'
 import { useBillingMatcher, type BillingCatalogItem } from '@/hooks/useBillingMatcher'
 import { useUser } from '@clerk/nextjs'
 import { AppLink } from '@/components/navigation/AppLink'
 import { scoreEM, type EncounterType } from '@/lib/emScoring'
+import { generateCode } from '@/components/billing/ManualServiceForm'
 
 interface SimpleFact {
   id: string
@@ -61,6 +63,12 @@ export function PlannedServicesWidget({
   const { user } = useUser()
   const [processedFacts, setProcessedFacts] = useState<Set<string>>(new Set())
   const [voidConfirming, setVoidConfirming] = useState(false)
+  const [showAddService, setShowAddService] = useState(false)
+  const [addName, setAddName] = useState('')
+  const [addPrice, setAddPrice] = useState('')
+  const [addSubmitting, setAddSubmitting] = useState(false)
+
+  const createCatalogItem = useMutation(api.billingCatalog.createFromBilling)
 
   // Queries
   const catalog = useQuery(
@@ -217,6 +225,44 @@ export function PlannedServicesWidget({
       onItemsChange?.()
     } catch (error) {
       console.error('Failed to delete billing item:', error)
+    }
+  }
+
+  const handleAddService = async () => {
+    if (!user?.id || !orgId || !addName.trim()) return
+    const priceNum = parseFloat(addPrice)
+    if (isNaN(priceNum) || priceNum < 0) return
+    setAddSubmitting(true)
+    try {
+      const catalogItemId = await createCatalogItem({
+        userId: user.id,
+        orgId,
+        name: addName.trim(),
+        code: generateCode(addName),
+        category: 'other',
+        basePrice: Math.round(priceNum * 100),
+        taxable: false,
+      })
+      await createProspective({
+        userId: user.id,
+        encounterId,
+        orgId,
+        catalogItemId: catalogItemId as Id<'billingCatalog'>,
+        description: addName.trim(),
+        quantity: 1,
+        unitPrice: Math.round(priceNum * 100),
+        taxable: false,
+        extractedFromFact: `manual-${Date.now()}`,
+        confidence: 'high',
+      })
+      setAddName('')
+      setAddPrice('')
+      setShowAddService(false)
+      onItemsChange?.()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setAddSubmitting(false)
     }
   }
 
@@ -392,6 +438,60 @@ export function PlannedServicesWidget({
             />
           ))}
         </div>
+
+        {/* Add Service inline */}
+        {!isFinalized && (
+          <div className="mt-3 pt-3 border-t">
+            {showAddService ? (
+              <div className="space-y-2">
+                <Input
+                  autoFocus
+                  placeholder="Service name"
+                  value={addName}
+                  onChange={e => setAddName(e.target.value)}
+                  className="h-8 text-sm"
+                  onKeyDown={e => { if (e.key === 'Escape') setShowAddService(false) }}
+                />
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Price ($)"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={addPrice}
+                    onChange={e => setAddPrice(e.target.value)}
+                    className="h-8 text-sm"
+                    onKeyDown={e => { if (e.key === 'Enter') handleAddService() }}
+                  />
+                  <Button
+                    size="sm"
+                    className="h-8 px-3 flex-shrink-0"
+                    disabled={addSubmitting || !addName.trim() || !addPrice}
+                    onClick={handleAddService}
+                  >
+                    {addSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Add'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 flex-shrink-0"
+                    onClick={() => { setShowAddService(false); setAddName(''); setAddPrice('') }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAddService(true)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add service
+              </button>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   )

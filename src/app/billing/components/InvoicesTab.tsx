@@ -37,6 +37,11 @@ export function InvoicesTab({ orgContext }: InvoicesTabProps) {
     orgContext ? { orgId: orgContext.orgId as Id<"organizations"> } : "skip"
   );
 
+  const invoiceRecords = useQuery(
+    api.invoices.getByOrg,
+    orgContext ? { orgId: orgContext.orgId as Id<"organizations"> } : "skip"
+  );
+
   if (!orgContext) {
     return (
       <div className="text-center py-10 text-sm text-muted-foreground">
@@ -45,7 +50,7 @@ export function InvoicesTab({ orgContext }: InvoicesTabProps) {
     );
   }
 
-  if (!encounters) {
+  if (!encounters || invoiceRecords === undefined) {
     return (
       <div className="flex justify-center py-10">
         <Clock className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -54,10 +59,12 @@ export function InvoicesTab({ orgContext }: InvoicesTabProps) {
   }
 
   const readyToInvoice = encounters.filter(c => c.publishedAt && !c.invoiceMetadata);
-  const invoiced = encounters.filter(c => c.invoiceMetadata?.status === 'finalized');
 
-  const totalInvoiced = invoiced.reduce((sum, c) => sum + (c.invoiceMetadata?.grandTotal || 0), 0);
-  const avgInvoice = invoiced.length > 0 ? totalInvoiced / invoiced.length : 0;
+  // Use dedicated invoices table for finalized records
+  const finalizedInvoices = (invoiceRecords ?? []).filter(i => i.status === 'finalized');
+  const totalInvoiced = finalizedInvoices.reduce((sum, i) => sum + i.grandTotal, 0);
+  const avgInvoice = finalizedInvoices.length > 0 ? totalInvoiced / finalizedInvoices.length : 0;
+  const encounterMap = new Map(encounters.map(e => [e._id as string, e]));
 
   return (
     <div className="space-y-8">
@@ -91,7 +98,7 @@ export function InvoicesTab({ orgContext }: InvoicesTabProps) {
               <Receipt className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{invoiced.length > 0 ? `$${(avgInvoice / 100).toFixed(0)}` : '—'}</p>
+              <p className="text-2xl font-bold">{finalizedInvoices.length > 0 ? `$${(avgInvoice / 100).toFixed(0)}` : '—'}</p>
               <p className="text-xs text-muted-foreground">Avg Invoice</p>
             </div>
           </div>
@@ -173,14 +180,14 @@ export function InvoicesTab({ orgContext }: InvoicesTabProps) {
           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
             Invoiced
           </h3>
-          {invoiced.length > 0 && (
+          {finalizedInvoices.length > 0 && (
             <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
-              {invoiced.length}
+              {finalizedInvoices.length}
             </span>
           )}
         </div>
 
-        {invoiced.length === 0 ? (
+        {finalizedInvoices.length === 0 ? (
           <EmptyState
             icon={FileText}
             title="No invoices yet"
@@ -189,35 +196,31 @@ export function InvoicesTab({ orgContext }: InvoicesTabProps) {
           />
         ) : (
           <div className="divide-y divide-border border border-border rounded-xl overflow-hidden">
-            {invoiced.map(c => {
-              const patient = c.extractedPatientInfo;
-              const meta = c.invoiceMetadata!;
+            {finalizedInvoices.map(inv => {
+              const enc = encounterMap.get(inv.encounterId as string);
+              const patientName = inv.patientName || enc?.extractedPatientInfo?.name || 'Unknown Patient';
 
               return (
-                <AppLink key={c._id} href={`/encounter/${c._id}/documents`} className="block">
+                <AppLink key={inv._id} href={`/encounter/${inv.encounterId}/documents`} className="block">
                   <div className="flex items-center gap-4 px-4 py-3 bg-card hover:bg-muted/30 transition-colors">
-                    <div className="h-9 w-9 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0 text-base">
+                    <div className="h-9 w-9 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
                       <CheckCircle className="h-4 w-4 text-green-600" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">
-                          {patient?.name || 'Unknown Patient'}
-                        </p>
-                        {meta.invoiceNumber && (
-                          <span className="text-xs text-muted-foreground font-mono flex-shrink-0">
-                            #{meta.invoiceNumber}
-                          </span>
-                        )}
+                        <p className="text-sm font-medium truncate">{patientName}</p>
+                        <span className="text-xs text-muted-foreground font-mono flex-shrink-0">
+                          #{inv.invoiceNumber}
+                        </span>
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="text-sm font-semibold text-green-700 dark:text-green-400">
-                        ${(meta.grandTotal / 100).toFixed(2)}
+                        ${(inv.grandTotal / 100).toFixed(2)}
                       </p>
-                      {meta.finalizedAt && (
+                      {inv.finalizedAt && (
                         <p className="text-xs text-muted-foreground">
-                          {formatRelativeDate(meta.finalizedAt)}
+                          {formatRelativeDate(inv.finalizedAt)}
                         </p>
                       )}
                     </div>

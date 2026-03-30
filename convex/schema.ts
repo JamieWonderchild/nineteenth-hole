@@ -852,4 +852,32 @@ export default defineSchema({
     .index("by_encounter_phase", ["encounterId", "phase"])
     .index("by_org", ["orgId"])
     .index("by_recording", ["recordingId"]),
+
+  invoices: defineTable({
+    encounterId: v.id("encounters"),
+    orgId: v.id("organizations"),
+    patientName: v.optional(v.string()),
+    invoiceNumber: v.string(),
+    invoiceDate: v.string(),
+    lineItems: v.array(v.object({
+      billingItemId: v.id("billingItems"),
+      description: v.string(),
+      quantity: v.number(),
+      unitPrice: v.number(),
+      taxable: v.boolean(),
+      total: v.number(),
+    })),
+    subtotal: v.number(),
+    taxAmount: v.number(),
+    taxRate: v.number(),
+    grandTotal: v.number(),
+    status: v.string(), // 'draft' | 'finalized' | 'voided'
+    finalizedAt: v.optional(v.string()),
+    voidedAt: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_encounter", ["encounterId"])
+    .index("by_org_status", ["orgId", "status"]),
 });

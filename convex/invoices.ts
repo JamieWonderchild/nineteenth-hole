@@ -3,6 +3,20 @@ import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 
 /**
+ * Get all invoices for an org (from the dedicated invoices table)
+ */
+export const getByOrg = query({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("invoices")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .order("desc")
+      .collect();
+  },
+});
+
+/**
  * Generate next invoice number for org
  * Format: INV-YYYYMM-####
  */
@@ -156,7 +170,31 @@ export const createDraftInvoice = mutation({
       invoiceMetadata,
     });
 
-    // 6. Return invoice data for document generation
+    // 6. Write to dedicated invoices table (upsert: delete stale draft first if exists)
+    const existingInvoice = await ctx.db
+      .query("invoices")
+      .withIndex("by_encounter", (q) => q.eq("encounterId", encounterId))
+      .first();
+    if (existingInvoice) await ctx.db.delete(existingInvoice._id);
+
+    const encounter = await ctx.db.get(encounterId);
+    await ctx.db.insert("invoices", {
+      encounterId,
+      orgId,
+      patientName: (encounter as any)?.extractedPatientInfo?.name,
+      invoiceNumber,
+      invoiceDate,
+      lineItems,
+      subtotal,
+      taxAmount,
+      taxRate,
+      grandTotal,
+      status: "draft",
+      createdAt: invoiceDate,
+      updatedAt: invoiceDate,
+    });
+
+    // 7. Return invoice data for document generation
     return {
       invoiceNumber,
       invoiceDate,
@@ -304,7 +342,7 @@ export const finalizeInvoice = mutation({
       }
     });
 
-    // 2. Update billing items: just mark as invoiced (keep phase as prospective for reconciliation)
+    // 2. Update billing items
     const lineItemIds = encounter.invoiceMetadata.lineItems.map(
       item => item.billingItemId
     );
@@ -314,10 +352,23 @@ export const finalizeInvoice = mutation({
         ctx.db.patch(itemId, {
           invoicedAt: now,
           updatedAt: now,
-          reconciliationStatus: "matched", // Mark as matched since they were planned AND billed
+          reconciliationStatus: "matched",
         })
       )
     );
+
+    // 3. Update invoices table record
+    const invoiceRecord = await ctx.db
+      .query("invoices")
+      .withIndex("by_encounter", (q) => q.eq("encounterId", encounterId))
+      .first();
+    if (invoiceRecord) {
+      await ctx.db.patch(invoiceRecord._id, {
+        status: "finalized",
+        finalizedAt: now,
+        updatedAt: now,
+      });
+    }
 
     return {
       success: true,
@@ -353,7 +404,7 @@ export const voidInvoice = mutation({
       )
     );
 
-    // Clear invoice metadata and generated invoice document
+    // Clear invoice metadata and generated invoice document from encounter
     const updatedDocs = encounter.generatedDocuments
       ? { ...encounter.generatedDocuments, invoice: undefined }
       : undefined;
@@ -362,6 +413,19 @@ export const voidInvoice = mutation({
       invoiceMetadata: undefined,
       generatedDocuments: updatedDocs,
     });
+
+    // Mark as voided in invoices table (preserve for audit trail)
+    const invoiceRecord = await ctx.db
+      .query("invoices")
+      .withIndex("by_encounter", (q) => q.eq("encounterId", args.encounterId))
+      .first();
+    if (invoiceRecord) {
+      await ctx.db.patch(invoiceRecord._id, {
+        status: "voided",
+        voidedAt: now,
+        updatedAt: now,
+      });
+    }
 
     return { success: true };
   }
