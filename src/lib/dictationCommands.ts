@@ -47,7 +47,19 @@ function applyPunctuation(text: string): string {
   for (const [pattern, replacement] of PUNCTUATION) {
     t = t.replace(pattern, replacement);
   }
-  return t.replace(/\s+([.,;:?!)])/g, '$1').replace(/\(\s+/g, '(').trim();
+  // Remove spaces before punctuation, fix spaces after open-paren
+  t = t.replace(/\s+([.,;:?!)])/g, '$1').replace(/\(\s+/g, '(');
+  // Capitalize after sentence-ending punctuation
+  t = t.replace(/([.!?]\s+)([a-z])/g, (_, p, ch) => p + ch.toUpperCase());
+  return t.trim();
+}
+
+/** Join a new text chunk onto existing pendingText without adding a space before punctuation */
+function joinText(existing: string, next: string): string {
+  if (!existing) return next;
+  if (!next) return existing;
+  // If next starts with punctuation, no space separator
+  return /^[.,;:!?)]/.test(next) ? existing + next : existing + ' ' + next;
 }
 
 function flushPending(state: DictationState): DictationState {
@@ -115,9 +127,11 @@ export function processSegment(raw: string, state: DictationState): DictationSta
       s = applyCommand(trimmed, s);
     } else {
       // Regular speech — apply punctuation and append
-      const clean = applyPunctuation(trimmed);
+      let clean = applyPunctuation(trimmed);
+      // Strip leading punctuation artifacts (e.g. ". " Corti adds after commands with automaticPunctuation)
+      if (!s.pendingText) clean = clean.replace(/^[.,;:!?\s]+/, '');
       if (clean) {
-        s = { ...s, pendingText: [s.pendingText, clean].filter(Boolean).join(' ') };
+        s = { ...s, pendingText: joinText(s.pendingText, clean) };
       }
     }
   }
