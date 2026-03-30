@@ -302,7 +302,7 @@ export default function FactsPage() {
   }, [changedFacts, dedupedFacts, recordings.length, encounterId, saveFactReconciliation]);
 
   const factGroups = useMemo(() => {
-    return dedupedFacts.reduce<Record<string, typeof facts>>((acc, f) => {
+    return dedupedFacts.reduce<Record<string, Array<{ id: string; text: string; group: string }>>>((acc, f) => {
       (acc[f.group] = acc[f.group] || []).push(f);
       return acc;
     }, {});
@@ -599,7 +599,7 @@ export default function FactsPage() {
                 {dedupedFacts.length} fact{dedupedFacts.length !== 1 ? 's' : ''} captured
               </h3>
               <div className="space-y-3">
-                {Object.entries(factGroups).map(([group, groupFacts]) => {
+                {(Object.entries(factGroups) as [string, Array<{ id: string; text: string; group: string }>][]).map(([group, groupFacts]) => {
                   const colors = getGroupColors(group);
                   return (
                     <div key={group} className={`border-l-[3px] ${colors.border} pl-3 py-1 space-y-1`}>
@@ -667,10 +667,10 @@ export default function FactsPage() {
 
               {/* Per-recording sections */}
               {recordings.map((rec, idx) => {
-                const recFacts = rec.facts || [];
+                const recFacts = (rec.facts || []) as Array<{ id: string; text: string; group: string }>;
                 if (recFacts.length === 0) return null;
 
-                const recGroups = recFacts.reduce<Record<string, typeof recFacts>>((acc, f) => {
+                const recGroups = recFacts.reduce<Record<string, Array<{ id: string; text: string; group: string }>>>((acc, f) => {
                   (acc[f.group] = acc[f.group] || []).push(f);
                   return acc;
                 }, {});
@@ -695,7 +695,7 @@ export default function FactsPage() {
                       )}
                     </div>
                     <div className="pl-7 space-y-2">
-                      {Object.entries(recGroups).map(([group, groupFacts]) => {
+                      {(Object.entries(recGroups) as [string, Array<{ id: string; text: string; group: string }>][]).map(([group, groupFacts]) => {
                         const colors = getGroupColors(group);
                         return (
                           <div key={group} className={`border-l-[3px] ${colors.border} pl-3 py-1 space-y-1`}>

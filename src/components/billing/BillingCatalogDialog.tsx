@@ -26,8 +26,11 @@ interface BillingCatalogDialogProps {
 }
 
 const CATEGORIES = [
+  { value: "em", label: "E&M (Evaluation & Management)" },
   { value: "exam", label: "Exam" },
   { value: "procedure", label: "Procedure" },
+  { value: "critical-care", label: "Critical Care" },
+  { value: "observation", label: "Observation" },
   { value: "lab", label: "Lab" },
   { value: "medication", label: "Medication" },
   { value: "supply", label: "Supply" },

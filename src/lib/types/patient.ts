@@ -7,6 +7,8 @@ export interface Patient {
   dateOfBirth?: string;
   age: string;
   sex?: string;
+  weight?: string;
+  weightUnit?: string;
   mrn?: string;
   lastVisit?: string;
   medicalHistory?: Array<{

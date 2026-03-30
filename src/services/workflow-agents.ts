@@ -680,9 +680,9 @@ function parseFollowUpFromText(text: string): FollowUpSuggestion | null {
 
   let type: FollowUpSuggestion['type'] = 'recheck';
   const lower = text.toLowerCase();
-  if (lower.includes('suture') || lower.includes('stitch')) type = 'suture-removal';
-  else if (lower.includes('lab') || lower.includes('blood') || lower.includes('test')) type = 'lab-recheck';
-  else if (lower.includes('vaccin')) type = 'vaccination';
+  if (lower.includes('lab') || lower.includes('blood') || lower.includes('test')) type = 'lab-recheck';
+  else if (lower.includes('wound') || lower.includes('suture') || lower.includes('stitch')) type = 'wound-check';
+  else if (lower.includes('imag') || lower.includes('x-ray') || lower.includes('scan')) type = 'imaging';
 
   const monitoringInstructions: string[] = [];
   const warningSignsForPatient: string[] = [];

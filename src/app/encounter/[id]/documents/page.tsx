@@ -17,6 +17,8 @@ import {
   Sparkles,
   X,
   Check,
+  Download,
+  Hospital,
 } from 'lucide-react';
 import { AppLink } from '@/components/navigation/AppLink';
 import { toast } from '@/hooks/use-toast';
@@ -68,7 +70,7 @@ export default function DocumentsPage() {
     const docs = detail?.generatedDocuments || {};
     const map = new Map<string, DocData>();
     for (const [key, val] of Object.entries(docs)) {
-      if (val && 'sections' in val) {
+      if (val && typeof val === 'object' && 'sections' in (val as object)) {
         map.set(key, val as DocData);
       }
     }
@@ -120,6 +122,8 @@ export default function DocumentsPage() {
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedForGeneration, setSelectedForGeneration] = useState<Set<string>>(new Set());
   const [isGeneratingMultiple, setIsGeneratingMultiple] = useState(false);
+  const [isPushingToEpic, setIsPushingToEpic] = useState(false);
+  const [epicPushedKeys, setEpicPushedKeys] = useState<Set<string>>(new Set());
 
   // Auto-select: prefer selectedKey if it's a valid dbKey, otherwise first generated doc
   const activeKey = selectedKey && ALL_DOC_TYPES.some(d => d.dbKey === selectedKey)
@@ -307,6 +311,68 @@ export default function DocumentsPage() {
     }
   }, [multiSelectMode]);
 
+  // Export note as a plain-text file (non-Epic fallback)
+  const handleExportText = useCallback((docKey: string, sections: { key: string; title: string; content: string }[], label: string) => {
+    const text = sections.map((s) => `${s.title}\n${'─'.repeat(s.title.length)}\n${s.content}`).join('\n\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${label.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${encounterId}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Downloaded' });
+  }, [encounterId]);
+
+  // Push note to Epic via FHIR DocumentReference
+  const handlePushToEpic = useCallback(async (docKey: string, sections: { key: string; title: string; content: string }[], label: string) => {
+    const epicPatientId = encounter?.epicPatientId as string | undefined;
+    if (!epicPatientId) {
+      // Redirect to SMART launch so the provider connects their Epic session
+      window.open('/fhir-launch', '_blank', 'width=700,height=600');
+      toast({
+        title: 'Connect to Epic first',
+        description: 'A window has opened to link your Epic account.',
+      });
+      return;
+    }
+
+    setIsPushingToEpic(true);
+    try {
+      const noteText = sections.map((s) => `${s.title}\n${s.content}`).join('\n\n');
+      const res = await fetch('/api/fhir/push-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientFhirId: epicPatientId,
+          encounterFhirId: encounter?.epicEncounterId as string | undefined,
+          docTitle: label,
+          noteText,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        if (res.status === 401) {
+          window.open('/fhir-launch', '_blank', 'width=700,height=600');
+          throw new Error('Session expired — reconnect to Epic via the opened window.');
+        }
+        throw new Error(err.error || `Push failed (${res.status})`);
+      }
+
+      setEpicPushedKeys((prev) => new Set([...prev, docKey]));
+      toast({ title: 'Pushed to Epic', description: `${label} added to patient chart.` });
+    } catch (error) {
+      toast({
+        title: 'Epic push failed',
+        description: error instanceof Error ? error.message : 'Could not push to Epic',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsPushingToEpic(false);
+    }
+  }, [encounter, encounterId]);
+
   if (encounter === undefined || detail === undefined) {
     return (
       <Layout>
@@ -462,22 +528,51 @@ export default function DocumentsPage() {
                     generatedAt={activeDoc.generatedAt}
                     encounterId={encounterId}
                     docKey={activeKey}
-                    headerActions={isEditable ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="gap-1.5 text-xs text-muted-foreground"
-                        disabled={!!generatingDocId}
-                        onClick={() => activeDocType && handleGenerateSingle(activeDocType)}
-                      >
-                        {generatingDocId === activeKey ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-3.5 w-3.5" />
+                    headerActions={(
+                      <div className="flex items-center gap-1">
+                        {isEditable && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="gap-1.5 text-xs text-muted-foreground"
+                            disabled={!!generatingDocId}
+                            onClick={() => activeDocType && handleGenerateSingle(activeDocType)}
+                          >
+                            {generatingDocId === activeKey ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-3.5 w-3.5" />
+                            )}
+                            Regenerate
+                          </Button>
                         )}
-                        Regenerate
-                      </Button>
-                    ) : undefined}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="gap-1.5 text-xs text-muted-foreground"
+                          onClick={() => activeDoc && activeDocType && handleExportText(activeKey!, activeDoc.sections, activeDocType.label)}
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Export
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className={`gap-1.5 text-xs ${epicPushedKeys.has(activeKey!) ? 'text-green-600' : 'text-muted-foreground'}`}
+                          disabled={isPushingToEpic}
+                          onClick={() => activeDoc && activeDocType && handlePushToEpic(activeKey!, activeDoc.sections, activeDocType.label)}
+                        >
+                          {isPushingToEpic ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : epicPushedKeys.has(activeKey!) ? (
+                            <Check className="h-3.5 w-3.5" />
+                          ) : (
+                            <Hospital className="h-3.5 w-3.5" />
+                          )}
+                          {epicPushedKeys.has(activeKey!) ? 'Pushed' : 'Push to Epic'}
+                        </Button>
+                      </div>
+                    )}
                   />
                 </div>
               ) : activeKey && !activeDoc ? (

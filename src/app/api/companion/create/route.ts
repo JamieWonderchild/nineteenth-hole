@@ -142,7 +142,6 @@ export async function POST(request: NextRequest) {
     const convexContext = {
       patientName: companionContext.patientName,
       age: companionContext.age,
-      weight: companionContext.weight,
       visitSummary: companionContext.visitSummary,
       visitDate: companionContext.visitDate,
       diagnosis: companionContext.diagnosis,

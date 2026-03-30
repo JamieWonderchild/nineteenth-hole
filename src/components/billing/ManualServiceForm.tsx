@@ -20,8 +20,11 @@ import { useUser } from '@clerk/nextjs';
 import { PendingBillingItem } from './AddMoreServicesPhase';
 
 export const CATEGORIES = [
+  { value: 'em',              label: 'E&M (Evaluation & Management)' },
   { value: 'exam',            label: 'Examination' },
   { value: 'procedure',       label: 'Procedure' },
+  { value: 'critical-care',   label: 'Critical Care' },
+  { value: 'observation',     label: 'Observation' },
   { value: 'lab',             label: 'Lab / Diagnostics' },
   { value: 'medication',      label: 'Medication' },
   { value: 'supply',          label: 'Supply' },

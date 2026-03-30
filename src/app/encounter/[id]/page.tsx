@@ -14,6 +14,7 @@ import { AddAddendumDialog } from '@/components/encounter/AddAddendumDialog';
 import { QuickNoteButton } from '@/components/encounter/QuickNoteButton';
 import { RecordingTimeline } from '@/components/encounter/RecordingTimeline';
 import { PlannedServicesWidget } from '@/components/billing/PlannedServicesWidget';
+import { MedicalCodingPanel } from '@/components/encounter/MedicalCodingPanel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -54,6 +55,7 @@ import {
   Phone,
   Weight,
   Heart,
+  MessageSquare,
   ExternalLink,
   FileText,
   ClipboardList,
@@ -109,6 +111,9 @@ export default function ConsultationDetailPage() {
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
   const [companionUrl, setCompanionUrl] = useState<string | null>(null);
   const [showCompanionModal, setShowCompanionModal] = useState(false);
+  const [smsPhone, setSmsPhone] = useState('');
+  const [isSendingSms, setIsSendingSms] = useState(false);
+  const [smsSent, setSmsSent] = useState(false);
   // Inline edit state for patient fields
   const [editingPatientField, setEditingPatientField] = useState<string | null>(null);
   const [editPatientValue, setEditPatientValue] = useState('');
@@ -478,6 +483,39 @@ export default function ConsultationDetailPage() {
       toast({ title: 'Error', description: 'Failed to refresh companion', variant: 'destructive' });
     }
   }, [updateSessionContext, encounterId]);
+
+  const handleSendSms = useCallback(async () => {
+    const url = companionUrl || (detail?.companion ? `${window.location.origin}/companion/${detail.companion.accessToken}` : null);
+    if (!url || !smsPhone.trim()) return;
+    setIsSendingSms(true);
+    try {
+      const res = await fetch('/api/companion/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toPhone: smsPhone.trim(),
+          companionUrl: url,
+          patientName: patient?.name,
+          clinicName: organization?.clinicName,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(err.error || `Failed (${res.status})`);
+      }
+      setSmsSent(true);
+      toast({ title: 'SMS sent', description: `Companion link sent to ${smsPhone}` });
+      setTimeout(() => setSmsSent(false), 4000);
+    } catch (error) {
+      toast({
+        title: 'SMS failed',
+        description: error instanceof Error ? error.message : 'Could not send SMS',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSendingSms(false);
+    }
+  }, [companionUrl, detail?.companion, smsPhone, patient?.name, organization?.clinicName]);
 
   // Auto-refresh companion context when documents are regenerated
   const lastGeneratedRef = useRef(encounter?.lastGeneratedAt);
@@ -926,6 +964,18 @@ export default function ConsultationDetailPage() {
             />
           )}
 
+          {/* Medical Coding — ICD-10 + CPT suggestions via Corti */}
+          {hasRecordings && (
+            <MedicalCodingPanel
+              encounterId={encounterId as Id<'encounters'>}
+              facts={computeFactsFromDetail()}
+              transcript={encounter.transcription}
+              existingIcd10={encounter.icd10Codes ?? []}
+              existingCpt={encounter.cptCodes ?? []}
+              isEditable={isEditable}
+            />
+          )}
+
           {/* Attachments */}
           <div
             className="rounded-lg border bg-card p-4"
@@ -1117,6 +1167,38 @@ export default function ConsultationDetailPage() {
                       Open
                     </Button>
                   </a>
+                </div>
+                {/* Send via SMS */}
+                <div className="w-full border-t pt-3 mt-1">
+                  <p className="text-xs text-muted-foreground text-center mb-2 flex items-center justify-center gap-1.5">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    Send link directly to patient&apos;s phone
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      type="tel"
+                      placeholder="Patient mobile number"
+                      value={smsPhone}
+                      onChange={(e) => setSmsPhone(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSendSms(); }}
+                      className="h-8 text-sm"
+                    />
+                    <Button
+                      size="sm"
+                      className="h-8 gap-1.5 flex-shrink-0"
+                      onClick={handleSendSms}
+                      disabled={isSendingSms || !smsPhone.trim()}
+                    >
+                      {isSendingSms ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : smsSent ? (
+                        <Check className="h-3.5 w-3.5" />
+                      ) : (
+                        <Phone className="h-3.5 w-3.5" />
+                      )}
+                      {smsSent ? 'Sent' : 'Send'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             ) : (

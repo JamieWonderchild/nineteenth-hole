@@ -1429,6 +1429,29 @@ export const clearExtractedPatientInfo = mutation({
 });
 
 // ============================================================================
+// Medical Coding
+// ============================================================================
+
+export const updateMedicalCodes = mutation({
+  args: {
+    encounterId: v.id("encounters"),
+    icd10Codes: v.optional(v.array(v.string())),
+    cptCodes: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const encounter = await ctx.db.get(args.encounterId);
+    if (!encounter) throw new Error("Encounter not found");
+
+    const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+    if (args.icd10Codes !== undefined) patch.icd10Codes = args.icd10Codes;
+    if (args.cptCodes !== undefined) patch.cptCodes = args.cptCodes;
+
+    await ctx.db.patch(args.encounterId, patch);
+    return { success: true };
+  },
+});
+
+// ============================================================================
 // Document Editing
 // ============================================================================
 

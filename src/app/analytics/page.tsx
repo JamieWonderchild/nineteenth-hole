@@ -247,8 +247,8 @@ export default function AnalyticsPage() {
     encounters.forEach(c => {
       const docs = c.generatedDocuments;
       if (!docs) return;
-      for (const key of Object.keys(docs) as (keyof typeof docs)[]) {
-        if (docs[key]) counts[key] = (counts[key] || 0) + 1;
+      for (const key of Object.keys(docs)) {
+        if ((docs as Record<string, unknown>)[key]) counts[key] = (counts[key] || 0) + 1;
       }
     });
     return Object.entries(counts)

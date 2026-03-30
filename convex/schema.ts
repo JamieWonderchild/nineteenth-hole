@@ -117,7 +117,7 @@ export default defineSchema({
     orgId: v.id("organizations"),
     name: v.string(),              // "CBC Panel", "Comprehensive Exam"
     code: v.string(),              // "LAB-001", "EXAM-001"
-    category: v.string(),          // 'exam' | 'procedure' | 'lab' | 'medication' | 'supply' | 'imaging' | 'hospitalization' | 'other'
+    category: v.string(),          // 'em' | 'exam' | 'procedure' | 'critical-care' | 'observation' | 'lab' | 'medication' | 'supply' | 'imaging' | 'hospitalization' | 'other'
     basePrice: v.number(),         // In cents (4500 = $45.00)
     taxable: v.boolean(),          // Should tax be applied to this item?
     description: v.optional(v.string()),
@@ -195,6 +195,9 @@ export default defineSchema({
       email: v.optional(v.string()),
       relationship: v.optional(v.string()),
     })),
+    // Vitals snapshot (frequently updated from encounters)
+    weight: v.optional(v.string()),      // e.g. "72 kg" or "160 lbs"
+    weightUnit: v.optional(v.string()),  // "kg" | "lbs"
     // Clinical
     allergies: v.optional(v.array(v.string())),
     primaryCareProvider: v.optional(v.string()),

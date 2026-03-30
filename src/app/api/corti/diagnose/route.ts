@@ -66,7 +66,6 @@ export async function POST(request: NextRequest) {
       patientId: body.patientId,
       patientInfo: body.patientInfo,
       transcript: body.transcript,
-      consultationType: body.consultationType,
     };
 
     // Run the full diagnosis pipeline
