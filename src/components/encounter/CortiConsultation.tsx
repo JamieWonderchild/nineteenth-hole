@@ -825,9 +825,8 @@ export function CortiConsultation({
                 isConnecting={false}
                 audioLevel={audioLevel}
               />
-              <div className={`w-full grid gap-4 ${isMobile ? 'px-4 grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
+              <div className="w-full">
                 <LiveTranscript segments={segments} isRecording={isRecording} accumulatedTranscript={displayTranscript} />
-                <LiveFactsPanel facts={facts} isRecording={isRecording && !isPaused} />
               </div>
             </div>
           )}
