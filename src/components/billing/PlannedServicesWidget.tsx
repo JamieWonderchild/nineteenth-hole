@@ -5,13 +5,12 @@ import { useEffect, useState } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from 'convex/_generated/api'
 import type { Id } from 'convex/_generated/dataModel'
-import { Input } from '@/components/ui/input'
-import { DollarSign, Trash2, AlertCircle, CheckCircle2, RotateCcw, Loader2, Plus, X } from 'lucide-react'
+import { DollarSign, Trash2, AlertCircle, CheckCircle2, RotateCcw, Loader2, Plus } from 'lucide-react'
 import { useBillingMatcher, type BillingCatalogItem } from '@/hooks/useBillingMatcher'
 import { useUser } from '@clerk/nextjs'
 import { AppLink } from '@/components/navigation/AppLink'
 import { scoreEM, type EncounterType } from '@/lib/emScoring'
-import { generateCode } from '@/components/billing/ManualServiceForm'
+import { AddServiceModal } from '@/components/billing/AddServiceModal'
 
 interface SimpleFact {
   id: string
@@ -61,11 +60,6 @@ export function PlannedServicesWidget({
   const [processedFacts, setProcessedFacts] = useState<Set<string>>(new Set())
   const [voidConfirming, setVoidConfirming] = useState(false)
   const [showAddService, setShowAddService] = useState(false)
-  const [addName, setAddName] = useState('')
-  const [addPrice, setAddPrice] = useState('')
-  const [addSubmitting, setAddSubmitting] = useState(false)
-
-  const createCatalogItem = useMutation(api.billingCatalog.createFromBilling)
 
   // Queries
   const catalog = useQuery(
@@ -225,44 +219,6 @@ export function PlannedServicesWidget({
     }
   }
 
-  const handleAddService = async () => {
-    if (!user?.id || !orgId || !addName.trim()) return
-    const priceNum = parseFloat(addPrice)
-    if (isNaN(priceNum) || priceNum < 0) return
-    setAddSubmitting(true)
-    try {
-      const catalogItemId = await createCatalogItem({
-        userId: user.id,
-        orgId,
-        name: addName.trim(),
-        code: generateCode(addName),
-        category: 'other',
-        basePrice: Math.round(priceNum * 100),
-        taxable: false,
-      })
-      await createProspective({
-        userId: user.id,
-        encounterId,
-        orgId,
-        catalogItemId: catalogItemId as Id<'billingCatalog'>,
-        description: addName.trim(),
-        quantity: 1,
-        unitPrice: Math.round(priceNum * 100),
-        taxable: false,
-        extractedFromFact: `manual-${Date.now()}`,
-        confidence: 'high',
-      })
-      setAddName('')
-      setAddPrice('')
-      setShowAddService(false)
-      onItemsChange?.()
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setAddSubmitting(false)
-    }
-  }
-
   const handleVoid = async () => {
     try {
       await voidInvoice({ encounterId })
@@ -354,14 +310,16 @@ export function PlannedServicesWidget({
             No billable items found yet.
           </p>
         )}
-        <AddServiceForm
-          show={showAddService}
-          onToggle={setShowAddService}
-          name={addName} onName={setAddName}
-          price={addPrice} onPrice={setAddPrice}
-          onSubmit={handleAddService}
-          submitting={addSubmitting}
-        />
+        <AddServiceTrigger onOpen={() => setShowAddService(true)} />
+        {orgId && (
+          <AddServiceModal
+            open={showAddService}
+            onClose={() => setShowAddService(false)}
+            encounterId={encounterId}
+            orgId={orgId}
+            onAdded={onItemsChange}
+          />
+        )}
       </div>
     )
   }
@@ -393,14 +351,16 @@ export function PlannedServicesWidget({
         ))}
       </div>
 
-      <AddServiceForm
-        show={showAddService}
-        onToggle={setShowAddService}
-        name={addName} onName={setAddName}
-        price={addPrice} onPrice={setAddPrice}
-        onSubmit={handleAddService}
-        submitting={addSubmitting}
-      />
+      <AddServiceTrigger onOpen={() => setShowAddService(true)} />
+      {orgId && (
+        <AddServiceModal
+          open={showAddService}
+          onClose={() => setShowAddService(false)}
+          encounterId={encounterId}
+          orgId={orgId}
+          onAdded={onItemsChange}
+        />
+      )}
     </div>
   )
 }
@@ -416,65 +376,16 @@ function PanelHeader({ title }: { title: string }) {
   )
 }
 
-interface AddServiceFormProps {
-  show: boolean
-  onToggle: (v: boolean) => void
-  name: string
-  onName: (v: string) => void
-  price: string
-  onPrice: (v: string) => void
-  onSubmit: () => void
-  submitting: boolean
-}
-
-function AddServiceForm({ show, onToggle, name, onName, price, onPrice, onSubmit, submitting }: AddServiceFormProps) {
+function AddServiceTrigger({ onOpen }: { onOpen: () => void }) {
   return (
     <div className="mt-3 pt-3 border-t">
-      {show ? (
-        <div className="space-y-2">
-          <Input
-            autoFocus
-            placeholder="Service name"
-            value={name}
-            onChange={e => onName(e.target.value)}
-            className="h-7 text-xs"
-            onKeyDown={e => { if (e.key === 'Escape') onToggle(false) }}
-          />
-          <div className="flex gap-1.5">
-            <Input
-              placeholder="Price ($)"
-              type="number"
-              min="0"
-              step="0.01"
-              value={price}
-              onChange={e => onPrice(e.target.value)}
-              className="h-7 text-xs"
-              onKeyDown={e => { if (e.key === 'Enter') onSubmit() }}
-            />
-            <button
-              disabled={submitting || !name.trim() || !price}
-              onClick={onSubmit}
-              className="h-7 px-2.5 rounded-md bg-primary text-primary-foreground text-xs font-medium disabled:opacity-50 flex-shrink-0"
-            >
-              {submitting ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}
-            </button>
-            <button
-              onClick={() => { onToggle(false); onName(''); onPrice('') }}
-              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground flex-shrink-0"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button
-          onClick={() => onToggle(true)}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Add service
-        </button>
-      )}
+      <button
+        onClick={onOpen}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        Add service
+      </button>
     </div>
   )
 }
