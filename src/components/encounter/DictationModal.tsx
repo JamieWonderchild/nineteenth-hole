@@ -25,7 +25,7 @@ import {
   type DictationMode,
 } from '@/lib/dictationCommands';
 
-type Stage = 'idle' | 'connecting' | 'recording' | 'reviewing' | 'saving';
+type Stage = 'idle' | 'connecting' | 'recording' | 'processing' | 'reviewing' | 'saving';
 
 interface DictationModalProps {
   encounterId: Id<'encounters'>;
@@ -166,6 +166,7 @@ export function DictationModal({ encounterId }: DictationModalProps) {
   };
 
   const stopRecording = useCallback(() => {
+    setStage('processing');
     if (wsRef.current?.readyState === 1) wsRef.current.send(JSON.stringify({ type: 'end' }));
     if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
   }, []);
@@ -202,7 +203,7 @@ export function DictationModal({ encounterId }: DictationModalProps) {
         Dictate Note
       </Button>
 
-      <Dialog open={open} onOpenChange={(v) => { if (!v && stage !== 'recording' && stage !== 'connecting') setOpen(false); }}>
+      <Dialog open={open} onOpenChange={(v) => { if (!v && stage !== 'recording' && stage !== 'connecting' && stage !== 'processing') setOpen(false); }}>
         <DialogContent className="max-w-2xl w-full p-0 gap-0 overflow-hidden">
           {/* Header */}
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
@@ -230,13 +231,19 @@ export function DictationModal({ encounterId }: DictationModalProps) {
                     {stage === 'connecting' ? 'Connecting…' : 'Recording'}
                   </span>
                 )}
+                {stage === 'processing' && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-500">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Processing…
+                  </span>
+                )}
                 {stage === 'reviewing' && (
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                     Review &amp; edit
                   </span>
                 )}
-                {/* Close — only when not actively recording */}
-                {stage !== 'recording' && stage !== 'connecting' && (
+                {/* Close — only when not actively recording or processing */}
+                {stage !== 'recording' && stage !== 'connecting' && stage !== 'processing' && (
                   <button
                     onClick={() => setOpen(false)}
                     className="rounded-sm opacity-70 hover:opacity-100 transition-opacity"
@@ -317,6 +324,31 @@ export function DictationModal({ encounterId }: DictationModalProps) {
               </div>
             )}
 
+            {stage === 'processing' && (
+              <div className="p-6 relative">
+                {/* Show captured content dimmed while processing */}
+                <div className="space-y-1.5 opacity-40">
+                  {rendered.blocks.map((block, i) => (
+                    <div key={i} className="flex items-start gap-2 text-sm leading-relaxed">
+                      {block.type === 'bullet' && (
+                        <span className="mt-0.5 text-primary font-bold flex-shrink-0">•</span>
+                      )}
+                      {block.type === 'numbered' && (
+                        <span className="mt-0.5 text-primary font-medium flex-shrink-0 min-w-[1.5rem]">
+                          {block.number}.
+                        </span>
+                      )}
+                      <span>{block.text}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processing final audio…
+                </div>
+              </div>
+            )}
+
             {stage === 'saving' && (
               <div className="flex items-center justify-center h-[280px] gap-2 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -353,6 +385,12 @@ export function DictationModal({ encounterId }: DictationModalProps) {
                   Stop &amp; Review
                 </Button>
               </>
+            )}
+
+            {stage === 'processing' && (
+              <p className="text-xs text-muted-foreground">
+                Finalising transcript…
+              </p>
             )}
 
             {stage === 'connecting' && (
