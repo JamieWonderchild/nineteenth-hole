@@ -1,6 +1,3 @@
 {
-  "buildCommand": "npx convex deploy --cmd 'next build' --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL",
-  "env": {
-    "CONVEX_PROVISION_HOST": "https://provision.convex.dev"
-  }
+  "buildCommand": "npx convex deploy --cmd 'next build' --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL"
 }
