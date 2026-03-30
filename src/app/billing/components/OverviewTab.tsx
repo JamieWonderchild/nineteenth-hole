@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/button';
@@ -18,14 +18,13 @@ import {
   TrendingUp,
   Clock,
   Package,
-  Stethoscope,
   ChevronRight,
 } from 'lucide-react';
 import { useQuery } from "convex/react";
 import { api } from 'convex/_generated/api';
 import { Id } from 'convex/_generated/dataModel';
-import { useAppRouter } from '@/hooks/useAppRouter';
 import { AppLink } from '@/components/navigation/AppLink';
+import { InvoiceCreationModal } from '@/components/billing/InvoiceCreationModal';
 import type { OrgContext } from '@/types/billing';
 
 function formatCurrency(cents: number): string {
@@ -89,10 +88,26 @@ interface OverviewTabProps {
 export function OverviewTab({ orgContext, isLoading, onSwitchToCatalog, onSwitchToInvoices }: OverviewTabProps) {
   const orgId = orgContext?.orgId as Id<"organizations">;
 
+  const [invoicingEncounter, setInvoicingEncounter] = useState<{
+    id: Id<'encounters'>;
+    interactionId: string;
+  } | null>(null);
+
   const encounters = useQuery(
     api.encounters.getConsultationsByOrg,
     orgContext ? { orgId } : 'skip'
   );
+
+  const patients = useQuery(
+    api.patients.getPatientsByOrg,
+    orgContext ? { orgId } : 'skip'
+  );
+
+  const patientNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    patients?.forEach(p => { if (p.name) map.set(p._id, p.name); });
+    return map;
+  }, [patients]);
 
   const catalogStats = useQuery(
     api.billingDashboard.getCatalogStats,
@@ -271,25 +286,39 @@ export function OverviewTab({ orgContext, isLoading, onSwitchToCatalog, onSwitch
           <CardContent className="pt-0">
             <div className="divide-y divide-border">
               {metrics!.readyToInvoice.slice(0, 5).map(c => {
-                const patient = c.extractedPatientInfo;
+                const patientName =
+                  c.extractedPatientInfo?.name ||
+                  patientNameMap.get(c.patientId as string) ||
+                  'Patient';
                 return (
-                  <AppLink
-                    key={c._id}
-                    href={`/encounter/${c._id}`}
-                    className="flex items-center gap-3 py-3 hover:bg-muted/30 -mx-2 px-2 rounded transition-colors"
-                  >
+                  <div key={c._id} className="flex items-center gap-3 py-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {patient?.name || 'Unknown Patient'}
-                      </p>
+                      <p className="text-sm font-medium truncate">{patientName}</p>
+                      {c.reasonForVisit && (
+                        <p className="text-xs text-muted-foreground truncate">{c.reasonForVisit}</p>
+                      )}
                     </div>
-                    <div className="flex-shrink-0 text-right">
-                      <p className="text-xs text-muted-foreground">
-                        {c.publishedAt ? formatRelativeDate(c.publishedAt) : '—'}
-                      </p>
+                    <p className="text-xs text-muted-foreground flex-shrink-0">
+                      {c.publishedAt ? formatRelativeDate(c.publishedAt) : '—'}
+                    </p>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <AppLink href={`/encounter/${c._id}`}>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                          View
+                        </Button>
+                      </AppLink>
+                      {c.interactionId && (
+                        <Button
+                          size="sm"
+                          className="h-7 px-3 text-xs"
+                          onClick={() => setInvoicingEncounter({ id: c._id, interactionId: c.interactionId! })}
+                        >
+                          <DollarSign className="h-3.5 w-3.5 mr-1" />
+                          Invoice
+                        </Button>
+                      )}
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  </AppLink>
+                  </div>
                 );
               })}
             </div>
@@ -303,6 +332,16 @@ export function OverviewTab({ orgContext, isLoading, onSwitchToCatalog, onSwitch
             )}
           </CardContent>
         </Card>
+      )}
+
+      {invoicingEncounter && orgContext && (
+        <InvoiceCreationModal
+          isOpen={!!invoicingEncounter}
+          onClose={() => setInvoicingEncounter(null)}
+          encounterId={invoicingEncounter.id}
+          interactionId={invoicingEncounter.interactionId}
+          orgId={orgId}
+        />
       )}
     </div>
   );

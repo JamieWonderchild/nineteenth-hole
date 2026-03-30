@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from 'convex/_generated/api';
 import { Id } from 'convex/_generated/dataModel';
@@ -35,6 +35,16 @@ export function InvoicesTab({ orgContext }: InvoicesTabProps) {
   const encounters = useQuery(
     api.encounters.getConsultationsByOrg,
     orgContext ? { orgId: orgContext.orgId as Id<"organizations"> } : "skip"
+  );
+
+  const patients = useQuery(
+    api.patients.getPatientsByOrg,
+    orgContext ? { orgId: orgContext.orgId as Id<"organizations"> } : "skip"
+  );
+
+  const patientNameMap = useMemo(
+    () => new Map((patients ?? []).map(p => [p._id as string, p.name ?? ''])),
+    [patients]
   );
 
   const invoiceRecords = useQuery(
@@ -129,8 +139,6 @@ export function InvoicesTab({ orgContext }: InvoicesTabProps) {
         ) : (
           <div className="divide-y divide-border border border-border rounded-xl overflow-hidden">
             {readyToInvoice.map(c => {
-              const patient = c.extractedPatientInfo;
-
               return (
                 <div key={c._id} className="flex items-center gap-4 px-4 py-3 bg-card hover:bg-muted/30 transition-colors">
                   <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 text-base">
@@ -138,7 +146,7 @@ export function InvoicesTab({ orgContext }: InvoicesTabProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">
-                      {patient?.name || 'Unknown Patient'}
+                      {c.extractedPatientInfo?.name || patientNameMap.get(c.patientId as string) || 'Patient'}
                     </p>
                     {c.reasonForVisit && (
                       <p className="text-xs text-muted-foreground truncate italic">{c.reasonForVisit}</p>
