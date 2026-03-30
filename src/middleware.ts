@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 // Public routes that don't require authentication
 const isPublicRoute = createRouteMatcher([
@@ -14,9 +15,29 @@ const isPublicRoute = createRouteMatcher([
   "/privacy",                  // Privacy Policy (public)
 ]);
 
+// Routes that should bypass the org-redirect check
+const isOnboardingRoute = createRouteMatcher([
+  "/onboarding(.*)",
+]);
+
 export default clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req)) {
     await auth.protect();
+  }
+
+  const { userId, orgId } = await auth();
+
+  // Signed in but no active org → send to onboarding
+  // (unless already going there or it's a public/API route)
+  if (
+    userId &&
+    !orgId &&
+    !isOnboardingRoute(req) &&
+    !isPublicRoute(req) &&
+    !req.nextUrl.pathname.startsWith("/api/")
+  ) {
+    const onboardingUrl = new URL("/onboarding", req.url);
+    return NextResponse.redirect(onboardingUrl);
   }
 });
 
