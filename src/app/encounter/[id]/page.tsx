@@ -916,183 +916,189 @@ export default function ConsultationDetailPage() {
             </div>
           )}
 
-          {/* Card Grid — command center */}
+          {/* Two-column layout once encounter has content */}
           {hasRecordings && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {cards.map((card) => {
-                const CardIcon = card.icon;
-                return (
-                  <AppLink
-                    key={card.title}
-                    href={card.href}
-                    className="group rounded-lg border bg-card p-4 flex items-center gap-4 transition-colors hover:bg-muted/50 hover:border-primary/30"
-                  >
-                    <div className={`h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      card.hasContent ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                    }`}>
-                      <CardIcon className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium group-hover:text-primary transition-colors">
-                        {card.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {card.subtitle}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </AppLink>
-                );
-              })}
-            </div>
-          )}
+            <div className="flex gap-6 items-start">
 
-          {/* Recording Timeline - Always show when encounter has interactions */}
-          {hasRecordings && (
-            <RecordingTimeline
-              recordings={detail?.recordings || []}
-              factReconciliation={detail?.factReconciliation}
-            />
-          )}
+              {/* ── Left: clinical ─────────────────────────────────── */}
+              <div className="flex-1 min-w-0 space-y-5">
 
-          {/* Planned Services Widget - Prospective Billing */}
-          {hasRecordings && orgContext?.orgId && (
-            <PlannedServicesWidget
-              encounterId={encounterId as Id<"encounters">}
-              orgId={orgContext.orgId as Id<"organizations">}
-              facts={computeFactsFromDetail()}
-              encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
-            />
-          )}
-
-          {/* Medical Coding — ICD-10 + CPT suggestions via Corti */}
-          {hasRecordings && (
-            <MedicalCodingPanel
-              encounterId={encounterId as Id<'encounters'>}
-              facts={computeFactsFromDetail()}
-              transcript={encounter.transcription}
-              existingIcd10={encounter.icd10Codes ?? []}
-              existingCpt={encounter.cptCodes ?? []}
-              isEditable={isEditable}
-              addenda={encounter.addenda ?? []}
-              encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
-            />
-          )}
-
-          {/* Attachments */}
-          <div
-            className="rounded-lg border bg-card p-4"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => { e.preventDefault(); handleFileUpload(e.dataTransfer.files); }}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Attachments</p>
-                {evidenceFiles && evidenceFiles.length > 0 && (
-                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                    {evidenceFiles.length}
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-              >
-                {isUploading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Upload className="h-3.5 w-3.5" />
-                )}
-                Attach file
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                accept="application/pdf,image/jpeg,image/png,image/webp"
-                multiple
-                onChange={(e) => handleFileUpload(e.target.files)}
-              />
-            </div>
-
-            {evidenceFiles === undefined ? (
-              <div className="flex justify-center py-4">
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              </div>
-            ) : evidenceFiles.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-1">
-                No attachments — drag and drop or click &quot;Attach file&quot; above
-              </p>
-            ) : (
-              <div className="divide-y">
-                {evidenceFiles.map((file) => (
-                  <div key={file._id} className="flex items-center gap-2 py-2 first:pt-0 last:pb-0">
-                    <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                    <span className="text-sm flex-1 truncate">{file.fileName}</span>
-                    <span className="text-xs text-muted-foreground flex-shrink-0">
-                      {file.fileSize < 1024 * 1024
-                        ? `${(file.fileSize / 1024).toFixed(1)} KB`
-                        : `${(file.fileSize / (1024 * 1024)).toFixed(1)} MB`}
-                    </span>
-                    {file.url && (
-                      <button
-                        onClick={() => window.open(file.url!, '_blank')}
-                        className="text-muted-foreground hover:text-foreground transition-colors"
-                        title="Open"
+                {/* Card Grid — command centre */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {cards.map((card) => {
+                    const CardIcon = card.icon;
+                    return (
+                      <AppLink
+                        key={card.title}
+                        href={card.href}
+                        className="group rounded-lg border bg-card p-4 flex items-center gap-4 transition-colors hover:bg-muted/50 hover:border-primary/30"
                       >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDeleteFile(file._id)}
-                      className="text-muted-foreground hover:text-destructive transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                        <div className={`h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          card.hasContent ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                        }`}>
+                          <CardIcon className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium group-hover:text-primary transition-colors">
+                            {card.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {card.subtitle}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </AppLink>
+                    );
+                  })}
+                </div>
 
-          {/* Quick Notes / Addenda */}
-          {encounter?.addenda && encounter.addenda.length > 0 && (
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                Notes
-              </p>
-              <div className="space-y-2">
-                {encounter.addenda.map((note, i) => (
-                  <div key={i} className="text-sm space-y-0.5">
-                    <div className="space-y-0.5">
-                      {note.text.split('\n').map((line, j) => {
-                        const bullet = line.match(/^-\s+(.+)/);
-                        const numbered = line.match(/^(\d+)\.\s+(.+)/);
-                        if (bullet) return (
-                          <div key={j} className="flex items-start gap-2">
-                            <span className="text-primary font-bold mt-0.5 flex-shrink-0">•</span>
-                            <span>{bullet[1]}</span>
-                          </div>
-                        );
-                        if (numbered) return (
-                          <div key={j} className="flex items-start gap-2">
-                            <span className="text-primary font-medium mt-0.5 flex-shrink-0 min-w-[1.2rem]">{numbered[1]}.</span>
-                            <span>{numbered[2]}</span>
-                          </div>
-                        );
-                        return line ? <p key={j}>{line}</p> : null;
-                      })}
+                {/* Recording Timeline */}
+                <RecordingTimeline
+                  recordings={detail?.recordings || []}
+                  factReconciliation={detail?.factReconciliation}
+                />
+
+                {/* Attachments */}
+                <div
+                  className="rounded-lg border bg-card p-4"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); handleFileUpload(e.dataTransfer.files); }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Attachments</p>
+                      {evidenceFiles && evidenceFiles.length > 0 && (
+                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                          {evidenceFiles.length}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(note.createdAt).toLocaleString()}
-                    </p>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                    >
+                      {isUploading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5" />
+                      )}
+                      Attach file
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept="application/pdf,image/jpeg,image/png,image/webp"
+                      multiple
+                      onChange={(e) => handleFileUpload(e.target.files)}
+                    />
                   </div>
-                ))}
-              </div>
+
+                  {evidenceFiles === undefined ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : evidenceFiles.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-1">
+                      No attachments — drag and drop or click &quot;Attach file&quot; above
+                    </p>
+                  ) : (
+                    <div className="divide-y">
+                      {evidenceFiles.map((file) => (
+                        <div key={file._id} className="flex items-center gap-2 py-2 first:pt-0 last:pb-0">
+                          <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                          <span className="text-sm flex-1 truncate">{file.fileName}</span>
+                          <span className="text-xs text-muted-foreground flex-shrink-0">
+                            {file.fileSize < 1024 * 1024
+                              ? `${(file.fileSize / 1024).toFixed(1)} KB`
+                              : `${(file.fileSize / (1024 * 1024)).toFixed(1)} MB`}
+                          </span>
+                          {file.url && (
+                            <button
+                              onClick={() => window.open(file.url!, '_blank')}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                              title="Open"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteFile(file._id)}
+                            className="text-muted-foreground hover:text-destructive transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick Notes / Addenda */}
+                {encounter?.addenda && encounter.addenda.length > 0 && (
+                  <div className="rounded-lg border bg-card p-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                      Notes
+                    </p>
+                    <div className="space-y-2">
+                      {encounter.addenda.map((note, i) => (
+                        <div key={i} className="text-sm space-y-0.5">
+                          <div className="space-y-0.5">
+                            {note.text.split('\n').map((line, j) => {
+                              const bullet = line.match(/^-\s+(.+)/);
+                              const numbered = line.match(/^(\d+)\.\s+(.+)/);
+                              if (bullet) return (
+                                <div key={j} className="flex items-start gap-2">
+                                  <span className="text-primary font-bold mt-0.5 flex-shrink-0">•</span>
+                                  <span>{bullet[1]}</span>
+                                </div>
+                              );
+                              if (numbered) return (
+                                <div key={j} className="flex items-start gap-2">
+                                  <span className="text-primary font-medium mt-0.5 flex-shrink-0 min-w-[1.2rem]">{numbered[1]}.</span>
+                                  <span>{numbered[2]}</span>
+                                </div>
+                              );
+                              return line ? <p key={j}>{line}</p> : null;
+                            })}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(note.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              </div>{/* end left column */}
+
+              {/* ── Right: billing sidebar ──────────────────────────── */}
+              <div className="w-80 flex-shrink-0 space-y-4 sticky top-6 self-start">
+                {orgContext?.orgId && (
+                  <PlannedServicesWidget
+                    encounterId={encounterId as Id<"encounters">}
+                    orgId={orgContext.orgId as Id<"organizations">}
+                    facts={computeFactsFromDetail()}
+                    encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
+                  />
+                )}
+                <MedicalCodingPanel
+                  encounterId={encounterId as Id<'encounters'>}
+                  facts={computeFactsFromDetail()}
+                  transcript={encounter.transcription}
+                  existingIcd10={encounter.icd10Codes ?? []}
+                  existingCpt={encounter.cptCodes ?? []}
+                  isEditable={isEditable}
+                  addenda={encounter.addenda ?? []}
+                  encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
+                />
+              </div>{/* end right sidebar */}
+
             </div>
-          )}
+          )}{/* end two-column */}
 
         </div>
 
