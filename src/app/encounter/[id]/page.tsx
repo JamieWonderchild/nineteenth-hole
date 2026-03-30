@@ -973,6 +973,7 @@ export default function ConsultationDetailPage() {
               existingIcd10={encounter.icd10Codes ?? []}
               existingCpt={encounter.cptCodes ?? []}
               isEditable={isEditable}
+              addenda={encounter.addenda ?? []}
             />
           )}
 

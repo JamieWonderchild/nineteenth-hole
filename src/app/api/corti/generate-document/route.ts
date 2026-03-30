@@ -35,6 +35,7 @@ interface GenerateDocumentRequest {
   transcript?: string;
   documentType: DocumentType;
   patientName?: string;
+  acceptedCodes?: { icd10: string[]; cpt: string[] };
 }
 
 interface GeneratedSection {
@@ -91,9 +92,27 @@ export async function POST(request: NextRequest) {
       .filter(f => !f.isDiscarded)
       .map(f => ({
         text: f.text,
-        source: 'core' as const,  // Facts from transcription are LLM-generated
+        source: 'core' as const,
         group: f.group || undefined,
       }));
+
+    // Inject accepted medical codes as user-confirmed facts so Corti includes
+    // them in the generated document (assessment = ICD-10, plan = CPT)
+    const { icd10 = [], cpt = [] } = body.acceptedCodes ?? {};
+    const codeFacts = [
+      ...icd10.map(code => ({
+        text: `Confirmed diagnosis: ${code}`,
+        source: 'user' as const,
+        group: 'assessment',
+      })),
+      ...cpt.map(code => ({
+        text: `Confirmed procedure code: ${code}`,
+        source: 'user' as const,
+        group: 'plan',
+      })),
+    ];
+
+    const allFacts = [...simplifiedFacts, ...codeFacts];
 
     // Build the document generation payload
     // Note: We only send facts, not transcript. Corti's transcript context expects
@@ -101,7 +120,7 @@ export async function POST(request: NextRequest) {
     // The facts extracted from the transcript are sufficient for document generation.
     const payload: DocumentGenerationPayload = {
       context: [
-        { type: 'facts', data: simplifiedFacts },
+        { type: 'facts', data: allFacts },
       ],
       templateKey: template.templateKey,
       outputLanguage: 'en',

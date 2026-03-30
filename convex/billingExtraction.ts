@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { action, internalMutation, mutation } from "./_generated/server";
-import { internal, api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
 /**
@@ -364,5 +364,73 @@ export const updateExtractionStatus = internalMutation({
       billingItemsExtracted: args.itemsExtracted,
       billingExtractionError: args.error,
     });
+  },
+});
+
+/**
+ * Background action: Extract billing items from a dictated note (addendum)
+ * Triggered automatically after addAddendum saves a note.
+ * Converts note markdown lines into synthetic facts and runs them through
+ * the same billing extraction pipeline used for recordings.
+ */
+export const extractFromNote = action({
+  args: {
+    encounterId: v.id("encounters"),
+    orgId: v.id("organizations"),
+    userId: v.string(),
+    noteText: v.string(),
+    noteIndex: v.number(), // position in addenda array, used for dedup key
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; itemsCreated?: number; error?: string }> => {
+    try {
+      // Convert markdown note into synthetic facts (one per non-empty line)
+      const facts = args.noteText
+        .split('\n')
+        .map((line, i) => ({
+          id: `note-${args.noteIndex}-${i}`,
+          // Strip markdown list markers (-, *, 1., 2., etc.)
+          text: line.replace(/^[\s]*[-*\d.]+\s+/, '').trim(),
+          group: 'plan',
+        }))
+        .filter(f => f.text.length > 4);
+
+      if (facts.length === 0) return { success: true, itemsCreated: 0 };
+
+      const catalog: Array<{ _id: string; name: string; code: string; category: string; basePrice: number; taxable: boolean }> = await ctx.runMutation(
+        internal.billingExtraction.getCatalogData,
+        { orgId: args.orgId }
+      );
+      if (catalog.length === 0) return { success: true, itemsCreated: 0 };
+
+      const existingItems: Array<{ factId: string; description: string }> = await ctx.runMutation(
+        internal.billingExtraction.getExistingItems,
+        { encounterId: args.encounterId }
+      );
+
+      const apiUrl = process.env.SITE_URL || 'https://health-platform.vercel.app';
+      const response = await fetch(`${apiUrl}/api/corti/extract-billing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ facts, catalog, existingItems }),
+      });
+
+      if (!response.ok) return { success: false, error: `API error: ${response.status}` };
+
+      const { extraction } = await response.json();
+
+      const itemsCreated: number = await ctx.runMutation(
+        internal.billingExtraction.createExtractedItems,
+        {
+          encounterId: args.encounterId,
+          orgId: args.orgId,
+          userId: args.userId,
+          extractedItems: extraction.extractedItems,
+        }
+      );
+
+      return { success: true, itemsCreated };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
   },
 });

@@ -10,6 +10,9 @@ import { DocumentModal, type GeneratedDoc } from "@/components/documents/Documen
 import { CombinedFactsPanel } from "./CombinedFactsPanel"
 import { LiveFactsPanel } from "./LiveFactsPanel"
 import { useOrgContext } from "@/hooks/useOrgContext"
+import { useQuery } from "convex/react"
+import { api } from "convex/_generated/api"
+import type { Id } from "convex/_generated/dataModel"
 import type {
   StreamTranscriptSegment,
   Fact,
@@ -64,8 +67,9 @@ const STREAM_CONFIG: StreamConfig = {
 
 interface CortiConsultationProps {
   onSessionComplete?: (session: EncounterSession) => void
-  onRecordAgain?: () => Promise<void> | void // NEW: Callback for "Record Again" to delete auto-saved recording
+  onRecordAgain?: () => Promise<void> | void
   patientInfo?: { name?: string; age?: string; sex?: string; weight?: string; weightUnit?: string; _id?: string }
+  acceptedCodes?: { icd10: string[]; cpt: string[] }
   consultationType?: "sick-visit" | "wellness" | "emergency" | "follow-up"
   // Multi-recording support
   encounterId?: string
@@ -81,6 +85,7 @@ export function CortiConsultation({
   onSessionComplete,
   onRecordAgain,
   patientInfo,
+  acceptedCodes,
   consultationType = "sick-visit",
   encounterId: externalConsultationId,
   previousRecordings = [],
@@ -91,6 +96,17 @@ export function CortiConsultation({
 }: CortiConsultationProps) {
   // Org context
   const { orgContext } = useOrgContext()
+
+  // Fetch accepted codes from Convex so they're included in document generation
+  // even if the parent didn't pass them as a prop
+  const encounterRecord = useQuery(
+    api.encounters.getById,
+    externalConsultationId ? { id: externalConsultationId as Id<'encounters'> } : 'skip'
+  )
+  const resolvedCodes = acceptedCodes ?? {
+    icd10: encounterRecord?.icd10Codes ?? [],
+    cpt: encounterRecord?.cptCodes ?? [],
+  }
 
   // Connection state
   const [connectionState, setConnectionState] = React.useState<ConnectionState>("idle")
@@ -654,6 +670,7 @@ export function CortiConsultation({
         facts: activeFacts,
         transcript: transcriptText,
         patientName: patientInfo?.name,
+        acceptedCodes: resolvedCodes,
       }
 
       // Generate both documents in parallel

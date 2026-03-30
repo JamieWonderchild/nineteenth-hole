@@ -1227,6 +1227,7 @@ export const addAddendum = mutation({
 
     const timestamp = new Date().toISOString();
     const existingAddenda = encounter.addenda || [];
+    const noteIndex = existingAddenda.length; // 0-based index of the new note
 
     await ctx.db.patch(args.encounterId, {
       addenda: [...existingAddenda, {
@@ -1236,6 +1237,17 @@ export const addAddendum = mutation({
       }],
       updatedAt: timestamp,
     });
+
+    // Trigger billing extraction from note text in the background
+    if (encounter.orgId) {
+      await ctx.scheduler.runAfter(0, api.billingExtraction.extractFromNote, {
+        encounterId: args.encounterId,
+        orgId: encounter.orgId,
+        userId: args.providerId,
+        noteText: args.text,
+        noteIndex,
+      });
+    }
 
     return { success: true };
   },

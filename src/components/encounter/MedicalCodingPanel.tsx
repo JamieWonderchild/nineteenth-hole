@@ -32,6 +32,7 @@ interface MedicalCodingPanelProps {
   existingIcd10?: string[];
   existingCpt?: string[];
   isEditable?: boolean;
+  addenda?: Array<{ text: string; createdAt: string }>;
 }
 
 export function MedicalCodingPanel({
@@ -41,6 +42,7 @@ export function MedicalCodingPanel({
   existingIcd10 = [],
   existingCpt = [],
   isEditable = true,
+  addenda = [],
 }: MedicalCodingPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [icd10Suggestions, setIcd10Suggestions] = useState<MedicalCode[]>([]);
@@ -101,6 +103,66 @@ export function MedicalCodingPanel({
       runCoding();
     }
   }, [facts.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-run coding when new addenda (dictated notes) are saved
+  const processedAddendaCount = useRef(addenda.length);
+  useEffect(() => {
+    if (!isEditable) return;
+    if (addenda.length <= processedAddendaCount.current) return;
+
+    const newNotes = addenda.slice(processedAddendaCount.current);
+    processedAddendaCount.current = addenda.length;
+
+    // Build synthetic facts from note lines and run coding
+    const noteFacts = newNotes.flatMap((note, ni) =>
+      note.text
+        .split('\n')
+        .map((line, li) => ({
+          id: `note-${processedAddendaCount.current - newNotes.length + ni}-${li}`,
+          text: line.replace(/^[\s]*[-*\d.]+\s+/, '').trim(),
+          group: 'plan',
+        }))
+        .filter(f => f.text.length > 4)
+    );
+
+    if (noteFacts.length === 0) return;
+
+    // Merge note facts with existing facts and re-run
+    fetch('/api/corti/predict-codes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ facts: noteFacts }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        const newIcd10: MedicalCode[] = data.icd10 ?? [];
+        const newCpt: MedicalCode[] = data.cpt ?? [];
+        // Merge: pre-accept new codes alongside existing accepted ones
+        setIcd10Suggestions(prev => {
+          const existing = new Map(prev.map(c => [c.code, c]));
+          newIcd10.forEach(c => { if (!existing.has(c.code)) existing.set(c.code, c); });
+          return Array.from(existing.values());
+        });
+        setCptSuggestions(prev => {
+          const existing = new Map(prev.map(c => [c.code, c]));
+          newCpt.forEach(c => { if (!existing.has(c.code)) existing.set(c.code, c); });
+          return Array.from(existing.values());
+        });
+        setAcceptedIcd10(prev => {
+          const next = new Set(prev);
+          newIcd10.forEach(c => next.add(c.code));
+          return next;
+        });
+        setAcceptedCpt(prev => {
+          const next = new Set(prev);
+          newCpt.forEach(c => next.add(c.code));
+          return next;
+        });
+        setHasRun(true);
+      })
+      .catch(() => null);
+  }, [addenda.length, isEditable]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-save helper — debounced 600ms
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
