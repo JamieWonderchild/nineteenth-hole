@@ -57,6 +57,7 @@ export interface MedicalCode {
   system: 'ICD-10-CM' | 'ICD-10-PCS' | 'CPT';
   description: string;
   confidence: number;
+  evidences?: Array<{ text: string; start: number; end: number }>;
 }
 
 export interface Template {

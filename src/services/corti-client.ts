@@ -290,7 +290,12 @@ export class CortiClient {
     }
 
     const data = await response.json() as {
-      codes: Array<{ system: string; code: string; display: string; evidences?: unknown[] }>;
+      codes: Array<{
+        system: string;
+        code: string;
+        display: string;
+        evidences?: Array<{ contextIndex: number; text: string; start: number; end: number }>;
+      }>;
     };
 
     const systemMap: Record<string, MedicalCode['system']> = {
@@ -304,7 +309,8 @@ export class CortiClient {
       code: c.code,
       system: systemMap[c.system] ?? (c.system as MedicalCode['system']),
       description: c.display,
-      confidence: c.evidences?.length ? Math.min(1, c.evidences.length * 0.25) : 0.5,
+      confidence: c.evidences?.length ? Math.min(1, c.evidences.length * 0.3) : 0.5,
+      evidences: c.evidences?.map(({ text, start, end }) => ({ text, start, end })),
     }));
   }
 
