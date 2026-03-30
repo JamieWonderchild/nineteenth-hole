@@ -1,6 +1,8 @@
 // Dictation command processor
 // Parses finalized transcript segments and converts voice commands into formatted blocks.
 // Supports: bullet lists, numbered lists, paragraph breaks, inline punctuation.
+//
+// Commands can appear ANYWHERE in a segment — not just at the start.
 
 export type DictationMode = 'paragraph' | 'bullet' | 'numbered';
 
@@ -21,13 +23,10 @@ export function createDictationState(): DictationState {
   return { blocks: [], pendingText: '', mode: 'paragraph', numberedCounter: 0 };
 }
 
-// Commands that start a new block
-const BULLET_CMD = /^[\s,.]*(bullet\s*point|list\s*item|new\s*bullet|next\s*bullet|next\s*point)\b\s*/i;
-const NUMBERED_CMD = /^[\s,.]*(next\s*number|next\s*item|numbered?\s*item|new\s*number)\b\s*/i;
-const NEW_LIST_CMD = /^[\s,.]*(start\s*(numbered|bullet)\s*list|numbered\s*list|bullet\s*list)\b\s*/i;
+// ─── Split pattern — capture group keeps delimiters in result ────────────────
+// Order matters: longer/more-specific phrases before shorter ones.
 
-// Commands that break the current block mid-sentence
-const BREAK_CMD = /\b(new\s*line|new\s*paragraph|end\s*list|paragraph\s*break)\b/gi;
+const CMD_SPLIT = /(start\s+numbered\s+list|start\s+bullet\s+list|numbered\s+list|bullet\s+list|bullet\s*point|list\s*item|new\s*bullet|next\s*bullet|next\s*point|next\s*number|next\s*item|numbered?\s*item|new\s*number|new\s*line|new\s*paragraph|end\s*list|paragraph\s*break)/gi;
 
 // Inline punctuation substitutions
 const PUNCTUATION: Array<[RegExp, string]> = [
@@ -48,7 +47,6 @@ function applyPunctuation(text: string): string {
   for (const [pattern, replacement] of PUNCTUATION) {
     t = t.replace(pattern, replacement);
   }
-  // Clean up spaces before punctuation
   return t.replace(/\s+([.,;:?!)])/g, '$1').replace(/\(\s+/g, '(').trim();
 }
 
@@ -69,52 +67,58 @@ function flushPending(state: DictationState): DictationState {
   };
 }
 
-export function processSegment(raw: string, state: DictationState): DictationState {
-  let text = raw.trim();
-  let s = { ...state };
+function applyCommand(cmd: string, s: DictationState): DictationState {
+  const lower = cmd.toLowerCase().replace(/\s+/g, ' ').trim();
 
-  // Detect block-starting command at the beginning of the segment
-  if (BULLET_CMD.test(text)) {
-    s = flushPending(s);
-    text = text.replace(BULLET_CMD, '').trim();
-    s = { ...s, mode: 'bullet' };
-  } else if (NUMBERED_CMD.test(text)) {
-    s = flushPending(s);
-    text = text.replace(NUMBERED_CMD, '').trim();
-    s = {
+  if (/^(bullet point|list item|new bullet|next bullet|next point)$/.test(lower)) {
+    return { ...s, mode: 'bullet' };
+  }
+
+  if (/^(next number|next item|new number)$/.test(lower) || /^numbered? item$/.test(lower)) {
+    return {
       ...s,
       mode: 'numbered',
       numberedCounter: s.mode === 'numbered' ? s.numberedCounter + 1 : 1,
     };
-  } else if (NEW_LIST_CMD.test(text)) {
-    s = flushPending(s);
-    const isNumbered = /numbered/.test(text.toLowerCase());
-    text = text.replace(NEW_LIST_CMD, '').trim();
-    s = { ...s, mode: isNumbered ? 'numbered' : 'bullet', numberedCounter: isNumbered ? 1 : 0 };
   }
 
-  // Handle break commands mid-segment (split into sub-parts)
-  BREAK_CMD.lastIndex = 0;
-  if (BREAK_CMD.test(text)) {
-    BREAK_CMD.lastIndex = 0;
-    const parts = text.split(BREAK_CMD);
-    for (let i = 0; i < parts.length; i++) {
-      const part = applyPunctuation(parts[i].trim());
-      // Skip the command word itself (captured by the split group)
-      if (!part || /^(new\s*line|new\s*paragraph|end\s*list|paragraph\s*break)$/i.test(part)) {
-        if (i < parts.length - 1) {
-          s = flushPending(s);
-          if (s.mode === 'numbered') s = { ...s, numberedCounter: s.numberedCounter + 1 };
-          else s = { ...s, mode: 'paragraph' };
-        }
-        continue;
+  if (/numbered list|start numbered/.test(lower)) {
+    return { ...s, mode: 'numbered', numberedCounter: 1 };
+  }
+
+  if (/bullet list|start bullet/.test(lower)) {
+    return { ...s, mode: 'bullet' };
+  }
+
+  // new line / new paragraph / end list / paragraph break
+  if (s.mode === 'numbered') {
+    return { ...s, numberedCounter: s.numberedCounter + 1 };
+  }
+  return { ...s, mode: 'paragraph' };
+}
+
+export function processSegment(raw: string, state: DictationState): DictationState {
+  let s = { ...state };
+
+  // Split on any command — capture group keeps the command tokens in the array
+  const parts = raw.trim().split(CMD_SPLIT);
+
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+
+    // Re-test whether this part IS a command token
+    CMD_SPLIT.lastIndex = 0;
+    if (CMD_SPLIT.test(trimmed)) {
+      // Flush whatever text was accumulating, then apply the command
+      s = flushPending(s);
+      s = applyCommand(trimmed, s);
+    } else {
+      // Regular speech — apply punctuation and append
+      const clean = applyPunctuation(trimmed);
+      if (clean) {
+        s = { ...s, pendingText: [s.pendingText, clean].filter(Boolean).join(' ') };
       }
-      s = { ...s, pendingText: [s.pendingText, part].filter(Boolean).join(' ') };
-    }
-  } else {
-    const clean = applyPunctuation(text);
-    if (clean) {
-      s = { ...s, pendingText: [s.pendingText, clean].filter(Boolean).join(' ') };
     }
   }
 

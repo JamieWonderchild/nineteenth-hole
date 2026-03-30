@@ -38,6 +38,11 @@ export const extractFromRecording = action({
 
       if (!consultationData || consultationData.facts.length === 0) {
         console.log('[BillingExtraction] ❌ No facts to process, skipping');
+        await ctx.runMutation(internal.billingExtraction.updateExtractionStatus, {
+          recordingId: args.recordingId,
+          status: 'completed',
+          itemsExtracted: 0,
+        });
         return { success: true, itemsCreated: 0, message: 'No facts to process' };
       }
 
@@ -57,6 +62,11 @@ export const extractFromRecording = action({
 
       if (catalog.length === 0) {
         console.log('[BillingExtraction] ❌ No catalog items available, skipping');
+        await ctx.runMutation(internal.billingExtraction.updateExtractionStatus, {
+          recordingId: args.recordingId,
+          status: 'completed',
+          itemsExtracted: 0,
+        });
         return { success: true, itemsCreated: 0, message: 'No catalog items' };
       }
 
