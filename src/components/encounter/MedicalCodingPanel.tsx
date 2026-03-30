@@ -236,22 +236,20 @@ export function MedicalCodingPanel({
           )}
         </div>
         {isEditable && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 gap-1.5 text-xs text-muted-foreground"
+          <button
             onClick={runCoding}
             disabled={isLoading || facts.length === 0}
+            title={isLoading ? 'Analyzing…' : hasRun ? 'Re-run coding' : 'Suggest codes'}
+            className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
           >
             {isLoading ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : hasRun ? (
-              <RefreshCw className="h-3 w-3" />
+              <RefreshCw className="h-3.5 w-3.5" />
             ) : (
-              <Sparkles className="h-3 w-3" />
+              <Sparkles className="h-3.5 w-3.5" />
             )}
-            {isLoading ? 'Analyzing…' : hasRun ? 'Re-run' : 'Suggest Codes'}
-          </Button>
+          </button>
         )}
       </div>
 

@@ -5,9 +5,6 @@ import { useEffect, useState } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from 'convex/_generated/api'
 import type { Id } from 'convex/_generated/dataModel'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { DollarSign, Trash2, AlertCircle, CheckCircle2, RotateCcw, Loader2, Plus, X } from 'lucide-react'
 import { useBillingMatcher, type BillingCatalogItem } from '@/hooks/useBillingMatcher'
@@ -275,225 +272,210 @@ export function PlannedServicesWidget({
     }
   }
 
-  // Empty catalog
+  // ── Empty catalog ─────────────────────────────────────────────────────────
   if (!catalog || catalog.length === 0) {
     return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
-            Planned Services
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-6 text-muted-foreground">
-            <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Set up your billing catalog first</p>
-            {orgId && (
-              <AppLink href="/billing?tab=catalog">
-                <Button variant="link" size="sm" className="mt-2">
-                  Go to Billing Catalog
-                </Button>
-              </AppLink>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="rounded-lg border bg-card p-4">
+        <PanelHeader title="Planned Services" />
+        <div className="flex flex-col items-center gap-1 py-4 text-muted-foreground">
+          <AlertCircle className="h-5 w-5 opacity-40 mb-1" />
+          <p className="text-xs">Set up your billing catalog first</p>
+          {orgId && (
+            <AppLink href="/billing?tab=catalog" className="text-xs text-primary hover:underline mt-1">
+              Go to Billing Catalog
+            </AppLink>
+          )}
+        </div>
+      </div>
     )
   }
 
-  // ── Billed state (invoice finalized) ──────────────────────────────────────
+  // ── Billed state ──────────────────────────────────────────────────────────
   if (isFinalized) {
     return (
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
+      <div className="rounded-lg border bg-card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
               Billed Services
-              {billedItems && <Badge variant="secondary">{billedItems.length}</Badge>}
-            </CardTitle>
-            <div className="flex items-center gap-3">
-              <div className="text-sm font-semibold text-green-600 dark:text-green-400">
-                ${total.toFixed(2)}
-              </div>
-              {voidConfirming ? (
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-muted-foreground">Void invoice?</span>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={handleVoid}
-                  >
-                    Yes, void
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => setVoidConfirming(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setVoidConfirming(true)}
-                >
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  Redo
-                </Button>
-              )}
-            </div>
-          </div>
-          {invoiceMeta?.invoiceNumber && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {invoiceMeta.invoiceNumber}
             </p>
-          )}
-        </CardHeader>
-        <CardContent>
-          {!billedItems || billedItems.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No items on invoice</p>
-          ) : (
-            <div className="space-y-2">
-              {billedItems.map((item) => (
-                <BillingItemRow
-                  key={item._id}
-                  item={item}
-                  readonly
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            {billedItems && billedItems.length > 0 && (
+              <span className="rounded-full bg-green-500/10 px-1.5 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
+                {billedItems.length}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-green-600 dark:text-green-400">${total.toFixed(2)}</span>
+            {voidConfirming ? (
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-muted-foreground">Void?</span>
+                <button onClick={handleVoid} className="text-[10px] text-destructive hover:underline">Yes</button>
+                <button onClick={() => setVoidConfirming(false)} className="text-[10px] text-muted-foreground hover:underline">No</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setVoidConfirming(true)}
+                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
+                title="Void invoice"
+              >
+                <RotateCcw className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        </div>
+        {invoiceMeta?.invoiceNumber && (
+          <p className="text-[10px] text-muted-foreground mb-2 font-mono">{invoiceMeta.invoiceNumber}</p>
+        )}
+        {!billedItems || billedItems.length === 0 ? (
+          <p className="text-xs text-muted-foreground py-1">No items on invoice</p>
+        ) : (
+          <div className="space-y-1">
+            {billedItems.map((item) => <BillingItemRow key={item._id} item={item} readonly />)}
+          </div>
+        )}
+      </div>
     )
   }
 
   // ── Planned state (pre-invoice) ────────────────────────────────────────────
-
   if (!prospectiveItems || prospectiveItems.length === 0) {
     return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
-            Planned Services
-          </CardTitle>
-          {isExtracting && (
-            <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Analyzing encounter for billable items…
-            </div>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-6 text-muted-foreground">
-            <p className="text-sm">
-              {isExtracting ? 'Extracting services from encounter...' : 'No billable items found'}
-            </p>
-            <p className="text-xs mt-1">
-              {isExtracting
-                ? 'Items are automatically detected from clinical facts'
-                : 'Items are extracted automatically after each recording'}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="rounded-lg border bg-card p-4">
+        <PanelHeader title="Planned Services" />
+        {isExtracting ? (
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5 py-1">
+            <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+            Analyzing for billable items…
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground py-1">
+            No billable items found yet.
+          </p>
+        )}
+        <AddServiceForm
+          show={showAddService}
+          onToggle={setShowAddService}
+          name={addName} onName={setAddName}
+          price={addPrice} onPrice={setAddPrice}
+          onSubmit={handleAddService}
+          submitting={addSubmitting}
+        />
+      </div>
     )
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
+    <div className="rounded-lg border bg-card p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+            <DollarSign className="h-3.5 w-3.5" />
             Planned Services
-            <Badge variant="secondary">{prospectiveItems.length}</Badge>
-          </CardTitle>
-          <div className="text-sm font-semibold text-green-600 dark:text-green-400">
+          </p>
+          <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+            {prospectiveItems.length}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {isExtracting && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+          <span className="text-xs font-semibold text-green-600 dark:text-green-400">
             Est. ${total.toFixed(2)}
-          </div>
+          </span>
         </div>
-        {isExtracting && (
-          <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Analyzing encounter for additional billable items…
-          </div>
-        )}
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {prospectiveItems.map((item) => (
-            <BillingItemRow
-              key={item._id}
-              item={item}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
+      </div>
 
-        {/* Add Service inline */}
-        {!isFinalized && (
-          <div className="mt-3 pt-3 border-t">
-            {showAddService ? (
-              <div className="space-y-2">
-                <Input
-                  autoFocus
-                  placeholder="Service name"
-                  value={addName}
-                  onChange={e => setAddName(e.target.value)}
-                  className="h-8 text-sm"
-                  onKeyDown={e => { if (e.key === 'Escape') setShowAddService(false) }}
-                />
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Price ($)"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={addPrice}
-                    onChange={e => setAddPrice(e.target.value)}
-                    className="h-8 text-sm"
-                    onKeyDown={e => { if (e.key === 'Enter') handleAddService() }}
-                  />
-                  <Button
-                    size="sm"
-                    className="h-8 px-3 flex-shrink-0"
-                    disabled={addSubmitting || !addName.trim() || !addPrice}
-                    onClick={handleAddService}
-                  >
-                    {addSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Add'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 p-0 flex-shrink-0"
-                    onClick={() => { setShowAddService(false); setAddName(''); setAddPrice('') }}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowAddService(true)}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add service
-              </button>
-            )}
+      <div className="space-y-1">
+        {prospectiveItems.map((item) => (
+          <BillingItemRow key={item._id} item={item} onDelete={handleDelete} />
+        ))}
+      </div>
+
+      <AddServiceForm
+        show={showAddService}
+        onToggle={setShowAddService}
+        name={addName} onName={setAddName}
+        price={addPrice} onPrice={setAddPrice}
+        onSubmit={handleAddService}
+        submitting={addSubmitting}
+      />
+    </div>
+  )
+}
+
+// ── Shared sub-components ──────────────────────────────────────────────────
+
+function PanelHeader({ title }: { title: string }) {
+  return (
+    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-3">
+      <DollarSign className="h-3.5 w-3.5" />
+      {title}
+    </p>
+  )
+}
+
+interface AddServiceFormProps {
+  show: boolean
+  onToggle: (v: boolean) => void
+  name: string
+  onName: (v: string) => void
+  price: string
+  onPrice: (v: string) => void
+  onSubmit: () => void
+  submitting: boolean
+}
+
+function AddServiceForm({ show, onToggle, name, onName, price, onPrice, onSubmit, submitting }: AddServiceFormProps) {
+  return (
+    <div className="mt-3 pt-3 border-t">
+      {show ? (
+        <div className="space-y-2">
+          <Input
+            autoFocus
+            placeholder="Service name"
+            value={name}
+            onChange={e => onName(e.target.value)}
+            className="h-7 text-xs"
+            onKeyDown={e => { if (e.key === 'Escape') onToggle(false) }}
+          />
+          <div className="flex gap-1.5">
+            <Input
+              placeholder="Price ($)"
+              type="number"
+              min="0"
+              step="0.01"
+              value={price}
+              onChange={e => onPrice(e.target.value)}
+              className="h-7 text-xs"
+              onKeyDown={e => { if (e.key === 'Enter') onSubmit() }}
+            />
+            <button
+              disabled={submitting || !name.trim() || !price}
+              onClick={onSubmit}
+              className="h-7 px-2.5 rounded-md bg-primary text-primary-foreground text-xs font-medium disabled:opacity-50 flex-shrink-0"
+            >
+              {submitting ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}
+            </button>
+            <button
+              onClick={() => { onToggle(false); onName(''); onPrice('') }}
+              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground flex-shrink-0"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      ) : (
+        <button
+          onClick={() => onToggle(true)}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add service
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -509,63 +491,30 @@ function BillingItemRow({ item, onDelete, readonly }: BillingItemRowProps) {
 
   return (
     <div
-      className="flex items-start justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+      className="flex items-center justify-between py-1.5 group"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <p className="text-sm font-medium truncate">{item.description}</p>
-          {item.confidence && (
-            <Badge
-              variant={
-                item.confidence === 'high'
-                  ? 'default'
-                  : item.confidence === 'medium'
-                  ? 'secondary'
-                  : 'outline'
-              }
-              className="text-xs"
-            >
-              {item.confidence}
-            </Badge>
-          )}
-          {item.manuallyAdded && (
-            <Badge variant="outline" className="text-xs">
-              Manual
-            </Badge>
-          )}
-          {item.phase === 'retrospective' && (
-            <Badge variant="outline" className="text-xs">
-              Added
-            </Badge>
+      <div className="flex-1 min-w-0 mr-2">
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs font-medium truncate">{item.description}</p>
+          {item.confidence === 'high' && (
+            <span className="text-[10px] rounded-full bg-primary/10 text-primary px-1.5 py-0.5 flex-shrink-0">high</span>
           )}
         </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span>Qty: {item.quantity}</span>
-          <span>${(item.unitPrice / 100).toFixed(2)} ea</span>
-          {item.taxable && (
-            <Badge variant="outline" className="text-xs">
-              Taxable
-            </Badge>
-          )}
-        </div>
+        <p className="text-[10px] text-muted-foreground mt-0.5">
+          Qty {item.quantity} · ${(item.unitPrice / 100).toFixed(2)} ea
+        </p>
       </div>
-      <div className="flex items-center gap-2 ml-4">
-        <div className="text-sm font-semibold text-right min-w-[60px]">
-          ${itemTotal.toFixed(2)}
-        </div>
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        <span className="text-xs font-semibold">${itemTotal.toFixed(2)}</span>
         {!readonly && isHovered && onDelete && (
-          <div className="flex gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => onDelete(item._id)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          <button
+            onClick={() => onDelete(item._id)}
+            className="text-muted-foreground hover:text-destructive transition-colors"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
         )}
       </div>
     </div>
