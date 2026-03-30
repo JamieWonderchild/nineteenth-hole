@@ -60,6 +60,7 @@ import {
   FileText,
   ClipboardList,
   ChevronRight,
+  AlertTriangle,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -162,6 +163,7 @@ export default function ConsultationDetailPage() {
   );
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   const handleFileUpload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -799,6 +801,29 @@ export default function ConsultationDetailPage() {
             </div>
           </div>
 
+          {/* Conflict resolution banner — shown whenever there are unresolved contradictions */}
+          {unresolvedContradictions > 0 && (
+            <div className="rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-500 p-4 flex items-start gap-4">
+              <div className="h-10 w-10 rounded-full bg-amber-400/20 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                  {unresolvedContradictions} conflicting fact{unresolvedContradictions !== 1 ? 's' : ''} need your review
+                </p>
+                <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+                  Recordings contain contradictory information. Resolve each conflict before medical codes can be generated or documents created.
+                </p>
+              </div>
+              <button
+                onClick={() => timelineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className="flex-shrink-0 text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-200/60 hover:bg-amber-200 dark:bg-amber-800/40 dark:hover:bg-amber-800/60 px-3 py-1.5 rounded-md transition-colors whitespace-nowrap"
+              >
+                Resolve now →
+              </button>
+            </div>
+          )}
+
           {/* Patient Details */}
           {patient && (
             <div className="rounded-lg border bg-card px-4 py-3">
@@ -974,11 +999,13 @@ export default function ConsultationDetailPage() {
                 </div>
 
                 {/* Recording Timeline */}
-                <RecordingTimeline
-                  recordings={detail?.recordings || []}
-                  factReconciliation={detail?.factReconciliation}
-                  onResolveConflict={isEditable ? handleResolveConflict : undefined}
-                />
+                <div ref={timelineRef}>
+                  <RecordingTimeline
+                    recordings={detail?.recordings || []}
+                    factReconciliation={detail?.factReconciliation}
+                    onResolveConflict={isEditable ? handleResolveConflict : undefined}
+                  />
+                </div>
 
                 {/* Attachments */}
                 <div

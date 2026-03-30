@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Clock, Mic, FileText, AlertCircle, CheckCircle, RefreshCw, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { Clock, Mic, FileText, AlertCircle, CheckCircle, RefreshCw, Sparkles, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -106,8 +106,35 @@ const statusConfig: Record<string, { icon: any; color: string; label: string }> 
 };
 
 export function RecordingTimeline({ recordings, factReconciliation, onResolveConflict }: RecordingTimelineProps) {
-  // Track which recordings are expanded
+  const unresolvedCount = useMemo(() => {
+    if (!factReconciliation) return 0;
+    return factReconciliation.reconciledFacts.filter(
+      f => f.status === 'contradicted' && !f.resolution
+    ).length;
+  }, [factReconciliation]);
+
+  // Auto-expand recordings that have unresolved contradictions
+  const recordingsWithConflicts = useMemo((): Set<number> => {
+    if (!factReconciliation) return new Set<number>();
+    const indices: number[] = factReconciliation.reconciledFacts
+      .filter(f => f.status === 'contradicted' && !f.resolution)
+      .flatMap(f => [f.recordingIndex, f.priorRecordingIndex].filter((i): i is number => i !== undefined));
+    return new Set(indices);
+  }, [factReconciliation]);
+
+  // Track which recordings are expanded — default-expand those with conflicts
   const [expandedRecordings, setExpandedRecordings] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (recordingsWithConflicts.size === 0) return;
+    setExpandedRecordings(prev => {
+      const next = new Set(prev);
+      recordings.forEach((rec, idx) => {
+        if (recordingsWithConflicts.has(idx)) next.add(rec._id);
+      });
+      return next;
+    });
+  }, [recordingsWithConflicts, recordings]);
 
   const toggleRecording = (recordingId: string) => {
     setExpandedRecordings((prev) => {
@@ -174,13 +201,30 @@ export function RecordingTimeline({ recordings, factReconciliation, onResolveCon
     <TooltipProvider>
       <Card>
         <CardContent className="p-6">
-          <div className="flex items-center gap-2 mb-6">
+          <div className="flex items-center gap-2 mb-4">
             <Clock className="h-5 w-5 text-primary" />
             <h3 className="text-lg font-semibold">Recording Timeline</h3>
             <Badge variant="outline" className="ml-auto">
               {recordings.length} recording{recordings.length !== 1 ? 's' : ''}
             </Badge>
           </div>
+
+          {/* Unresolved conflicts banner */}
+          {unresolvedCount > 0 && (
+            <div className="rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-500 px-4 py-3 mb-6 flex items-start gap-3">
+              <div className="h-8 w-8 rounded-full bg-amber-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                  {unresolvedCount} conflicting fact{unresolvedCount !== 1 ? 's' : ''} require your review
+                </p>
+                <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+                  Medical codes cannot be generated until all conflicts are resolved. Review each conflict below and choose the correct value.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="relative">
             {/* Timeline line */}
@@ -306,10 +350,66 @@ export function RecordingTimeline({ recordings, factReconciliation, onResolveCon
 
                               const isUnresolvedConflict = fact.status === 'contradicted' && !fact.resolution;
 
+                              // Unresolved contradiction — full choice card
+                              if (isUnresolvedConflict && onResolveConflict) {
+                                return (
+                                  <div key={fact.factId} className="rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-500 p-3 my-1">
+                                    <div className="flex items-center gap-1.5 mb-2.5">
+                                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                                      <span className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wide">
+                                        Conflict — {fact.group}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-amber-700/70 dark:text-amber-400/60 mb-2">
+                                      Which value is correct?
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <button
+                                        onClick={() => onResolveConflict(fact.factId, 'keep-old')}
+                                        className="text-left p-2.5 rounded-md border-2 border-border bg-background hover:border-primary hover:bg-primary/5 transition-all group/btn"
+                                      >
+                                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 group-hover/btn:text-primary transition-colors">
+                                          Recording {(fact.priorRecordingIndex ?? 0) + 1}
+                                        </p>
+                                        <p className="text-xs font-medium text-foreground leading-snug">{fact.priorText}</p>
+                                      </button>
+                                      <button
+                                        onClick={() => onResolveConflict(fact.factId, 'accept-new')}
+                                        className="text-left p-2.5 rounded-md border-2 border-border bg-background hover:border-primary hover:bg-primary/5 transition-all group/btn"
+                                      >
+                                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 group-hover/btn:text-primary transition-colors">
+                                          Recording {fact.recordingIndex + 1} — latest
+                                        </p>
+                                        <p className="text-xs font-medium text-foreground leading-snug">{fact.text}</p>
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              // Resolved contradiction
+                              if (fact.status === 'contradicted' && fact.resolution) {
+                                const kept = fact.resolution === 'keep-old' ? fact.priorText : fact.text;
+                                const discarded = fact.resolution === 'keep-old' ? fact.text : fact.priorText;
+                                return (
+                                  <div key={fact.factId} className="flex items-start gap-2 text-sm">
+                                    <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-green-600" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-muted-foreground">
+                                        <span className="font-medium text-foreground">{fact.group}:</span>{' '}
+                                        {kept}
+                                      </p>
+                                      <p className="text-[11px] text-muted-foreground/50 line-through mt-0.5">{discarded}</p>
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              // All other statuses (confirmed, updated, new, unchanged)
                               return (
                                 <div
                                   key={fact.factId}
-                                  className={`flex items-start gap-2 text-sm group ${isUnresolvedConflict ? 'rounded-md border border-red-200 bg-red-50/50 dark:border-red-900/50 dark:bg-red-950/20 p-2 -mx-2' : ''}`}
+                                  className="flex items-start gap-2 text-sm group"
                                 >
                                   <StatusIcon className={`h-4 w-4 mt-0.5 flex-shrink-0 ${config.color}`} />
                                   <div className="flex-1 min-w-0">
@@ -322,33 +422,6 @@ export function RecordingTimeline({ recordings, factReconciliation, onResolveCon
                                     {fact.status === 'updated' && fact.priorText && (
                                       <p className="text-xs text-muted-foreground/60 mt-0.5 line-through">
                                         Previously: {fact.priorText}
-                                      </p>
-                                    )}
-                                    {fact.status === 'contradicted' && fact.priorText && (
-                                      <p className="text-xs mt-0.5">
-                                        <span className="text-muted-foreground">Previously: </span>
-                                        <span className="font-medium text-foreground">{fact.priorText}</span>
-                                      </p>
-                                    )}
-                                    {isUnresolvedConflict && onResolveConflict && (
-                                      <div className="flex items-center gap-2 mt-1.5">
-                                        <button
-                                          onClick={() => onResolveConflict(fact.factId, 'accept-new')}
-                                          className="text-[11px] font-medium px-2 py-0.5 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                                        >
-                                          Use new
-                                        </button>
-                                        <button
-                                          onClick={() => onResolveConflict(fact.factId, 'keep-old')}
-                                          className="text-[11px] font-medium px-2 py-0.5 rounded bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                                        >
-                                          Keep old
-                                        </button>
-                                      </div>
-                                    )}
-                                    {fact.status === 'contradicted' && fact.resolution && (
-                                      <p className="text-[11px] text-muted-foreground mt-1">
-                                        Resolved: {fact.resolution === 'accept-new' ? 'using new value' : 'keeping old value'}
                                       </p>
                                     )}
                                   </div>

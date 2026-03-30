@@ -20,6 +20,7 @@ import {
   Download,
   Hospital,
   Copy,
+  AlertTriangle,
 } from 'lucide-react';
 import { AppLink } from '@/components/navigation/AppLink';
 import { toast } from '@/hooks/use-toast';
@@ -146,9 +147,24 @@ export default function DocumentsPage() {
   const hasInteraction = !!interactionId;
   const hasFacts = aggregatedFacts.length > 0;
 
+  const unresolvedContradictions = useMemo(() => {
+    if (!detail?.factReconciliation) return 0;
+    return detail.factReconciliation.reconciledFacts.filter(
+      (f: { status: string; resolution?: string }) => f.status === 'contradicted' && !f.resolution
+    ).length;
+  }, [detail?.factReconciliation]);
+
   // Generate or regenerate a single document
   const handleGenerateSingle = useCallback(async (docType: typeof ALL_DOC_TYPES[number]) => {
     if (!interactionId || aggregatedFacts.length === 0) return;
+    if (unresolvedContradictions > 0) {
+      toast({
+        title: 'Resolve conflicts first',
+        description: `${unresolvedContradictions} contradicted fact${unresolvedContradictions !== 1 ? 's' : ''} in the recording timeline need to be resolved before generating documents.`,
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setGeneratingDocId(docType.dbKey);
     try {
@@ -213,6 +229,14 @@ export default function DocumentsPage() {
   // Generate multiple selected documents
   const handleGenerateMultiple = useCallback(async () => {
     if (!interactionId || aggregatedFacts.length === 0 || selectedForGeneration.size === 0) return;
+    if (unresolvedContradictions > 0) {
+      toast({
+        title: 'Resolve conflicts first',
+        description: `${unresolvedContradictions} contradicted fact${unresolvedContradictions !== 1 ? 's' : ''} need to be resolved before generating documents.`,
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setIsGeneratingMultiple(true);
     try {
@@ -436,6 +460,29 @@ export default function DocumentsPage() {
     <Layout>
       <BillingGuard feature="Encounters">
         <div className="mx-auto max-w-5xl p-4 sm:p-6 space-y-5">
+          {/* Conflict resolution banner */}
+          {unresolvedContradictions > 0 && (
+            <div className="rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-500 p-4 flex items-start gap-4">
+              <div className="h-10 w-10 rounded-full bg-amber-400/20 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                  Documents cannot be generated yet
+                </p>
+                <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+                  {unresolvedContradictions} conflicting fact{unresolvedContradictions !== 1 ? 's' : ''} in the recording timeline need to be resolved first.
+                </p>
+              </div>
+              <AppLink
+                href={`/encounter/${encounterId}`}
+                className="flex-shrink-0 text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-200/60 hover:bg-amber-200 dark:bg-amber-800/40 dark:hover:bg-amber-800/60 px-3 py-1.5 rounded-md transition-colors whitespace-nowrap"
+              >
+                Go resolve →
+              </AppLink>
+            </div>
+          )}
+
           {/* Header */}
           <div className="space-y-1">
             <AppLink
