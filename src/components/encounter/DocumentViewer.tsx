@@ -210,7 +210,9 @@ export function DocumentViewer({ title, sections, generatedAt, encounterId, docK
                 className={`text-sm prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-headings:mt-2 prose-headings:mb-1 prose-strong:font-semibold prose-strong:text-foreground/80 prose-pre:bg-muted prose-pre:text-foreground prose-code:bg-muted prose-code:text-foreground prose-code:before:content-none prose-code:after:content-none dark:prose-invert ${canEdit ? 'cursor-text hover:bg-muted/30 rounded px-1 -mx-1 transition-colors' : ''}`}
                 onClick={() => canEdit && startEditing(idx)}
               >
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{section.content}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {section.content.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim()}
+                </ReactMarkdown>
               </div>
             )}
           </div>
