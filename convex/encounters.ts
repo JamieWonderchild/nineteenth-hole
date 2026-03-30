@@ -86,6 +86,7 @@ export const saveVoiceConsultation = mutation({
       }))),
     })),
     encounterId: v.optional(v.id("encounters")),
+    encounterType: v.optional(v.string()), // 'outpatient' | 'inpatient' | 'ed'
     recordingPhase: v.optional(v.string()),
     recordingDuration: v.optional(v.number()),
     extractedPatientInfo: v.optional(v.object({
@@ -197,6 +198,7 @@ export const saveVoiceConsultation = mutation({
         facts: args.facts,
         diagnosisResult: args.diagnosisResult,
         status: 'in-progress',
+        encounterType: args.encounterType,
         extractedPatientInfo: args.extractedPatientInfo,
       });
 

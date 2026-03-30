@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { facts, transcript } = body;
+    const { facts, transcript, encounterType } = body;
 
     if (!Array.isArray(facts) || facts.length === 0) {
       return NextResponse.json(
@@ -26,9 +26,15 @@ export async function POST(request: NextRequest) {
       .map((f) => `[${f.group}] ${f.text}`)
       .join('\n');
 
+    const encounterContext = encounterType === 'inpatient'
+      ? 'SETTING: Inpatient hospital encounter. Probable and suspected diagnoses may be coded.\n\n'
+      : encounterType === 'ed'
+      ? 'SETTING: Emergency department encounter.\n\n'
+      : '';
+
     const text = transcript
-      ? `CLINICAL TRANSCRIPT:\n${transcript}\n\nEXTRACTED FACTS:\n${factsText}`
-      : `CLINICAL FACTS:\n${factsText}`;
+      ? `${encounterContext}CLINICAL TRANSCRIPT:\n${transcript}\n\nEXTRACTED FACTS:\n${factsText}`
+      : `${encounterContext}CLINICAL FACTS:\n${factsText}`;
 
     const client = createCortiClientFromEnv();
     const codes = await client.predictCodes(text);

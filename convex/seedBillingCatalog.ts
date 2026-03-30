@@ -2,6 +2,55 @@ import { mutation } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
+ * Seed inpatient and ED E&M codes for an org
+ * Usage: npx convex run seedBillingCatalog:seedInpatientCodes '{"orgId":"..."}'
+ */
+export const seedInpatientCodes = mutation({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    const inpatientItems = [
+      // ─── Inpatient Hospital Care (Hospitalist / subsequent visits) ────────
+      { name: "Hospital Inpatient Care – Subsequent, Low (99231)", code: "99231", category: "em", basePrice: 9000, taxable: false, description: "Subsequent hospital care, straightforward/low MDM or 25 min" },
+      { name: "Hospital Inpatient Care – Subsequent, Moderate (99232)", code: "99232", category: "em", basePrice: 15500, taxable: false, description: "Subsequent hospital care, moderate MDM or 35 min" },
+      { name: "Hospital Inpatient Care – Subsequent, High (99233)", code: "99233", category: "em", basePrice: 22500, taxable: false, description: "Subsequent hospital care, high MDM or 50 min" },
+      // ─── Inpatient Admission (Initial Hospital Care) ──────────────────────
+      { name: "Initial Hospital Care – Low Complexity (99221)", code: "99221", category: "em", basePrice: 14000, taxable: false, description: "Initial hospital care, straightforward/low MDM or 40 min" },
+      { name: "Initial Hospital Care – Moderate Complexity (99222)", code: "99222", category: "em", basePrice: 22000, taxable: false, description: "Initial hospital care, moderate MDM or 55 min" },
+      { name: "Initial Hospital Care – High Complexity (99223)", code: "99223", category: "em", basePrice: 32000, taxable: false, description: "Initial hospital care, high MDM or 75 min" },
+      // ─── Discharge Day Management ─────────────────────────────────────────
+      { name: "Hospital Discharge – 30 min or less (99238)", code: "99238", category: "em", basePrice: 13500, taxable: false, description: "Discharge day management, 30 minutes or less" },
+      { name: "Hospital Discharge – More than 30 min (99239)", code: "99239", category: "em", basePrice: 20000, taxable: false, description: "Discharge day management, more than 30 minutes" },
+      // ─── Emergency Department ─────────────────────────────────────────────
+      { name: "ED Visit – Low Severity (99283)", code: "99283", category: "em", basePrice: 18000, taxable: false, description: "ED visit, moderate severity problem, low MDM" },
+      { name: "ED Visit – Moderate Severity (99284)", code: "99284", category: "em", basePrice: 28000, taxable: false, description: "ED visit, high severity problem, moderate MDM" },
+      { name: "ED Visit – High Severity (99285)", code: "99285", category: "em", basePrice: 40000, taxable: false, description: "ED visit, high severity with threat to life, high MDM" },
+    ];
+
+    const created: { id: string; name: string }[] = [];
+    for (const item of inpatientItems) {
+      // Skip if code already exists for this org
+      const existing = await ctx.db
+        .query("billingCatalog")
+        .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+        .filter((q) => q.eq(q.field("code"), item.code))
+        .first();
+      if (existing) continue;
+
+      const id = await ctx.db.insert("billingCatalog", {
+        orgId: args.orgId,
+        ...item,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      created.push({ id, name: item.name });
+    }
+
+    return { success: true, itemsCreated: created.length, items: created };
+  },
+});
+
+/**
  * Seed billing catalog with sample human-medicine clinical items
  * Usage: npx convex run seedBillingCatalog:populateSampleItems '{"orgId":"..."}'
  */

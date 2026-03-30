@@ -44,6 +44,7 @@ export default function NewEncounterPage() {
   const isMobileQuickStart = searchParams.get('mobile') === 'true';
   const isMobile = useIsMobile();
 
+  const [encounterType, setEncounterType] = useState<'outpatient' | 'inpatient' | 'ed'>('outpatient');
   const [sessionData, setSessionData] = useState<EncounterSession | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -399,6 +400,28 @@ export default function NewEncounterPage() {
             )}
           </div>
         </div>
+
+        {/* Encounter type selector — shown before first recording */}
+        {!sessionData && !encounterId && (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground font-medium">Encounter type</span>
+            <div className="flex rounded-lg border overflow-hidden">
+              {(['outpatient', 'inpatient', 'ed'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setEncounterType(t)}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                    encounterType === t
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-background text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {t === 'outpatient' ? 'Outpatient' : t === 'inpatient' ? 'Inpatient' : 'ED'}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <CortiConsultation
           consultationType="sick-visit"

@@ -961,6 +961,7 @@ export default function ConsultationDetailPage() {
               encounterId={encounterId as Id<"encounters">}
               orgId={orgContext.orgId as Id<"organizations">}
               facts={computeFactsFromDetail()}
+              encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
             />
           )}
 
@@ -974,6 +975,7 @@ export default function ConsultationDetailPage() {
               existingCpt={encounter.cptCodes ?? []}
               isEditable={isEditable}
               addenda={encounter.addenda ?? []}
+              encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
             />
           )}
 

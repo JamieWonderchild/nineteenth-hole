@@ -12,7 +12,7 @@ import { DollarSign, Trash2, AlertCircle, CheckCircle2, RotateCcw, Loader2 } fro
 import { useBillingMatcher, type BillingCatalogItem } from '@/hooks/useBillingMatcher'
 import { useUser } from '@clerk/nextjs'
 import { AppLink } from '@/components/navigation/AppLink'
-import { scoreEM } from '@/lib/emScoring'
+import { scoreEM, type EncounterType } from '@/lib/emScoring'
 
 interface SimpleFact {
   id: string
@@ -46,6 +46,7 @@ interface PlannedServicesWidgetProps {
   recordingId?: Id<'recordings'>
   orgId?: Id<'organizations'>
   facts: SimpleFact[]
+  encounterType?: EncounterType
   onItemsChange?: () => void
 }
 
@@ -54,6 +55,7 @@ export function PlannedServicesWidget({
   recordingId,
   orgId,
   facts,
+  encounterType = 'outpatient',
   onItemsChange,
 }: PlannedServicesWidgetProps) {
   const { user } = useUser()
@@ -169,7 +171,7 @@ export function PlannedServicesWidget({
       return
     }
 
-    const result = scoreEM(facts)
+    const result = scoreEM(facts, 'established', encounterType)
     const catalogItem = catalog.find(
       (item) => item.code === result.code
     )

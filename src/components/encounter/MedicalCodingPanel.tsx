@@ -33,6 +33,7 @@ interface MedicalCodingPanelProps {
   existingCpt?: string[];
   isEditable?: boolean;
   addenda?: Array<{ text: string; createdAt: string }>;
+  encounterType?: 'outpatient' | 'inpatient' | 'ed';
 }
 
 export function MedicalCodingPanel({
@@ -43,6 +44,7 @@ export function MedicalCodingPanel({
   existingCpt = [],
   isEditable = true,
   addenda = [],
+  encounterType = 'outpatient',
 }: MedicalCodingPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [icd10Suggestions, setIcd10Suggestions] = useState<MedicalCode[]>([]);
@@ -62,7 +64,7 @@ export function MedicalCodingPanel({
       const res = await fetch('/api/corti/predict-codes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ facts, transcript }),
+        body: JSON.stringify({ facts, transcript, encounterType }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Unknown error' }));

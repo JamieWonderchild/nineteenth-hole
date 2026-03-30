@@ -8,6 +8,7 @@
 
 export type MDMLevel = 'low' | 'moderate' | 'high';
 export type PatientType = 'new' | 'established';
+export type EncounterType = 'outpatient' | 'inpatient' | 'ed';
 
 export interface MDMScores {
   problems: MDMLevel;
@@ -45,17 +46,16 @@ const MODERATE_RISK_PLAN = /\b(prescri|new medication|start.*mg|titrat|refill|ph
 
 // ─── E&M code tables ─────────────────────────────────────────────────────────
 
-const ESTABLISHED_CODES: Record<MDMLevel, string> = {
-  low: '99213',
-  moderate: '99214',
-  high: '99215',
-};
+// Outpatient office/clinic visit
+const OUTPATIENT_ESTABLISHED: Record<MDMLevel, string> = { low: '99213', moderate: '99214', high: '99215' };
+const OUTPATIENT_NEW: Record<MDMLevel, string> = { low: '99203', moderate: '99204', high: '99205' };
 
-const NEW_PATIENT_CODES: Record<MDMLevel, string> = {
-  low: '99203',
-  moderate: '99204',
-  high: '99205',
-};
+// Inpatient hospital care — defaults to subsequent visit (most common for hospitalists)
+// Admission (99221-99223) and discharge (99238-99239) should be selected manually from billing panel
+const INPATIENT_SUBSEQUENT: Record<MDMLevel, string> = { low: '99231', moderate: '99232', high: '99233' };
+
+// Emergency department (complexity-based; new vs established not relevant in ED)
+const ED_CODES: Record<MDMLevel, string> = { low: '99283', moderate: '99284', high: '99285' };
 
 // ─── Scoring functions ────────────────────────────────────────────────────────
 
@@ -161,7 +161,8 @@ function applyMDMMatrix(
 
 export function scoreEM(
   facts: Fact[],
-  patientType: PatientType = 'established'
+  patientType: PatientType = 'established',
+  encounterType: EncounterType = 'outpatient'
 ): EMScoringResult {
   const byGroup = (group: string) => facts.filter((f) => f.group === group);
 
@@ -177,7 +178,14 @@ export function scoreEM(
 
   const overall = applyMDMMatrix(problems.level, data.level, risk.level);
 
-  const codes = patientType === 'new' ? NEW_PATIENT_CODES : ESTABLISHED_CODES;
+  let codes: Record<MDMLevel, string>;
+  if (encounterType === 'inpatient') {
+    codes = INPATIENT_SUBSEQUENT;
+  } else if (encounterType === 'ed') {
+    codes = ED_CODES;
+  } else {
+    codes = patientType === 'new' ? OUTPATIENT_NEW : OUTPATIENT_ESTABLISHED;
+  }
 
   return {
     code: codes[overall],
