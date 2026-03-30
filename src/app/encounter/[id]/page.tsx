@@ -1094,6 +1094,7 @@ export default function ConsultationDetailPage() {
                   isEditable={isEditable}
                   addenda={encounter.addenda ?? []}
                   encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
+                  reconciledAt={detail?.factReconciliation?.reconciledAt}
                 />
               </div>{/* end right sidebar */}
 

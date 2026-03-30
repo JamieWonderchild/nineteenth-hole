@@ -5,7 +5,6 @@ import { useMutation } from 'convex/react';
 import { api } from 'convex/_generated/api';
 import type { Id } from 'convex/_generated/dataModel';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -15,6 +14,7 @@ import {
   Tag,
   Loader2,
   RefreshCw,
+  GitMerge,
 } from 'lucide-react';
 
 interface MedicalCode {
@@ -34,6 +34,7 @@ interface MedicalCodingPanelProps {
   isEditable?: boolean;
   addenda?: Array<{ text: string; createdAt: string }>;
   encounterType?: 'outpatient' | 'inpatient' | 'ed';
+  reconciledAt?: string; // ISO timestamp — changes when fact reconciliation completes
 }
 
 export function MedicalCodingPanel({
@@ -45,6 +46,7 @@ export function MedicalCodingPanel({
   isEditable = true,
   addenda = [],
   encounterType = 'outpatient',
+  reconciledAt,
 }: MedicalCodingPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [icd10Suggestions, setIcd10Suggestions] = useState<MedicalCode[]>([]);
@@ -53,7 +55,9 @@ export function MedicalCodingPanel({
   const [acceptedIcd10, setAcceptedIcd10] = useState<Set<string>>(new Set(existingIcd10));
   const [acceptedCpt, setAcceptedCpt] = useState<Set<string>>(new Set(existingCpt));
   const [hasRun, setHasRun] = useState(existingIcd10.length > 0 || existingCpt.length > 0);
+  const [reconciliationBanner, setReconciliationBanner] = useState(false);
   const autoTriggered = useRef(false);
+  const lastReconciledAt = useRef<string | undefined>(reconciledAt);
 
   const updateMedicalCodes = useMutation(api.encounters.updateMedicalCodes);
 
@@ -166,6 +170,19 @@ export function MedicalCodingPanel({
       .catch(() => null);
   }, [addenda.length, isEditable]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-run coding when fact reconciliation produces a new timestamp
+  useEffect(() => {
+    if (!isEditable || !reconciledAt) return;
+    // Skip the initial mount value — only fire when it genuinely changes
+    if (reconciledAt === lastReconciledAt.current) return;
+    lastReconciledAt.current = reconciledAt;
+
+    runCoding().then(() => {
+      setReconciliationBanner(true);
+      setTimeout(() => setReconciliationBanner(false), 4000);
+    });
+  }, [reconciledAt, isEditable]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-save helper — debounced 600ms
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingIcd10 = useRef<Set<string>>(acceptedIcd10);
@@ -252,6 +269,14 @@ export function MedicalCodingPanel({
           </button>
         )}
       </div>
+
+      {/* Reconciliation banner */}
+      {reconciliationBanner && (
+        <div className="flex items-center gap-1.5 text-[11px] text-primary mb-2 animate-in fade-in slide-in-from-top-1 duration-300">
+          <GitMerge className="h-3 w-3 flex-shrink-0" />
+          Codes updated from reconciled facts
+        </div>
+      )}
 
       {/* Loading */}
       {isLoading && (
