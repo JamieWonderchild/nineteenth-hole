@@ -254,7 +254,7 @@ export function buildDocumentReference(params: {
     '34748-4': 'Telephone encounter note',
   };
 
-  const encoded = btoa(unescape(encodeURIComponent(noteText)));
+  const encoded = Buffer.from(noteText, 'utf-8').toString('base64');
 
   const doc: FhirDocumentReference = {
     resourceType: 'DocumentReference',

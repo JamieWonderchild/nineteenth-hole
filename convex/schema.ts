@@ -440,6 +440,8 @@ export default defineSchema({
     admissionStatus: v.optional(v.string()), // 'ambulatory' | 'admitted' | 'transferred' | 'discharged'
     icd10Codes: v.optional(v.array(v.string())),
     cptCodes: v.optional(v.array(v.string())),
+    epicPatientId: v.optional(v.string()),    // FHIR Patient ID from Epic SMART launch
+    epicEncounterId: v.optional(v.string()),  // FHIR Encounter ID from Epic SMART launch
     extractedPatientInfo: v.optional(v.object({
       name: v.optional(v.string()),
       age: v.optional(v.string()),
