@@ -9,12 +9,12 @@ type CellValue = 'yes' | 'partial' | 'no' | string; // string = custom label
 type ComparisonRow = {
   feature: string;
   tooltip?: string;
-  vetaiOnly?: boolean; // shows "Only [PRODUCT_NAME]" badge
-  vetai: CellValue;
-  scribenote: CellValue;
-  vetrec: CellValue;
-  talkatoo: CellValue;
-  digitail: CellValue;
+  notaOnly?: boolean; // shows "Only [PRODUCT_NAME]" badge
+  nota: CellValue;
+  dax: CellValue;
+  suki: CellValue;
+  deepscribe: CellValue;
+  nabla: CellValue;
 };
 
 type Category = {
@@ -30,28 +30,28 @@ const CATEGORIES: Category[] = [
     rows: [
       {
         feature: 'AI-generated SOAP notes',
-        vetai: 'yes', scribenote: 'yes', vetrec: 'yes', talkatoo: 'yes', digitail: 'yes',
+        nota: 'yes', dax: 'yes', suki: 'yes', deepscribe: 'yes', nabla: 'yes',
       },
       {
         feature: 'Real-time fact extraction',
-        vetai: 'yes', scribenote: 'yes', vetrec: 'yes', talkatoo: 'partial', digitail: 'yes',
+        nota: 'yes', dax: 'yes', suki: 'yes', deepscribe: 'yes', nabla: 'partial',
       },
       {
         feature: 'Multiple recordings per visit',
         tooltip: 'Record pre-consult, during exam, and follow-up — all merged into one encounter',
-        vetaiOnly: true,
-        vetai: 'yes', scribenote: 'no', vetrec: 'no', talkatoo: 'no', digitail: 'no',
+        notaOnly: true,
+        nota: 'yes', dax: 'no', suki: 'no', deepscribe: 'no', nabla: 'no',
       },
       {
         feature: 'Cross-recording fact reconciliation',
         tooltip: 'AI detects contradictions across recordings and lets you resolve them before generating documents',
-        vetaiOnly: true,
-        vetai: 'yes', scribenote: 'no', vetrec: 'no', talkatoo: 'no', digitail: 'no',
+        notaOnly: true,
+        nota: 'yes', dax: 'no', suki: 'no', deepscribe: 'no', nabla: 'no',
       },
       {
         feature: 'Prior encounter context',
         tooltip: 'Inject a patient\'s history from past visits into the current document generation',
-        vetai: 'yes', scribenote: 'no', vetrec: 'no', talkatoo: 'no', digitail: 'partial',
+        nota: 'yes', dax: 'partial', suki: 'no', deepscribe: 'no', nabla: 'partial',
       },
     ],
   },
@@ -60,32 +60,32 @@ const CATEGORIES: Category[] = [
     rows: [
       {
         feature: 'SOAP note',
-        vetai: 'yes', scribenote: 'yes', vetrec: 'yes', talkatoo: 'yes', digitail: 'yes',
+        nota: 'yes', dax: 'yes', suki: 'yes', deepscribe: 'yes', nabla: 'yes',
       },
       {
         feature: 'Patient summary & discharge instructions',
-        vetai: 'yes', scribenote: 'yes', vetrec: 'yes', talkatoo: 'yes', digitail: 'yes',
+        nota: 'yes', dax: 'yes', suki: 'yes', deepscribe: 'yes', nabla: 'yes',
       },
       {
         feature: 'Prescription document',
-        vetai: 'yes', scribenote: 'no', vetrec: 'no', talkatoo: 'no', digitail: 'yes',
+        nota: 'yes', dax: 'no', suki: 'no', deepscribe: 'no', nabla: 'partial',
       },
       {
         feature: 'Referral letter',
-        vetai: 'yes', scribenote: 'no', vetrec: 'yes', talkatoo: 'no', digitail: 'no',
+        nota: 'yes', dax: 'partial', suki: 'no', deepscribe: 'no', nabla: 'no',
       },
       {
         feature: 'Lab order',
-        vetaiOnly: true,
-        vetai: 'yes', scribenote: 'no', vetrec: 'no', talkatoo: 'no', digitail: 'no',
+        notaOnly: true,
+        nota: 'yes', dax: 'no', suki: 'no', deepscribe: 'no', nabla: 'no',
       },
       {
         feature: 'Follow-up plan',
-        vetai: 'yes', scribenote: 'no', vetrec: 'no', talkatoo: 'no', digitail: 'partial',
+        nota: 'yes', dax: 'partial', suki: 'no', deepscribe: 'no', nabla: 'partial',
       },
       {
         feature: 'Total document types',
-        vetai: '7 types', scribenote: '3–4', vetrec: '6+', talkatoo: '3', digitail: '4',
+        nota: '7 types', dax: '3–4', suki: '3', deepscribe: '4', nabla: '3–4',
       },
     ],
   },
@@ -94,22 +94,27 @@ const CATEGORIES: Category[] = [
     rows: [
       {
         feature: 'Differential diagnosis support',
-        vetai: 'yes', scribenote: 'partial', vetrec: 'yes', talkatoo: 'partial', digitail: 'partial',
+        nota: 'yes', dax: 'partial', suki: 'partial', deepscribe: 'no', nabla: 'yes',
       },
       {
         feature: 'Drug interaction checking',
         tooltip: 'Powered by DrugBank — flags contraindications and patient-specific dosing concerns',
-        vetaiOnly: true,
-        vetai: 'yes', scribenote: 'no', vetrec: 'no', talkatoo: 'no', digitail: 'no',
+        notaOnly: true,
+        nota: 'yes', dax: 'no', suki: 'no', deepscribe: 'no', nabla: 'no',
       },
       {
         feature: 'Multi-turn AI clinical chat',
-        vetai: 'yes', scribenote: 'partial', vetrec: 'yes', talkatoo: 'partial', digitail: 'partial',
+        nota: 'yes', dax: 'partial', suki: 'partial', deepscribe: 'no', nabla: 'yes',
       },
       {
         feature: 'Medical literature references',
         tooltip: 'Surfaces relevant PubMed studies with PMID links during case reasoning',
-        vetai: 'yes', scribenote: 'no', vetrec: 'no', talkatoo: 'no', digitail: 'no',
+        nota: 'yes', dax: 'no', suki: 'no', deepscribe: 'no', nabla: 'no',
+      },
+      {
+        feature: 'ICD-10 / CPT code suggestions',
+        notaOnly: true,
+        nota: 'yes', dax: 'no', suki: 'no', deepscribe: 'no', nabla: 'no',
       },
     ],
   },
@@ -118,22 +123,18 @@ const CATEGORIES: Category[] = [
     rows: [
       {
         feature: 'Patient summary (text / PDF)',
-        vetai: 'yes', scribenote: 'yes', vetrec: 'yes', talkatoo: 'yes', digitail: 'yes',
+        nota: 'yes', dax: 'yes', suki: 'yes', deepscribe: 'yes', nabla: 'yes',
       },
       {
         feature: 'Interactive AI companion for patients',
-        tooltip: 'A shareable AI the patient can actually chat with — answers questions about medications, care, and warning signs',
-        vetaiOnly: true,
-        vetai: 'yes', scribenote: 'no', vetrec: 'no', talkatoo: 'no', digitail: 'no',
+        tooltip: 'A shareable AI the patient can chat with — answers questions about medications, care, and warning signs',
+        notaOnly: true,
+        nota: 'yes', dax: 'no', suki: 'no', deepscribe: 'no', nabla: 'no',
       },
       {
-        feature: 'Shareable visit link (no app download)',
-        vetaiOnly: true,
-        vetai: 'yes', scribenote: 'no', vetrec: 'no', talkatoo: 'no', digitail: 'no',
-      },
-      {
-        feature: 'Patient mobile app',
-        vetai: 'no', scribenote: 'no', vetrec: 'no', talkatoo: 'no', digitail: 'yes',
+        feature: 'Shareable visit link via SMS (no app download)',
+        notaOnly: true,
+        nota: 'yes', dax: 'no', suki: 'no', deepscribe: 'no', nabla: 'no',
       },
     ],
   },
@@ -142,27 +143,24 @@ const CATEGORIES: Category[] = [
     rows: [
       {
         feature: 'Multi-provider team management',
-        vetai: 'yes', scribenote: 'partial', vetrec: 'yes', talkatoo: 'no', digitail: 'yes',
+        nota: 'yes', dax: 'partial', suki: 'partial', deepscribe: 'yes', nabla: 'yes',
       },
       {
         feature: 'Multi-location support',
-        vetai: 'yes', scribenote: 'partial', vetrec: 'partial', talkatoo: 'no', digitail: 'yes',
+        nota: 'yes', dax: 'partial', suki: 'no', deepscribe: 'partial', nabla: 'partial',
       },
       {
         feature: 'Role-based permissions',
-        vetai: 'yes', scribenote: 'partial', vetrec: 'no', talkatoo: 'no', digitail: 'yes',
+        nota: 'yes', dax: 'no', suki: 'no', deepscribe: 'partial', nabla: 'partial',
       },
       {
-        feature: 'Billing catalog',
-        vetai: 'yes', scribenote: 'no', vetrec: 'partial', talkatoo: 'no', digitail: 'yes',
+        feature: 'CPT billing catalog',
+        notaOnly: true,
+        nota: 'yes', dax: 'no', suki: 'no', deepscribe: 'no', nabla: 'no',
       },
       {
-        feature: 'PIMS / EMR integration',
-        vetai: 'no', scribenote: 'yes', vetrec: 'yes', talkatoo: 'yes', digitail: 'partial',
-      },
-      {
-        feature: 'Scheduling & full PIMS',
-        vetai: 'no', scribenote: 'no', vetrec: 'no', talkatoo: 'no', digitail: 'yes',
+        feature: 'EHR / EMR integration',
+        nota: 'partial', dax: 'yes', suki: 'yes', deepscribe: 'yes', nabla: 'partial',
       },
     ],
   },
@@ -171,25 +169,25 @@ const CATEGORIES: Category[] = [
     rows: [
       {
         feature: 'Free plan',
-        vetai: 'no', scribenote: 'yes', vetrec: 'no', talkatoo: 'no', digitail: 'no',
+        nota: 'no', dax: 'no', suki: 'no', deepscribe: 'no', nabla: 'partial',
       },
       {
         feature: 'Starting price (per provider / month)',
-        vetai: '$79', scribenote: 'Free', vetrec: '$99', talkatoo: '~$117', digitail: '$300+',
+        nota: '$79', dax: '~$150', suki: '$99', deepscribe: '$99', nabla: '$99',
       },
     ],
   },
 ];
 
 const COMPETITORS: { key: CompetitorKey; label: string; isUs?: boolean }[] = [
-  { key: 'vetai', label: '[PRODUCT_NAME]', isUs: true },
-  { key: 'scribenote', label: 'Scribenote' },
-  { key: 'vetrec', label: 'VetRec' },
-  { key: 'talkatoo', label: 'Talkatoo' },
-  { key: 'digitail', label: 'Digitail' },
+  { key: 'nota', label: '[PRODUCT_NAME]', isUs: true },
+  { key: 'dax', label: 'Nuance DAX' },
+  { key: 'suki', label: 'Suki' },
+  { key: 'deepscribe', label: 'DeepScribe' },
+  { key: 'nabla', label: 'Nabla' },
 ];
 
-type CompetitorKey = 'vetai' | 'scribenote' | 'vetrec' | 'talkatoo' | 'digitail';
+type CompetitorKey = 'nota' | 'dax' | 'suki' | 'deepscribe' | 'nabla';
 
 // ─── Cell renderer ─────────────────────────────────────────────────────────────
 
@@ -324,7 +322,7 @@ export function ComparisonSection() {
                       <td className="px-5 py-3.5">
                         <div className="flex items-start gap-2">
                           <span className="text-sm text-foreground leading-snug">{row.feature}</span>
-                          {row.vetaiOnly && (
+                          {row.notaOnly && (
                             <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap shrink-0 mt-0.5">
                               <Sparkles className="h-2 w-2" />
                               Only [PRODUCT_NAME]

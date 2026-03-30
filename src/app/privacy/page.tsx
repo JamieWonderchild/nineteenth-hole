@@ -46,7 +46,7 @@ export default function PrivacyPolicyPage() {
           <p>
             The Service processes audio recordings of clinical encounters, transcribed
             text, extracted clinical facts (patient history, symptoms, examination findings,
-            diagnoses, treatments), and AI-generated documents such as SOAP notes, client
+            diagnoses, treatments), and AI-generated documents such as SOAP notes, patient
             summaries, discharge instructions, referral letters, prescriptions, follow-up
             plans, and lab requests.
           </p>
@@ -159,17 +159,18 @@ export default function PrivacyPolicyPage() {
             please contact us and we will take steps to delete it.
           </p>
 
-          <h2>10. Clinical Data Disclaimer</h2>
+          <h2>10. Clinical Data & HIPAA</h2>
           <p>
-            [PRODUCT_NAME] Assistant processes animal medical data, not human health data. The Health
-            Insurance Portability and Accountability Act (HIPAA) and similar human health data
-            regulations do not apply to clinical records. Nevertheless, we recognize the
-            sensitive nature of clinical data and maintain security standards comparable to
-            those used in healthcare technology.
+            [PRODUCT_NAME] Assistant processes human clinical data, including protected health
+            information (PHI) as defined by the Health Insurance Portability and Accountability
+            Act (HIPAA). We maintain technical, administrative, and physical safeguards consistent
+            with HIPAA requirements. Healthcare providers using the Service are responsible for
+            ensuring their use complies with applicable HIPAA obligations, including executing a
+            Business Associate Agreement (BAA) with us where required.
           </p>
           <p>
-            Clinical professionals are responsible for complying with any applicable state or
-            local regulations regarding clinical medical records and data retention.
+            Clinical professionals are responsible for complying with all applicable federal and
+            state regulations regarding patient medical records, data retention, and privacy.
           </p>
 
           <h2>11. Changes to This Policy</h2>

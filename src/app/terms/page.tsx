@@ -46,7 +46,7 @@ export default function TermsOfServicePage() {
           <p>
             [PRODUCT_NAME] Assistant is an AI-powered clinical documentation platform. The Service
             records voice encounters, extracts clinical facts, and generates documents
-            including SOAP notes, client summaries, discharge instructions, referral letters,
+            including SOAP notes, patient summaries, discharge instructions, referral letters,
             prescriptions, follow-up plans, and lab requests. The Service also provides an
             &quot;Patient Companion&quot; feature that shares post-visit information with
             patients via temporary links.
@@ -98,7 +98,7 @@ export default function TermsOfServicePage() {
           </p>
           <ul>
             <li>Use the Service only for lawful clinical documentation and clinical support purposes</li>
-            <li>Not use the Service for human medical diagnosis, treatment, or documentation</li>
+            <li>Not use the Service as a substitute for professional clinical judgement — AI-generated content must be reviewed and approved by a licensed clinician before use</li>
             <li>Not upload or transmit content that is unlawful, harmful, or infringes on the rights of others</li>
             <li>Not attempt to reverse-engineer, decompile, or disassemble any part of the Service</li>
             <li>Not share your account credentials with unauthorized individuals</li>

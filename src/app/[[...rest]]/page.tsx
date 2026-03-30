@@ -238,7 +238,7 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
             <div>
               <h1 className="text-2xl font-bold">
-                {getGreeting()}, {user?.firstName ?? 'Doctor'}
+                {getGreeting()}, {user?.firstName ?? 'Provider'}
               </h1>
               <p className="text-muted-foreground text-sm mt-1">
                 Here&apos;s your practice overview

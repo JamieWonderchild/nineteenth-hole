@@ -35,7 +35,7 @@ const FEATURES = [
     icon: FileText,
     title: 'Auto-Generated Documents',
     description:
-      'SOAP notes, client summaries, discharge instructions, referral letters, and prescriptions — all generated from your conversation.',
+      'SOAP notes, patient summaries, discharge instructions, referral letters, and prescriptions — all generated from your conversation.',
   },
   {
     icon: MessageCircle,
