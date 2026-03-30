@@ -12,6 +12,7 @@ import { DollarSign, Trash2, AlertCircle, CheckCircle2, RotateCcw, Loader2 } fro
 import { useBillingMatcher, type BillingCatalogItem } from '@/hooks/useBillingMatcher'
 import { useUser } from '@clerk/nextjs'
 import { AppLink } from '@/components/navigation/AppLink'
+import { scoreEM } from '@/lib/emScoring'
 
 interface SimpleFact {
   id: string
@@ -150,6 +151,54 @@ export function PlannedServicesWidget({
     catalog,
     prospectiveItems,
     processedFacts,
+    createProspective,
+    onItemsChange,
+  ])
+
+  // Auto-create E&M visit complexity code from MDM scoring
+  useEffect(() => {
+    if (isFinalized) return
+    if (!user?.id || !orgId || !catalog || facts.length === 0) return
+    if (processedFacts.has('em-scoring')) return
+
+    const existingEM = prospectiveItems?.find(
+      (item) => item.extractedFromFact === 'em-scoring'
+    )
+    if (existingEM) {
+      setProcessedFacts((prev) => new Set(prev).add('em-scoring'))
+      return
+    }
+
+    const result = scoreEM(facts)
+    const catalogItem = catalog.find(
+      (item) => item.code === result.code
+    )
+    if (!catalogItem) return
+
+    setProcessedFacts((prev) => new Set(prev).add('em-scoring'))
+    createProspective({
+      userId: user.id,
+      encounterId,
+      orgId,
+      recordingId,
+      catalogItemId: catalogItem._id as Id<'billingCatalog'>,
+      description: catalogItem.name,
+      quantity: 1,
+      unitPrice: catalogItem.basePrice,
+      taxable: catalogItem.taxable,
+      extractedFromFact: 'em-scoring',
+      confidence: 'high',
+    }).then(() => onItemsChange?.()).catch(console.error)
+  }, [
+    isFinalized,
+    facts,
+    catalog,
+    prospectiveItems,
+    processedFacts,
+    user?.id,
+    orgId,
+    encounterId,
+    recordingId,
     createProspective,
     onItemsChange,
   ])

@@ -13,7 +13,7 @@ export async function POST() {
 
   const clientId = process.env.CORTI_CLIENT_ID;
   const clientSecret = process.env.CORTI_CLIENT_SECRET;
-  const tenant = process.env.CORTI_TENANT;
+  const tenant = process.env.CORTI_TENANT?.trim();
   const region = process.env.CORTI_ENV || 'eu';
 
   if (!clientId || !clientSecret || !tenant) {

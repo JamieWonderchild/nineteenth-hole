@@ -10,7 +10,7 @@ interface LogEntry {
 }
 
 class DebugLogger {
-  private enabled = true; // Temporarily enable for production debugging
+  private enabled = process.env.NODE_ENV === 'development';
   private buffer: LogEntry[] = [];
   private flushInterval: NodeJS.Timeout | null = null;
 

@@ -138,7 +138,7 @@ export function useOrgContext(): {
     return { orgContext: null, isLoading: false, error: 'Not a member of this organization' };
   }
 
-  debugLog.info('useOrgContext', 'Org context successfully loaded', {
+  debugLog.debug('useOrgContext', 'Org context successfully loaded', {
     orgId: org._id,
     orgName: org.name,
     clerkOrgId: org.clerkOrgId,

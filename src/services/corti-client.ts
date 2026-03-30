@@ -374,7 +374,7 @@ export function getCortiClient(config?: CortiConfig): CortiClient {
 export function createCortiClientFromEnv(): CortiClient {
   const clientId = process.env.CORTI_CLIENT_ID;
   const clientSecret = process.env.CORTI_CLIENT_SECRET;
-  const tenant = process.env.CORTI_TENANT;
+  const tenant = process.env.CORTI_TENANT?.trim();
   const region = (process.env.CORTI_ENV as 'eu' | 'us') || 'eu';
 
   if (!clientId || !clientSecret || !tenant) {

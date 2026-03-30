@@ -225,26 +225,12 @@ export default function NewEncounterPage() {
   // AUTO-SAVE: Always save after recording completes (safety net)
   React.useEffect(() => {
     let timer: NodeJS.Timeout;
-    console.log('[AUTO-SAVE] Effect triggered:', {
-      hasSessionData: !!sessionData,
-      hasUserId: !!user?.id,
-      saved,
-      isSaving,
-      isExtracting,
-      draftPatientId,
-      encounterId,
-    });
     if (sessionData && user?.id && !saved && !isSaving && !isExtracting) {
-      console.log('[AUTO-SAVE] Starting 2s timer...');
       setAutoSaving(true);
       timer = setTimeout(() => {
-        // For draft encounters, save silently in background without redirect
         if (draftPatientId) {
-          console.log('[AUTO-SAVE] Triggering save for draft encounter');
           handleSave({ redirect: false }).finally(() => setAutoSaving(false));
         } else {
-          console.log('[AUTO-SAVE] Skipping - no draftPatientId (new encounter needs patient selection)');
-          // For new encounters, skip auto-save (they need to choose patient)
           setAutoSaving(false);
         }
       }, 2000);

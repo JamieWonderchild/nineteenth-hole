@@ -4,7 +4,7 @@ const envSchema = z.object({
   CORTI_CLIENT_ID: z.string().min(1, 'CORTI_CLIENT_ID is required'),
   CORTI_CLIENT_SECRET: z.string().min(1, 'CORTI_CLIENT_SECRET is required'),
   CORTI_ENV: z.enum(['eu', 'us']).default('eu'),
-  CORTI_TENANT: z.string().min(1, 'CORTI_TENANT is required'),
+  CORTI_TENANT: z.string().min(1, 'CORTI_TENANT is required').transform(s => s.trim()),
 });
 
 type Env = z.infer<typeof envSchema>;
