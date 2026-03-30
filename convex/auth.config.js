@@ -2,7 +2,7 @@
 export default {
     providers: [
       {
-        domain: "clerk.healthplatform.com", // Production
+        domain: "clerk.heathplatform.com", // Production
         applicationID: "convex",
       }
     ]
