@@ -11,7 +11,7 @@ import type { Id } from 'convex/_generated/dataModel';
 import { Layout } from '@/components/layout/Layout';
 import { BillingGuard } from '@/components/billing/BillingGuard';
 import { AddAddendumDialog } from '@/components/encounter/AddAddendumDialog';
-import { QuickNoteButton } from '@/components/encounter/QuickNoteButton';
+import { DictationModal } from '@/components/encounter/DictationModal';
 import { RecordingTimeline } from '@/components/encounter/RecordingTimeline';
 import { PlannedServicesWidget } from '@/components/billing/PlannedServicesWidget';
 import { MedicalCodingPanel } from '@/components/encounter/MedicalCodingPanel';
@@ -687,7 +687,7 @@ export default function ConsultationDetailPage() {
 
               {(status === 'in-progress' || status === 'review') && (
                 <>
-                  <QuickNoteButton encounterId={encounterId as Id<'encounters'>} />
+                  <DictationModal encounterId={encounterId as Id<'encounters'>} />
                   <AppLink href={`/encounter/new?encounterId=${encounterId}`}>
                     <Button variant="outline" className="gap-2">
                       <Mic className="h-4 w-4" />
@@ -731,7 +731,7 @@ export default function ConsultationDetailPage() {
 
               {status === 'published' && (
                 <>
-                  <QuickNoteButton encounterId={encounterId as Id<'encounters'>} />
+                  <DictationModal encounterId={encounterId as Id<'encounters'>} />
                   <Button
                     variant="outline"
                     className="gap-2"
@@ -1063,7 +1063,25 @@ export default function ConsultationDetailPage() {
               <div className="space-y-2">
                 {encounter.addenda.map((note, i) => (
                   <div key={i} className="text-sm space-y-0.5">
-                    <p>{note.text}</p>
+                    <div className="space-y-0.5">
+                      {note.text.split('\n').map((line, j) => {
+                        const bullet = line.match(/^-\s+(.+)/);
+                        const numbered = line.match(/^(\d+)\.\s+(.+)/);
+                        if (bullet) return (
+                          <div key={j} className="flex items-start gap-2">
+                            <span className="text-primary font-bold mt-0.5 flex-shrink-0">•</span>
+                            <span>{bullet[1]}</span>
+                          </div>
+                        );
+                        if (numbered) return (
+                          <div key={j} className="flex items-start gap-2">
+                            <span className="text-primary font-medium mt-0.5 flex-shrink-0 min-w-[1.2rem]">{numbered[1]}.</span>
+                            <span>{numbered[2]}</span>
+                          </div>
+                        );
+                        return line ? <p key={j}>{line}</p> : null;
+                      })}
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {new Date(note.createdAt).toLocaleString()}
                     </p>
