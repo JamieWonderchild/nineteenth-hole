@@ -105,6 +105,7 @@ export function PlannedServicesWidget({
   useEffect(() => {
     if (isFinalized) return
     if (!user?.id || !orgId || !catalog || matches.length === 0) return
+    if (prospectiveItems === undefined) return // wait for DB to load
 
     const highConfidenceMatches = matches.filter(
       (match) => match.confidence === 'high' && match.bestMatch
@@ -160,6 +161,7 @@ export function PlannedServicesWidget({
   useEffect(() => {
     if (isFinalized) return
     if (!user?.id || !orgId || !catalog || facts.length === 0) return
+    if (prospectiveItems === undefined) return // wait for DB to load before checking
     if (processedFacts.has('em-scoring')) return
 
     const existingEM = prospectiveItems?.find(
