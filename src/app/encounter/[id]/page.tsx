@@ -150,6 +150,7 @@ export default function ConsultationDetailPage() {
   const updateSessionContext = useMutation(api.companions.updateSessionContext);
   const updatePatient = useMutation(api.patients.updatePatient);
   const clearExtractedPatientInfo = useMutation(api.encounters.clearExtractedPatientInfo);
+  const resolveFactConflict = useMutation(api.encounters.resolveFactConflict);
 
   // Attachments
   const generateUploadUrl = useMutation(api.evidenceFiles.generateUploadUrl);
@@ -405,6 +406,26 @@ export default function ConsultationDetailPage() {
   }, [detail?.recordings, detail?.factReconciliation]);
 
   const hasFacts = factCount > 0;
+
+  const unresolvedContradictions = useMemo(() => {
+    if (!detail?.factReconciliation) return 0;
+    return detail.factReconciliation.reconciledFacts.filter(
+      f => f.status === 'contradicted' && !f.resolution
+    ).length;
+  }, [detail?.factReconciliation]);
+
+  const handleResolveConflict = useCallback(async (factId: string, resolution: 'accept-new' | 'keep-old') => {
+    try {
+      await resolveFactConflict({
+        encounterId: encounterId as Id<'encounters'>,
+        factId,
+        resolution,
+      });
+    } catch (err) {
+      toast({ title: 'Failed to resolve conflict', variant: 'destructive' });
+      console.error(err);
+    }
+  }, [resolveFactConflict, encounterId]);
 
   const handleCreateCompanion = useCallback(async () => {
     if (!encounter || !patient || !detail?.recordings) return;
@@ -956,6 +977,7 @@ export default function ConsultationDetailPage() {
                 <RecordingTimeline
                   recordings={detail?.recordings || []}
                   factReconciliation={detail?.factReconciliation}
+                  onResolveConflict={isEditable ? handleResolveConflict : undefined}
                 />
 
                 {/* Attachments */}
@@ -1095,6 +1117,7 @@ export default function ConsultationDetailPage() {
                   addenda={encounter.addenda ?? []}
                   encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
                   reconciledAt={detail?.factReconciliation?.reconciledAt}
+                  unresolvedContradictions={unresolvedContradictions}
                 />
               </div>{/* end right sidebar */}
 

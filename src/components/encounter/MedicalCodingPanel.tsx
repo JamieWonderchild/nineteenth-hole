@@ -15,6 +15,7 @@ import {
   Loader2,
   RefreshCw,
   GitMerge,
+  AlertCircle,
 } from 'lucide-react';
 
 interface MedicalCode {
@@ -35,6 +36,7 @@ interface MedicalCodingPanelProps {
   addenda?: Array<{ text: string; createdAt: string }>;
   encounterType?: 'outpatient' | 'inpatient' | 'ed';
   reconciledAt?: string; // ISO timestamp — changes when fact reconciliation completes
+  unresolvedContradictions?: number; // blocks coding until all conflicts are resolved
 }
 
 export function MedicalCodingPanel({
@@ -47,6 +49,7 @@ export function MedicalCodingPanel({
   addenda = [],
   encounterType = 'outpatient',
   reconciledAt,
+  unresolvedContradictions = 0,
 }: MedicalCodingPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [icd10Suggestions, setIcd10Suggestions] = useState<MedicalCode[]>([]);
@@ -58,6 +61,7 @@ export function MedicalCodingPanel({
   const [reconciliationBanner, setReconciliationBanner] = useState(false);
   const autoTriggered = useRef(false);
   const lastReconciledAt = useRef<string | undefined>(reconciledAt);
+  const lastReconciledKey = useRef<string>(`${reconciledAt ?? ''}:${unresolvedContradictions}`);
 
   const updateMedicalCodes = useMutation(api.encounters.updateMedicalCodes);
 
@@ -170,18 +174,21 @@ export function MedicalCodingPanel({
       .catch(() => null);
   }, [addenda.length, isEditable]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-run coding when fact reconciliation produces a new timestamp
+  // Re-run coding when fact reconciliation completes — but only once all contradictions are resolved
   useEffect(() => {
     if (!isEditable || !reconciledAt) return;
-    // Skip the initial mount value — only fire when it genuinely changes
-    if (reconciledAt === lastReconciledAt.current) return;
-    lastReconciledAt.current = reconciledAt;
+    const key = `${reconciledAt}:${unresolvedContradictions}`;
+    if (key === lastReconciledKey.current) return;
+    lastReconciledKey.current = key;
+
+    // Block if doctor still needs to resolve contradictions
+    if (unresolvedContradictions > 0) return;
 
     runCoding().then(() => {
       setReconciliationBanner(true);
       setTimeout(() => setReconciliationBanner(false), 4000);
     });
-  }, [reconciledAt, isEditable]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [reconciledAt, unresolvedContradictions, isEditable]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-save helper — debounced 600ms
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -255,8 +262,8 @@ export function MedicalCodingPanel({
         {isEditable && (
           <button
             onClick={runCoding}
-            disabled={isLoading || facts.length === 0}
-            title={isLoading ? 'Analyzing…' : hasRun ? 'Re-run coding' : 'Suggest codes'}
+            disabled={isLoading || facts.length === 0 || unresolvedContradictions > 0}
+            title={unresolvedContradictions > 0 ? 'Resolve conflicts first' : isLoading ? 'Analyzing…' : hasRun ? 'Re-run coding' : 'Suggest codes'}
             className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
           >
             {isLoading ? (
@@ -269,6 +276,23 @@ export function MedicalCodingPanel({
           </button>
         )}
       </div>
+
+      {/* Blocking state — unresolved contradictions */}
+      {unresolvedContradictions > 0 && (
+        <div className="rounded-md border border-red-200 bg-red-50/50 dark:border-red-900/50 dark:bg-red-950/20 px-3 py-2.5 mb-2">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-3.5 w-3.5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-medium text-red-700 dark:text-red-400">
+                {unresolvedContradictions} conflicting fact{unresolvedContradictions !== 1 ? 's' : ''} need review
+              </p>
+              <p className="text-[11px] text-red-600/80 dark:text-red-500/80 mt-0.5">
+                Resolve the conflicts in the recording timeline before codes can be generated.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Reconciliation banner */}
       {reconciliationBanner && (

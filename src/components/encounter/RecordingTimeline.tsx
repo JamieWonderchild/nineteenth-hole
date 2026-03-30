@@ -51,6 +51,7 @@ type FactReconciliation = {
 interface RecordingTimelineProps {
   recordings: RecordingData[];
   factReconciliation?: FactReconciliation;
+  onResolveConflict?: (factId: string, resolution: 'accept-new' | 'keep-old') => void;
 }
 
 const phaseConfig: Record<string, { label: string; icon: any; color: string }> = {
@@ -104,7 +105,7 @@ const statusConfig: Record<string, { icon: any; color: string; label: string }> 
   },
 };
 
-export function RecordingTimeline({ recordings, factReconciliation }: RecordingTimelineProps) {
+export function RecordingTimeline({ recordings, factReconciliation, onResolveConflict }: RecordingTimelineProps) {
   // Track which recordings are expanded
   const [expandedRecordings, setExpandedRecordings] = useState<Set<string>>(new Set());
 
@@ -303,10 +304,12 @@ export function RecordingTimeline({ recordings, factReconciliation }: RecordingT
                                 ? fact.priorText
                                 : fact.text;
 
+                              const isUnresolvedConflict = fact.status === 'contradicted' && !fact.resolution;
+
                               return (
                                 <div
                                   key={fact.factId}
-                                  className="flex items-start gap-2 text-sm group"
+                                  className={`flex items-start gap-2 text-sm group ${isUnresolvedConflict ? 'rounded-md border border-red-200 bg-red-50/50 dark:border-red-900/50 dark:bg-red-950/20 p-2 -mx-2' : ''}`}
                                 >
                                   <StatusIcon className={`h-4 w-4 mt-0.5 flex-shrink-0 ${config.color}`} />
                                   <div className="flex-1 min-w-0">
@@ -319,6 +322,33 @@ export function RecordingTimeline({ recordings, factReconciliation }: RecordingT
                                     {fact.status === 'updated' && fact.priorText && (
                                       <p className="text-xs text-muted-foreground/60 mt-0.5 line-through">
                                         Previously: {fact.priorText}
+                                      </p>
+                                    )}
+                                    {fact.status === 'contradicted' && fact.priorText && (
+                                      <p className="text-xs mt-0.5">
+                                        <span className="text-muted-foreground">Previously: </span>
+                                        <span className="font-medium text-foreground">{fact.priorText}</span>
+                                      </p>
+                                    )}
+                                    {isUnresolvedConflict && onResolveConflict && (
+                                      <div className="flex items-center gap-2 mt-1.5">
+                                        <button
+                                          onClick={() => onResolveConflict(fact.factId, 'accept-new')}
+                                          className="text-[11px] font-medium px-2 py-0.5 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                                        >
+                                          Use new
+                                        </button>
+                                        <button
+                                          onClick={() => onResolveConflict(fact.factId, 'keep-old')}
+                                          className="text-[11px] font-medium px-2 py-0.5 rounded bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                        >
+                                          Keep old
+                                        </button>
+                                      </div>
+                                    )}
+                                    {fact.status === 'contradicted' && fact.resolution && (
+                                      <p className="text-[11px] text-muted-foreground mt-1">
+                                        Resolved: {fact.resolution === 'accept-new' ? 'using new value' : 'keeping old value'}
                                       </p>
                                     )}
                                   </div>
