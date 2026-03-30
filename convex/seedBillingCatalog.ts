@@ -390,7 +390,7 @@ export const populateSampleItems = mutation({
       },
     ];
 
-    const createdItems = [];
+    const createdItems: { id: string; name: string }[] = [];
     for (const item of sampleItems) {
       const id = await ctx.db.insert("billingCatalog", {
         orgId,

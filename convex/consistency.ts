@@ -328,7 +328,7 @@ export const detectOrphanedMemberships = query({
     assertSuperadmin(args.callerEmail);
 
     const memberships = await ctx.db.query("memberships").collect();
-    const orphaned = [];
+    const orphaned: any[] = [];
 
     for (const membership of memberships) {
       const org = await ctx.db.get(membership.orgId);
@@ -363,7 +363,7 @@ export const detectOrphanedLocations = query({
     assertSuperadmin(args.callerEmail);
 
     const locations = await ctx.db.query("locations").collect();
-    const orphaned = [];
+    const orphaned: any[] = [];
 
     for (const location of locations) {
       const org = await ctx.db.get(location.orgId);
@@ -397,7 +397,7 @@ export const detectOrphanedPatients = query({
     assertSuperadmin(args.callerEmail);
 
     const patients = await ctx.db.query("patients").collect();
-    const orphaned = [];
+    const orphaned: any[] = [];
 
     for (const patient of patients) {
       if (!patient.orgId) continue; // Skip old patients without orgId
@@ -433,7 +433,7 @@ export const detectOrphanedConsultations = query({
     assertSuperadmin(args.callerEmail);
 
     const encounters = await ctx.db.query("encounters").collect();
-    const orphaned = [];
+    const orphaned: any[] = [];
 
     for (const encounter of encounters) {
       let isOrphaned = false;
@@ -488,7 +488,7 @@ export const detectOrphanedCompanionSessions = query({
     assertSuperadmin(args.callerEmail);
 
     const sessions = await ctx.db.query("companionSessions").collect();
-    const orphaned = [];
+    const orphaned: any[] = [];
 
     for (const session of sessions) {
       if (!session.orgId) continue;
@@ -524,7 +524,7 @@ export const detectOrphanedFollowUps = query({
     assertSuperadmin(args.callerEmail);
 
     const followUps = await ctx.db.query("followUps").collect();
-    const orphaned = [];
+    const orphaned: any[] = [];
 
     for (const followUp of followUps) {
       if (!followUp.orgId) continue;
@@ -559,7 +559,7 @@ export const detectOrphanedUsageRecords = query({
     assertSuperadmin(args.callerEmail);
 
     const usageRecords = await ctx.db.query("usageRecords").collect();
-    const orphaned = [];
+    const orphaned: any[] = [];
 
     for (const record of usageRecords) {
       const org = await ctx.db.get(record.orgId);
@@ -593,7 +593,7 @@ export const detectOrphanedEvidenceFiles = query({
     assertSuperadmin(args.callerEmail);
 
     const evidenceFiles = await ctx.db.query("evidenceFiles").collect();
-    const orphaned = [];
+    const orphaned: any[] = [];
 
     for (const file of evidenceFiles) {
       const encounter = await ctx.db.get(file.encounterId);
@@ -627,7 +627,7 @@ export const detectOrphanedRecordings = query({
     assertSuperadmin(args.callerEmail);
 
     const recordings = await ctx.db.query("recordings").collect();
-    const orphaned = [];
+    const orphaned: any[] = [];
 
     for (const recording of recordings) {
       const encounter = await ctx.db.get(recording.encounterId);

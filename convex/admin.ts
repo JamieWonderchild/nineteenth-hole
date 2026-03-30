@@ -697,7 +697,7 @@ export const resetUserAccount = action({
     // Get unique org IDs
     const orgIds = [...new Set(memberships.map((m: any) => m.orgId))];
 
-    const deletedOrgs = [];
+    const deletedOrgs: Array<{ orgId: string; name: string; plan: string }> = [];
 
     // Delete each organization
     for (const orgId of orgIds) {
@@ -884,7 +884,7 @@ export const debugDeleteOrphanedMemberships = mutation({
     assertSuperadmin(args.callerEmail);
 
     const memberships = await ctx.db.query("memberships").collect();
-    const orphaned = [];
+    const orphaned: Array<{ _id: Id<"memberships">; userId: string; orgId: Id<"organizations"> }> = [];
 
     for (const membership of memberships) {
       const org = await ctx.db.get(membership.orgId);
@@ -1296,7 +1296,7 @@ export const fixIncompleteAccounts = mutation({
       .withIndex("by_billing_status", (q) => q.eq("billingStatus", "incomplete"))
       .collect();
 
-    const fixes = [];
+    const fixes: Array<{ orgId: Id<"organizations">; name: string; plan: string; slug: string }> = [];
     const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
     for (const org of incompleteOrgs) {

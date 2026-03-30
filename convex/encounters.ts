@@ -994,7 +994,7 @@ export const getDraftConsultations = query({
         let patientName: string | null = null;
         let patientAge: string | null = null;
         if (c.patientId) {
-          const patient = await ctx.db.get(c.patientId);
+          const patient = await ctx.db.get(c.patientId) as { name?: string; age?: string } | null;
           patientName = patient?.name ?? null;
           patientAge = patient?.age ?? null;
         }
@@ -1321,7 +1321,7 @@ export const getPublishedConsultations = query({
         // Get patient info
         let patientName: string | null = null;
         if (c.patientId) {
-          const patient = await ctx.db.get(c.patientId);
+          const patient = await ctx.db.get(c.patientId) as { name?: string } | null;
           patientName = patient?.name ?? null;
         }
 

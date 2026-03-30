@@ -680,8 +680,8 @@ export function CortiConsultation({
       const soapText = await soapResponse.text()
       const clientText = await clientResponse.text()
 
-      let soapData = null
-      let clientData = null
+      let soapData: any = null
+      let clientData: any = null
       const errors: string[] = []
 
       if (soapResponse.ok) {

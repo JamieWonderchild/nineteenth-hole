@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         // Idempotent: retry check to handle race condition with onboarding
         // The onboarding flow creates the org first, then Clerk fires this webhook
         // Due to timing, we need to check multiple times with delays
-        let existingOrg = null;
+        let existingOrg: Awaited<ReturnType<typeof convex.query<typeof api.organizations.getByClerkOrg>>> | null = null;
         const maxRetries = 3;
 
         for (let attempt = 0; attempt < maxRetries; attempt++) {

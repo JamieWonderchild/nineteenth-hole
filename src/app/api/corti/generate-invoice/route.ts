@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Patient info facts
-    const patientFacts = [];
+    const patientFacts: { id: string; text: string; group: string; source: 'user' }[] = [];
     if (patientInfo.name) {
       patientFacts.push({
         id: 'patient-name',

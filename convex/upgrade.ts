@@ -296,7 +296,7 @@ export const validatePlanDowngrade = query({
     });
 
     if (!impact.canDowngrade) {
-      const reasons = [];
+      const reasons: string[] = [];
       if (impact.excess.providers > 0) {
         reasons.push(
           `You have ${impact.current.providers} active providers but ${args.targetPlan} plan only allows ${impact.limits.maxVets}. Please archive ${impact.excess.providers} provider(s) first.`
@@ -334,7 +334,7 @@ export const archiveMemberships = mutation({
   },
   handler: async (ctx, args) => {
     const timestamp = new Date().toISOString();
-    const archived = [];
+    const archived: { membershipId: typeof args.membershipIds[number]; userId: string; role: string }[] = [];
 
     for (const membershipId of args.membershipIds) {
       const membership = await ctx.db.get(membershipId);
@@ -377,7 +377,7 @@ export const archiveLocations = mutation({
   },
   handler: async (ctx, args) => {
     const timestamp = new Date().toISOString();
-    const archived = [];
+    const archived: { locationId: typeof args.locationIds[number]; name: string }[] = [];
 
     for (const locationId of args.locationIds) {
       const location = await ctx.db.get(locationId);
