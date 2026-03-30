@@ -279,7 +279,19 @@ export const createExtractedItems = internalMutation({
     let itemsCreated = 0;
     const timestamp = new Date().toISOString();
 
+    // Fetch existing prospective items once for dedup
+    const existing = await ctx.db
+      .query("billingItems")
+      .withIndex("by_encounter_phase", (q) =>
+        q.eq("encounterId", args.encounterId).eq("phase", "prospective")
+      )
+      .collect();
+    const existingCatalogIds = new Set(existing.map(i => i.catalogItemId));
+
     for (const item of args.extractedItems) {
+      // Skip if same catalog item already exists as a prospective line
+      if (existingCatalogIds.has(item.catalogItemId as Id<"billingCatalog">)) continue;
+
       await ctx.db.insert("billingItems", {
         encounterId: args.encounterId,
         orgId: args.orgId,
@@ -288,13 +300,14 @@ export const createExtractedItems = internalMutation({
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         taxable: item.taxable,
-        phase: "prospective", // Background extraction is prospective (before finalization)
+        phase: "prospective",
         manuallyAdded: false,
         extractedFromFact: item.factId,
         confidence: item.confidence,
         createdAt: timestamp,
         updatedAt: timestamp,
       });
+      existingCatalogIds.add(item.catalogItemId as Id<"billingCatalog">);
       itemsCreated++;
     }
 
