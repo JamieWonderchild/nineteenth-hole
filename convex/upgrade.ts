@@ -213,70 +213,60 @@ const PLAN_LIMITS = {
  * Get the impact of downgrading to a specific plan
  * Returns counts of what would be affected
  */
+async function computeDowngradeImpact(
+  ctx: { db: any },
+  args: { orgId: any; targetPlan: string }
+) {
+  const org = await ctx.db.get(args.orgId);
+  if (!org) throw new Error("Organization not found");
+
+  const targetPlan = args.targetPlan as "solo" | "practice" | "multi-location";
+  const limits = PLAN_LIMITS[targetPlan];
+
+  const memberships = await ctx.db
+    .query("memberships")
+    .withIndex("by_org", (q: any) => q.eq("orgId", args.orgId))
+    .filter((q: any) =>
+      q.and(
+        q.eq(q.field("status"), "active"),
+        q.eq(q.field("archivedAt"), undefined)
+      )
+    )
+    .collect();
+
+  const locations = await ctx.db
+    .query("locations")
+    .withIndex("by_org", (q: any) => q.eq("orgId", args.orgId))
+    .filter((q: any) => q.eq(q.field("archivedAt"), undefined))
+    .collect();
+
+  const currentVetCount = memberships.length;
+  const currentLocationCount = locations.length;
+  const wouldExceedVetLimit = currentVetCount > limits.maxVets;
+  const wouldExceedLocationLimit = currentLocationCount > limits.maxLocations;
+
+  return {
+    canDowngrade: !wouldExceedVetLimit && !wouldExceedLocationLimit,
+    currentPlan: org.plan,
+    targetPlan,
+    limits,
+    current: { providers: currentVetCount, locations: currentLocationCount },
+    excess: {
+      providers: wouldExceedVetLimit ? currentVetCount - limits.maxVets : 0,
+      locations: wouldExceedLocationLimit ? currentLocationCount - limits.maxLocations : 0,
+    },
+    memberships: memberships.map((m: any) => ({ _id: m._id, userId: m.userId, role: m.role, joinedAt: m.joinedAt })),
+    locations: locations.map((l: any) => ({ _id: l._id, name: l.name, isDefault: l.isDefault })),
+  };
+}
+
 export const getDowngradeImpact = query({
   args: {
     orgId: v.id("organizations"),
-    targetPlan: v.string(), // 'solo' | 'practice' | 'multi-location'
+    targetPlan: v.string(),
   },
   handler: async (ctx, args) => {
-    const org = await ctx.db.get(args.orgId);
-    if (!org) throw new Error("Organization not found");
-
-    const targetPlan = args.targetPlan as "solo" | "practice" | "multi-location";
-    const limits = PLAN_LIMITS[targetPlan];
-
-    // Count active memberships (non-archived, active status)
-    const memberships = await ctx.db
-      .query("memberships")
-      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("status"), "active"),
-          q.eq(q.field("archivedAt"), undefined)
-        )
-      )
-      .collect();
-
-    // Count active locations (non-archived)
-    const locations = await ctx.db
-      .query("locations")
-      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-      .filter((q) => q.eq(q.field("archivedAt"), undefined))
-      .collect();
-
-    const currentVetCount = memberships.length;
-    const currentLocationCount = locations.length;
-
-    const wouldExceedVetLimit = currentVetCount > limits.maxVets;
-    const wouldExceedLocationLimit = currentLocationCount > limits.maxLocations;
-
-    return {
-      canDowngrade: !wouldExceedVetLimit && !wouldExceedLocationLimit,
-      currentPlan: org.plan,
-      targetPlan,
-      limits,
-      current: {
-        providers: currentVetCount,
-        locations: currentLocationCount,
-      },
-      excess: {
-        providers: wouldExceedVetLimit ? currentVetCount - limits.maxVets : 0,
-        locations: wouldExceedLocationLimit
-          ? currentLocationCount - limits.maxLocations
-          : 0,
-      },
-      memberships: memberships.map((m) => ({
-        _id: m._id,
-        userId: m.userId,
-        role: m.role,
-        joinedAt: m.joinedAt,
-      })),
-      locations: locations.map((l) => ({
-        _id: l._id,
-        name: l.name,
-        isDefault: l.isDefault,
-      })),
-    };
+    return computeDowngradeImpact(ctx, args);
   },
 });
 
@@ -290,7 +280,7 @@ export const validatePlanDowngrade = query({
     targetPlan: v.string(),
   },
   handler: async (ctx, args) => {
-    const impact = await getDowngradeImpact(ctx, {
+    const impact = await computeDowngradeImpact(ctx, {
       orgId: args.orgId,
       targetPlan: args.targetPlan,
     });

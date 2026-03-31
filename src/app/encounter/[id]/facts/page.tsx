@@ -104,6 +104,17 @@ export default function FactsPage() {
   const [isReconciling, setIsReconciling] = useState(false);
   const reconcilingRef = useRef(false);
 
+  // Fact editing state
+  const [editingFactId, setEditingFactId] = useState<string | null>(null);
+  const [editedText, setEditedText] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [changedFacts, setChangedFacts] = useState<Set<string>>(new Set());
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get data needed for effects
+  const reconciliation = detail?.factReconciliation ?? null;
+  const recordings = detail?.recordings || [];
+
   const [isAcceptingAll, setIsAcceptingAll] = useState(false);
 
   const unresolvedConflicts = useMemo(() => {
@@ -129,17 +140,6 @@ export default function FactsPage() {
       setIsAcceptingAll(false);
     }
   };
-
-  // Fact editing state
-  const [editingFactId, setEditingFactId] = useState<string | null>(null);
-  const [editedText, setEditedText] = useState('');
-  const [isSavingEdit, setIsSavingEdit] = useState(false);
-  const [changedFacts, setChangedFacts] = useState<Set<string>>(new Set());
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Get data needed for effects
-  const reconciliation = detail?.factReconciliation ?? null;
-  const recordings = detail?.recordings || [];
   const hasMultipleRecordings = recordings.length > 1;
 
   // Dedup facts
