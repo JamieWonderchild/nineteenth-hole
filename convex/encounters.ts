@@ -1589,6 +1589,17 @@ export const resolveFactConflict = mutation({
       updatedAt: new Date().toISOString(),
     });
 
+    // When all contradictions are resolved, re-run billing extraction with reconciled facts
+    const unresolvedCount = updatedFacts.filter(
+      f => f.status === 'contradicted' && !f.resolution
+    ).length;
+
+    if (unresolvedCount === 0 && encounter.orgId) {
+      await ctx.scheduler.runAfter(0, api.billingExtraction.extractFromReconciliation, {
+        encounterId: args.encounterId,
+      });
+    }
+
     return { success: true };
   },
 });

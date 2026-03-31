@@ -184,11 +184,38 @@ export const extractFromRecording = action({
 });
 
 /**
- * Internal mutation: Fetch encounter facts
+ * Internal mutation: Fetch encounter facts, preferring reconciled facts when available
  */
 export const getConsultationData = internalMutation({
   args: { encounterId: v.id("encounters") },
   handler: async (ctx, args) => {
+    const encounter = await ctx.db.get(args.encounterId);
+
+    // Use reconciled facts when available — same resolution logic as computeFactsFromDetail()
+    if (encounter?.factReconciliation) {
+      const facts: Array<{ id: string; text: string; group: string }> = [];
+      const seenTexts = new Set<string>();
+
+      for (const rf of encounter.factReconciliation.reconciledFacts) {
+        if (rf.resolution === 'keep-old' && rf.priorText) {
+          const key = rf.priorText.toLowerCase().trim();
+          if (!seenTexts.has(key)) {
+            seenTexts.add(key);
+            facts.push({ id: rf.priorFactId || rf.factId, text: rf.priorText, group: rf.group });
+          }
+          continue;
+        }
+        const key = rf.text.toLowerCase().trim();
+        if (!seenTexts.has(key)) {
+          seenTexts.add(key);
+          facts.push({ id: rf.factId, text: rf.text, group: rf.group });
+        }
+      }
+
+      return { facts };
+    }
+
+    // Fallback: aggregate raw facts from all recordings
     const recordings = await ctx.db
       .query("recordings")
       .withIndex("by_encounter", (q) => q.eq("encounterId", args.encounterId))
@@ -357,6 +384,75 @@ export const retriggerExtraction = mutation({
     });
 
     return { triggered: true };
+  },
+});
+
+/**
+ * Internal mutation: Prepare for reconciliation-triggered re-extraction.
+ * Clears auto-extracted items (preserving manually-added and E&M scoring items),
+ * marks the latest recording as processing so the UI shows a loading state.
+ */
+export const prepareForReextraction = internalMutation({
+  args: { encounterId: v.id("encounters") },
+  handler: async (ctx, args): Promise<{ recordingId: Id<"recordings">; orgId: Id<"organizations">; userId: string } | null> => {
+    const encounter = await ctx.db.get(args.encounterId);
+    if (!encounter?.orgId) return null;
+
+    const recordings = await ctx.db
+      .query("recordings")
+      .withIndex("by_encounter", (q) => q.eq("encounterId", args.encounterId))
+      .collect();
+
+    if (recordings.length === 0) return null;
+
+    // Most recently created recording drives the extraction status shown in the UI
+    const latest = recordings.sort((a, b) => b._creationTime - a._creationTime)[0];
+
+    // Clear auto-extracted items — preserve manually-added items and E&M scoring
+    const items = await ctx.db
+      .query("billingItems")
+      .withIndex("by_encounter", (q) => q.eq("encounterId", args.encounterId))
+      .collect();
+    for (const item of items) {
+      if (!item.manuallyAdded && item.extractedFromFact !== 'em-scoring') {
+        await ctx.db.delete(item._id);
+      }
+    }
+
+    // Set recording status to 'processing' — drives the loading spinner in PlannedServicesWidget
+    await ctx.db.patch(latest._id, {
+      billingExtractionStatus: "processing" as const,
+      billingExtractionError: undefined,
+      billingItemsExtracted: undefined,
+      billingExtractionAt: undefined,
+    });
+
+    return { recordingId: latest._id, orgId: encounter.orgId, userId: encounter.providerId };
+  },
+});
+
+/**
+ * Action: Re-run billing extraction using reconciled facts.
+ * Called automatically when all fact contradictions are resolved.
+ */
+export const extractFromReconciliation = action({
+  args: { encounterId: v.id("encounters") },
+  handler: async (ctx, args): Promise<{ success: boolean; itemsCreated?: number; message?: string; error?: string }> => {
+    const prep = await ctx.runMutation(
+      internal.billingExtraction.prepareForReextraction,
+      { encounterId: args.encounterId }
+    );
+
+    if (!prep) {
+      return { success: false, message: 'No recordings or org found for re-extraction' };
+    }
+
+    return ctx.runAction(api.billingExtraction.extractFromRecording, {
+      encounterId: args.encounterId,
+      recordingId: prep.recordingId,
+      orgId: prep.orgId,
+      userId: prep.userId,
+    });
   },
 });
 
