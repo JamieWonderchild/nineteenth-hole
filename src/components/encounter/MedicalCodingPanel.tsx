@@ -60,8 +60,8 @@ export function MedicalCodingPanel({
   const [hasRun, setHasRun] = useState(existingIcd10.length > 0 || existingCpt.length > 0);
   const [reconciliationBanner, setReconciliationBanner] = useState(false);
   const autoTriggered = useRef(false);
-  const lastReconciledAt = useRef<string | undefined>(reconciledAt);
-  const lastReconciledKey = useRef<string>(`${reconciledAt ?? ''}:${unresolvedContradictions}`);
+  // undefined = "haven't seen an initial value yet" — prevents re-coding on page load
+  const lastReconciledKey = useRef<string | undefined>(undefined);
 
   const updateMedicalCodes = useMutation(api.encounters.updateMedicalCodes);
 
@@ -107,7 +107,9 @@ export function MedicalCodingPanel({
     }
   }, [facts, transcript, existingIcd10, existingCpt, encounterId, updateMedicalCodes]);
 
-  // Auto-trigger when facts first arrive and no codes have been saved yet
+  // Auto-trigger when facts first arrive and no codes have been saved yet.
+  // Include existingIcd10/Cpt lengths in deps so the closure sees the latest values —
+  // prevents false trigger when detail loads before encounter (codes arrive after facts).
   useEffect(() => {
     if (
       !autoTriggered.current &&
@@ -119,7 +121,7 @@ export function MedicalCodingPanel({
       autoTriggered.current = true;
       runCoding();
     }
-  }, [facts.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [facts.length, existingIcd10.length, existingCpt.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-run coding when new addenda (dictated notes) are saved
   const processedAddendaCount = useRef(addenda.length);
@@ -181,10 +183,25 @@ export function MedicalCodingPanel({
       .catch(() => null);
   }, [addenda.length, isEditable]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-run coding when fact reconciliation completes — but only once all contradictions are resolved
+  // Re-run coding when fact reconciliation completes — but only once all contradictions are resolved.
+  // We skip the FIRST time we see a reconciledAt value (that's just page hydration, not a new event).
   useEffect(() => {
-    if (!isEditable || !reconciledAt) return;
-    const key = `${reconciledAt}:${unresolvedContradictions}`;
+    if (!isEditable) return;
+    const key = reconciledAt ? `${reconciledAt}:${unresolvedContradictions}` : undefined;
+
+    // No reconciliation data yet — record undefined as baseline
+    if (!key) {
+      lastReconciledKey.current = undefined;
+      return;
+    }
+
+    // First time seeing a reconciledAt — record it as the baseline without triggering
+    if (lastReconciledKey.current === undefined) {
+      lastReconciledKey.current = key;
+      return;
+    }
+
+    // Key unchanged — nothing to do
     if (key === lastReconciledKey.current) return;
     lastReconciledKey.current = key;
 
