@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { AppLink } from '@/components/navigation/AppLink';
 import { toast } from '@/hooks/use-toast';
+import { useLanguagePreference } from '@/hooks/useLanguagePreference';
 
 // All 9 doc types in display order, with DB key and API doc type ID
 const ALL_DOC_TYPES = [
@@ -47,6 +48,7 @@ type DocData = { sections: { key: string; title: string; content: string }[]; ge
 export default function DocumentsPage() {
   const params = useParams();
   const encounterId = params.id as string;
+  const { language } = useLanguagePreference();
 
   const encounter = useQuery(
     api.encounters.getById,
@@ -182,6 +184,7 @@ export default function DocumentsPage() {
             weight: patient.weight ? parseFloat(patient.weight) : undefined,
             weightUnit: patient.weightUnit || undefined,
           } : undefined,
+          language,
         }),
       });
 
@@ -258,6 +261,7 @@ export default function DocumentsPage() {
             weight: patient.weight ? parseFloat(patient.weight) : undefined,
             weightUnit: patient.weightUnit || undefined,
           } : undefined,
+          language,
         }),
       });
 

@@ -18,6 +18,7 @@ import {
   ArrowLeftRight,
 } from 'lucide-react'
 import { useMutation } from 'convex/react'
+import { useLanguagePreference } from '@/hooks/useLanguagePreference'
 import { api } from 'convex/_generated/api'
 import type { Id } from 'convex/_generated/dataModel'
 
@@ -143,6 +144,7 @@ export function WorkflowPanel({
   // Convex mutations for auto-saving
   const saveDocsMutation = useMutation(api.encounters.saveGeneratedDocuments)
   const saveVetNotesMutation = useMutation(api.encounters.saveVetNotes)
+  const { language } = useLanguagePreference()
 
   // Document selection
   const [selectedDocs, setSelectedDocs] = React.useState<Set<string>>(
@@ -260,6 +262,7 @@ export function WorkflowPanel({
           vetTreatmentPlan: vetTreatmentNotes || undefined,
           evidenceFindings: evidenceFindings && evidenceFindings.length > 0 ? evidenceFindings : undefined,
           priorContext: priorContext && priorContext.length > 0 ? priorContext : undefined,
+          language,
         }),
       })
 
