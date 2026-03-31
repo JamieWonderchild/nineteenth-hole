@@ -89,6 +89,13 @@ export function MedicalCodingPanel({
       setAcceptedIcd10(newIcd10);
       setAcceptedCpt(newCpt);
       setHasRun(true);
+      // Persist immediately — without this, codes only save when the doctor
+      // manually toggles one, so a refresh would re-run coding from scratch
+      await updateMedicalCodes({
+        encounterId,
+        icd10Codes: Array.from(newIcd10),
+        cptCodes: Array.from(newCpt),
+      });
     } catch (error) {
       toast({
         title: 'Coding failed',
@@ -98,7 +105,7 @@ export function MedicalCodingPanel({
     } finally {
       setIsLoading(false);
     }
-  }, [facts, transcript, existingIcd10, existingCpt]);
+  }, [facts, transcript, existingIcd10, existingCpt, encounterId, updateMedicalCodes]);
 
   // Auto-trigger when facts first arrive and no codes have been saved yet
   useEffect(() => {
