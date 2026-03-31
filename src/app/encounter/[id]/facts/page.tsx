@@ -612,9 +612,9 @@ export default function FactsPage() {
                   disabled={isAcceptingAll}
                 >
                   {isAcceptingAll ? (
-                    <><Loader2 className="h-3 w-3 animate-spin mr-1.5" />Resolving…</>
+                    <><Loader2 className="h-3 w-3 animate-spin mr-1.5" />Confirming…</>
                   ) : (
-                    'Accept all new'
+                    'Confirm all'
                   )}
                 </Button>
               </div>
@@ -624,23 +624,22 @@ export default function FactsPage() {
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-24 flex-shrink-0 truncate">
                       {getGroupLabel(conflict.group)}
                     </span>
-                    <div className="flex-1 min-w-0 flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground line-through truncate max-w-[35%]">{conflict.priorText}</span>
-                      <span className="text-muted-foreground flex-shrink-0 text-xs">→</span>
-                      <span className="font-medium truncate">{conflict.text}</span>
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <p className="text-sm font-medium">{conflict.text}</p>
+                      <p className="text-[11px] text-muted-foreground">was: <span className="line-through">{conflict.priorText}</span></p>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <button
                         onClick={() => handleResolve(conflict.factId, 'keep-old')}
                         className="text-[11px] font-medium px-2.5 py-1 rounded border border-border hover:border-foreground/40 hover:bg-muted transition-colors"
                       >
-                        Keep
+                        Revert
                       </button>
                       <button
                         onClick={() => handleResolve(conflict.factId, 'accept-new')}
                         className="text-[11px] font-medium px-2.5 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                       >
-                        Update
+                        Confirm
                       </button>
                     </div>
                   </div>

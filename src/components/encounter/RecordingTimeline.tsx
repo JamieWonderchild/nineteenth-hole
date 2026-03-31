@@ -334,14 +334,19 @@ export function RecordingTimeline({ recordings, factReconciliation, onResolveCon
 
                               const isUnresolvedConflict = fact.status === 'contradicted' && !fact.resolution;
 
-                              // Unresolved contradiction — read-only diff, resolved on facts page
+                              // Unresolved contradiction — read-only, resolved on facts page
                               if (isUnresolvedConflict) {
                                 return (
-                                  <div key={fact.factId} className="flex items-center gap-2 text-xs py-0.5">
-                                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500 flex-shrink-0" />
-                                    <span className="text-muted-foreground line-through">{fact.priorText}</span>
-                                    <span className="text-muted-foreground">→</span>
-                                    <span className="text-foreground">{fact.text}</span>
+                                  <div key={fact.factId} className="flex items-start gap-2 text-xs py-0.5">
+                                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500 flex-shrink-0 mt-[5px]" />
+                                    <div>
+                                      <span className="text-foreground">{displayText}</span>
+                                      {fact.priorText && (
+                                        <span className="text-muted-foreground ml-1.5">
+                                          (was: <span className="line-through">{fact.priorText}</span>)
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 );
                               }
