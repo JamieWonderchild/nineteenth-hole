@@ -7,7 +7,6 @@ import { api } from 'convex/_generated/api';
 import type { Id } from 'convex/_generated/dataModel';
 import { Layout } from '@/components/layout/Layout';
 import { BillingGuard } from '@/components/billing/BillingGuard';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -17,7 +16,6 @@ import {
 } from '@/components/ui/tooltip';
 import {
   ArrowLeft,
-  ArrowRight,
   Loader2,
   ClipboardList,
   Check,
@@ -25,6 +23,7 @@ import {
   X,
   Save,
   AlertTriangle,
+  ChevronDown,
 } from 'lucide-react';
 import { AppLink } from '@/components/navigation/AppLink';
 import { toast } from '@/hooks/use-toast';
@@ -328,12 +327,31 @@ export default function FactsPage() {
     };
   }, [changedFacts, dedupedFacts, recordings.length, encounterId, saveFactReconciliation]);
 
+  const [changelogExpanded, setChangelogExpanded] = useState(false);
+
   const factGroups = useMemo(() => {
     return dedupedFacts.reduce<Record<string, Array<{ id: string; text: string; group: string }>>>((acc, f) => {
       (acc[f.group] = acc[f.group] || []).push(f);
       return acc;
     }, {});
   }, [dedupedFacts]);
+
+  // Canonical facts — single authoritative list across all recordings
+  const canonicalFacts = useMemo(() => {
+    if (!reconciliation) return dedupedFacts;
+    return reconciliation.reconciledFacts.map(rf => ({
+      id: rf.factId,
+      text: (rf.resolution === 'keep-old' && rf.priorText) ? rf.priorText : rf.text,
+      group: rf.group,
+    }));
+  }, [reconciliation, dedupedFacts]);
+
+  const canonicalGroups = useMemo(() => {
+    return canonicalFacts.reduce<Record<string, Array<{ id: string; text: string; group: string }>>>((acc, f) => {
+      (acc[f.group] = acc[f.group] || []).push(f);
+      return acc;
+    }, {});
+  }, [canonicalFacts]);
 
   const handleResolve = async (factId: string, resolution: 'accept-new' | 'keep-old') => {
     try {
@@ -683,103 +701,141 @@ export default function FactsPage() {
               </div>
             </div>
           ) : (
-            /* Multiple recordings — per-recording sections with reconciliation */
-            <div className="rounded-lg border bg-card p-5 space-y-4">
-              <h3 className="text-sm font-semibold text-muted-foreground">
-                {dedupedFacts.length} fact{dedupedFacts.length !== 1 ? 's' : ''} across {recordings.length} recordings
-              </h3>
-
-              {/* Reconciliation summary */}
-              {reconciliation && (
-                <div className="flex items-center gap-3 flex-wrap text-xs">
-                  <span className="text-muted-foreground font-medium">Reconciliation:</span>
-                  {reconciliation.summary.confirmed > 0 && (
-                    <span className="inline-flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full bg-green-500" />
-                      {reconciliation.summary.confirmed} confirmed
-                    </span>
-                  )}
-                  {reconciliation.summary.updated > 0 && (
-                    <span className="inline-flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full bg-blue-500" />
-                      {reconciliation.summary.updated} updated
-                    </span>
-                  )}
-                  {reconciliation.summary.contradicted > 0 && (
-                    <span className="inline-flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full bg-red-500" />
-                      {reconciliation.summary.contradicted} contradicted
-                    </span>
-                  )}
-                  {reconciliation.summary.new > 0 && (
-                    <span className="inline-flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full bg-purple-500" />
-                      {reconciliation.summary.new} new
-                    </span>
-                  )}
-                  {reconciliation.summary.unchanged > 0 && (
-                    <span className="inline-flex items-center gap-1 text-muted-foreground">
-                      <span className="h-2 w-2 rounded-full bg-gray-400" />
-                      {reconciliation.summary.unchanged} unchanged
-                    </span>
-                  )}
-                </div>
-              )}
-
+            /* Multiple recordings — canonical consolidated view + changelog */
+            <div className="space-y-4">
               {isReconciling && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground rounded-lg border bg-card px-4 py-3">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Analyzing fact relationships across recordings...
+                  Analyzing facts across recordings…
                 </div>
               )}
 
-              {/* Per-recording sections */}
-              {recordings.map((rec, idx) => {
-                const recFacts = (rec.facts || []) as Array<{ id: string; text: string; group: string }>;
-                if (recFacts.length === 0) return null;
-
-                const recGroups = recFacts.reduce<Record<string, Array<{ id: string; text: string; group: string }>>>((acc, f) => {
-                  (acc[f.group] = acc[f.group] || []).push(f);
-                  return acc;
-                }, {});
-
-                return (
-                  <div key={rec._id} className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">
-                        {idx + 1}
-                      </span>
-                      <span className="text-xs font-medium">Recording {idx + 1}</span>
-                      {rec.phase && (
-                        <Badge variant="outline" className="text-[10px] capitalize h-4 px-1.5">
-                          {rec.phase}
-                        </Badge>
+              {/* Canonical facts card */}
+              <div className="rounded-lg border bg-card p-5 space-y-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <h3 className="text-sm font-semibold text-muted-foreground">
+                    {canonicalFacts.length} fact{canonicalFacts.length !== 1 ? 's' : ''}
+                  </h3>
+                  {reconciliation && (
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      {reconciliation.summary.new > 0 && (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                          {reconciliation.summary.new} new
+                        </span>
                       )}
-                      <span className="text-[10px] text-muted-foreground">
-                        {recFacts.length} fact{recFacts.length !== 1 ? 's' : ''}
-                      </span>
-                      {idx < recordings.length - 1 && (
-                        <ArrowRight className="h-3 w-3 text-muted-foreground/50" />
+                      {reconciliation.summary.updated > 0 && (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                          {reconciliation.summary.updated} updated
+                        </span>
+                      )}
+                      {reconciliation.summary.confirmed > 0 && (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                          {reconciliation.summary.confirmed} confirmed
+                        </span>
+                      )}
+                      {reconciliation.summary.unchanged > 0 && (
+                        <span className="inline-flex items-center gap-1 opacity-60">
+                          <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+                          {reconciliation.summary.unchanged} unchanged
+                        </span>
                       )}
                     </div>
-                    <div className="pl-7 space-y-2">
-                      {(Object.entries(recGroups) as [string, Array<{ id: string; text: string; group: string }>][]).map(([group, groupFacts]) => {
-                        const colors = getGroupColors(group);
-                        return (
-                          <div key={group} className={`border-l-[3px] ${colors.border} pl-3 py-1 space-y-1`}>
-                            <h6 className={`text-[10px] font-semibold ${colors.text}`}>
-                              {getGroupLabel(group)}
-                            </h6>
-                            <ul className="space-y-0.5">
-                              {groupFacts.map((f) => renderFactItem(f, idx))}
-                            </ul>
-                          </div>
-                        );
-                      })}
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {(Object.entries(canonicalGroups) as [string, Array<{ id: string; text: string; group: string }>][]).map(([group, groupFacts]) => {
+                    const colors = getGroupColors(group);
+                    return (
+                      <div key={group} className={`border-l-[3px] ${colors.border} pl-3 py-1 space-y-1`}>
+                        <h5 className={`text-xs font-semibold ${colors.text}`}>
+                          {getGroupLabel(group)}
+                        </h5>
+                        <ul className="space-y-0.5">
+                          {groupFacts.map((f) => renderFactItem(f, 0))}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Changelog strip — what changed in the latest recording */}
+              {reconciliation && (
+                <div className="rounded-lg border bg-card overflow-hidden">
+                  <button
+                    className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-muted/50 transition-colors"
+                    onClick={() => setChangelogExpanded(v => !v)}
+                  >
+                    <div className="flex items-center gap-2 text-xs flex-wrap">
+                      <span className="font-medium text-foreground">
+                        Recording {recordings.length} changes
+                      </span>
+                      <span className="text-muted-foreground">·</span>
+                      {reconciliation.summary.new > 0 && (
+                        <span className="text-purple-600">+{reconciliation.summary.new} new</span>
+                      )}
+                      {reconciliation.summary.updated > 0 && (
+                        <span className="text-blue-600">{reconciliation.summary.updated} updated</span>
+                      )}
+                      {reconciliation.summary.contradicted > 0 && (
+                        <span className="text-red-600">{reconciliation.summary.contradicted} conflict{reconciliation.summary.contradicted !== 1 ? 's' : ''}</span>
+                      )}
+                      {reconciliation.summary.confirmed > 0 && (
+                        <span className="text-green-600">{reconciliation.summary.confirmed} confirmed</span>
+                      )}
                     </div>
-                  </div>
-                );
-              })}
+                    <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform flex-shrink-0 ${changelogExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {changelogExpanded && (
+                    <div className="border-t px-4 py-3 space-y-2.5">
+                      {reconciliation.reconciledFacts
+                        .filter(rf => rf.status !== 'unchanged')
+                        .map(rf => {
+                          const statusColors: Record<string, string> = {
+                            new: 'text-purple-600',
+                            updated: 'text-blue-600',
+                            confirmed: 'text-green-600',
+                            contradicted: 'text-red-600',
+                          };
+                          const statusLabels: Record<string, string> = {
+                            new: 'new',
+                            updated: 'updated',
+                            confirmed: 'confirmed',
+                            contradicted: rf.resolution
+                              ? (rf.resolution === 'accept-new' ? 'confirmed new' : 'kept previous')
+                              : 'conflict',
+                          };
+                          return (
+                            <div key={rf.factId} className="flex items-start gap-2 text-xs">
+                              <span className={`flex-shrink-0 font-medium w-24 ${statusColors[rf.status] || 'text-muted-foreground'}`}>
+                                {statusLabels[rf.status] || rf.status}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-foreground">{rf.text}</span>
+                                {rf.priorText && rf.status !== 'confirmed' && (
+                                  <span className="text-muted-foreground ml-1">
+                                    (was: <span className="line-through">{rf.priorText}</span>)
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">
+                                {getGroupLabel(rf.group)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      {reconciliation.reconciledFacts.filter(rf => rf.status !== 'unchanged').length === 0 && (
+                        <p className="text-xs text-muted-foreground">All facts unchanged in this recording.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
