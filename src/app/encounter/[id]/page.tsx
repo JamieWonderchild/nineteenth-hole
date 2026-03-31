@@ -803,24 +803,24 @@ export default function ConsultationDetailPage() {
 
           {/* Conflict resolution banner — shown whenever there are unresolved contradictions */}
           {unresolvedContradictions > 0 && (
-            <div className="rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-500 p-4 flex items-start gap-4">
-              <div className="h-10 w-10 rounded-full bg-amber-400/20 flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <div className="rounded-lg border-2 border-red-300 bg-red-50 dark:bg-red-950/40 dark:border-red-800 p-4 flex items-start gap-4">
+              <div className="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                  {unresolvedContradictions} conflicting fact{unresolvedContradictions !== 1 ? 's' : ''} need your review
+                <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+                  {unresolvedContradictions} conflicting fact{unresolvedContradictions !== 1 ? 's' : ''} must be resolved
                 </p>
-                <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
-                  Recordings contain contradictory information. Resolve each conflict before medical codes can be generated or documents created.
+                <p className="text-xs text-red-600/80 dark:text-red-400/70 mt-0.5">
+                  Medical coding and document generation are blocked until all conflicts are resolved.
                 </p>
               </div>
-              <button
-                onClick={() => timelineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                className="flex-shrink-0 text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-200/60 hover:bg-amber-200 dark:bg-amber-800/40 dark:hover:bg-amber-800/60 px-3 py-1.5 rounded-md transition-colors whitespace-nowrap"
+              <AppLink
+                href={`/encounter/${encounterId}/facts`}
+                className="flex-shrink-0 text-xs font-semibold text-red-700 dark:text-red-300 bg-red-100 hover:bg-red-200 dark:bg-red-900/40 dark:hover:bg-red-900/60 px-3 py-1.5 rounded-md transition-colors whitespace-nowrap"
               >
                 Resolve now →
-              </button>
+              </AppLink>
             </div>
           )}
 

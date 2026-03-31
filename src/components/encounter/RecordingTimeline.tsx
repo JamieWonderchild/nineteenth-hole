@@ -209,22 +209,6 @@ export function RecordingTimeline({ recordings, factReconciliation, onResolveCon
             </Badge>
           </div>
 
-          {/* Unresolved conflicts banner */}
-          {unresolvedCount > 0 && (
-            <div className="rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-500 px-4 py-3 mb-6 flex items-start gap-3">
-              <div className="h-8 w-8 rounded-full bg-amber-400/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                  {unresolvedCount} conflicting fact{unresolvedCount !== 1 ? 's' : ''} require your review
-                </p>
-                <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
-                  Medical codes cannot be generated until all conflicts are resolved. Review each conflict below and choose the correct value.
-                </p>
-              </div>
-            </div>
-          )}
 
           <div className="relative">
             {/* Timeline line */}
@@ -350,39 +334,14 @@ export function RecordingTimeline({ recordings, factReconciliation, onResolveCon
 
                               const isUnresolvedConflict = fact.status === 'contradicted' && !fact.resolution;
 
-                              // Unresolved contradiction — full choice card
-                              if (isUnresolvedConflict && onResolveConflict) {
+                              // Unresolved contradiction — read-only diff, resolved on facts page
+                              if (isUnresolvedConflict) {
                                 return (
-                                  <div key={fact.factId} className="rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-500 p-3 my-1">
-                                    <div className="flex items-center gap-1.5 mb-2.5">
-                                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                                      <span className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wide">
-                                        Conflict — {fact.group}
-                                      </span>
-                                    </div>
-                                    <p className="text-[11px] text-amber-700/70 dark:text-amber-400/60 mb-2">
-                                      Which value is correct?
-                                    </p>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <button
-                                        onClick={() => onResolveConflict(fact.factId, 'keep-old')}
-                                        className="text-left p-2.5 rounded-md border-2 border-border bg-background hover:border-primary hover:bg-primary/5 transition-all group/btn"
-                                      >
-                                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 group-hover/btn:text-primary transition-colors">
-                                          Recording {(fact.priorRecordingIndex ?? 0) + 1}
-                                        </p>
-                                        <p className="text-xs font-medium text-foreground leading-snug">{fact.priorText}</p>
-                                      </button>
-                                      <button
-                                        onClick={() => onResolveConflict(fact.factId, 'accept-new')}
-                                        className="text-left p-2.5 rounded-md border-2 border-border bg-background hover:border-primary hover:bg-primary/5 transition-all group/btn"
-                                      >
-                                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 group-hover/btn:text-primary transition-colors">
-                                          Recording {fact.recordingIndex + 1} — latest
-                                        </p>
-                                        <p className="text-xs font-medium text-foreground leading-snug">{fact.text}</p>
-                                      </button>
-                                    </div>
+                                  <div key={fact.factId} className="flex items-center gap-2 text-xs py-0.5">
+                                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500 flex-shrink-0" />
+                                    <span className="text-muted-foreground line-through">{fact.priorText}</span>
+                                    <span className="text-muted-foreground">→</span>
+                                    <span className="text-foreground">{fact.text}</span>
                                   </div>
                                 );
                               }

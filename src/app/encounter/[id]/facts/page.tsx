@@ -24,6 +24,7 @@ import {
   Edit2,
   X,
   Save,
+  AlertTriangle,
 } from 'lucide-react';
 import { AppLink } from '@/components/navigation/AppLink';
 import { toast } from '@/hooks/use-toast';
@@ -102,6 +103,32 @@ export default function FactsPage() {
   // Fact reconciliation state
   const [isReconciling, setIsReconciling] = useState(false);
   const reconcilingRef = useRef(false);
+
+  const [isAcceptingAll, setIsAcceptingAll] = useState(false);
+
+  const unresolvedConflicts = useMemo(() => {
+    if (!reconciliation) return [];
+    return reconciliation.reconciledFacts.filter(
+      f => f.status === 'contradicted' && !f.resolution
+    );
+  }, [reconciliation]);
+
+  const handleAcceptAllNew = async () => {
+    setIsAcceptingAll(true);
+    try {
+      for (const conflict of unresolvedConflicts) {
+        await resolveConflict({
+          encounterId: encounterId as Id<'encounters'>,
+          factId: conflict.factId,
+          resolution: 'accept-new',
+        });
+      }
+    } catch {
+      toast({ title: 'Failed to resolve some conflicts', variant: 'destructive' });
+    } finally {
+      setIsAcceptingAll(false);
+    }
+  };
 
   // Fact editing state
   const [editingFactId, setEditingFactId] = useState<string | null>(null);
@@ -486,26 +513,6 @@ export default function FactsPage() {
             was: {entry.priorText}
           </p>
         )}
-        {needsResolution && !isOldVersion && (
-          <div className="flex items-center gap-1 ml-[15px] mt-0.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 px-1.5 text-[10px]"
-              onClick={() => handleResolve(entry.factId, 'accept-new')}
-            >
-              Accept New
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 px-1.5 text-[10px]"
-              onClick={() => handleResolve(entry.factId, 'keep-old')}
-            >
-              Keep Old
-            </Button>
-          </div>
-        )}
       </li>
     );
 
@@ -579,6 +586,68 @@ export default function FactsPage() {
               {patient?.name || 'Patient'} — Facts
             </h1>
           </div>
+
+          {/* Conflict resolution — only shown when unresolved contradictions exist */}
+          {unresolvedConflicts.length > 0 && (
+            <div className="rounded-lg border-2 border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+                      {unresolvedConflicts.length} conflict{unresolvedConflicts.length !== 1 ? 's' : ''} need review
+                    </p>
+                    <p className="text-xs text-red-600/70 dark:text-red-400/60 mt-0.5">
+                      Medical coding and document generation are blocked until resolved.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/30 text-xs flex-shrink-0"
+                  onClick={handleAcceptAllNew}
+                  disabled={isAcceptingAll}
+                >
+                  {isAcceptingAll ? (
+                    <><Loader2 className="h-3 w-3 animate-spin mr-1.5" />Resolving…</>
+                  ) : (
+                    'Accept all new'
+                  )}
+                </Button>
+              </div>
+              <div className="space-y-1.5">
+                {unresolvedConflicts.map((conflict) => (
+                  <div key={conflict.factId} className="flex items-center gap-3 bg-background rounded-md px-3 py-2.5 border">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-24 flex-shrink-0 truncate">
+                      {getGroupLabel(conflict.group)}
+                    </span>
+                    <div className="flex-1 min-w-0 flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground line-through truncate max-w-[35%]">{conflict.priorText}</span>
+                      <span className="text-muted-foreground flex-shrink-0 text-xs">→</span>
+                      <span className="font-medium truncate">{conflict.text}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        onClick={() => handleResolve(conflict.factId, 'keep-old')}
+                        className="text-[11px] font-medium px-2.5 py-1 rounded border border-border hover:border-foreground/40 hover:bg-muted transition-colors"
+                      >
+                        Keep
+                      </button>
+                      <button
+                        onClick={() => handleResolve(conflict.factId, 'accept-new')}
+                        className="text-[11px] font-medium px-2.5 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                      >
+                        Update
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {dedupedFacts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 space-y-4 rounded-lg border bg-card">
