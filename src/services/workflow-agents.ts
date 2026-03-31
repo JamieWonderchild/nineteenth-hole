@@ -749,7 +749,7 @@ class WorkflowDocumentService {
     // Build the payload
     const payload: DocumentGenerationPayload = {
       context,
-      outputLanguage: 'en',
+      outputLanguage: request.language ?? 'en',
       name: request.patientInfo?.name
         ? `${typeInfo.title} - ${request.patientInfo.name}`
         : typeInfo.title,

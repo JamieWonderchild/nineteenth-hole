@@ -10,6 +10,7 @@ import { DocumentModal, type GeneratedDoc } from "@/components/documents/Documen
 import { CombinedFactsPanel } from "./CombinedFactsPanel"
 import { LiveFactsPanel } from "./LiveFactsPanel"
 import { useOrgContext } from "@/hooks/useOrgContext"
+import { useLanguagePreference } from "@/hooks/useLanguagePreference"
 import { useQuery } from "convex/react"
 import { api } from "convex/_generated/api"
 import type { Id } from "convex/_generated/dataModel"
@@ -52,17 +53,19 @@ function formatDuration(seconds: number): string {
   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
 }
 
-const STREAM_CONFIG: StreamConfig = {
-  transcription: {
-    primaryLanguage: "en",
-    isDiarization: true,
-    isMultichannel: false,
-    participants: [{ channel: 0, role: "multiple" }],
-  },
-  mode: {
-    type: "facts", // Extract facts in real-time
-    outputLocale: "en",
-  },
+function buildStreamConfig(language: string): StreamConfig {
+  return {
+    transcription: {
+      primaryLanguage: language,
+      isDiarization: true,
+      isMultichannel: false,
+      participants: [{ channel: 0, role: "multiple" }],
+    },
+    mode: {
+      type: "facts",
+      outputLocale: language,
+    },
+  }
 }
 
 interface CortiConsultationProps {
@@ -96,6 +99,7 @@ export function CortiConsultation({
 }: CortiConsultationProps) {
   // Org context
   const { orgContext } = useOrgContext()
+  const { language } = useLanguagePreference()
 
   // Fetch accepted codes from Convex so they're included in document generation
   // even if the parent didn't pass them as a prop
@@ -338,7 +342,7 @@ export function CortiConsultation({
 
       ws.onopen = () => {
         // Send configuration
-        ws.send(JSON.stringify({ type: "config", configuration: STREAM_CONFIG }))
+        ws.send(JSON.stringify({ type: "config", configuration: buildStreamConfig(language) }))
       }
 
       ws.onmessage = async (event) => {
@@ -671,6 +675,7 @@ export function CortiConsultation({
         transcript: transcriptText,
         patientName: patientInfo?.name,
         acceptedCodes: resolvedCodes,
+        language,
       }
 
       // Generate both documents in parallel

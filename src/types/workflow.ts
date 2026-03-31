@@ -89,6 +89,8 @@ export interface WorkflowRequest {
   evidenceFindings?: Array<{ id: string; text: string; group: string; confidence?: number }>;
   // Prior encounter context
   priorContext?: Array<{ encounterId: string; date: string; facts: Array<{ id: string; text: string; group: string }>; diagnosis?: string }>;
+  // Language for Corti document generation ('en' | 'fr')
+  language?: string;
 }
 
 export interface WorkflowResponse {

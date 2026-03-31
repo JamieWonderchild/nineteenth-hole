@@ -775,6 +775,8 @@ export default defineSchema({
     dismissedBanners: v.array(v.string()), // ['multi-location-upgrade', 'location-setup']
     completedTours: v.array(v.string()), // ['dashboard-tour', 'location-tour']
     seenFeatures: v.object({}), // Flexible object for feature timestamps
+    // Language preference for Corti AI (transcription, facts, document generation)
+    language: v.optional(v.string()), // 'en' | 'fr' — defaults to 'en' if absent
     // Wizard state (resumable)
     wizardState: v.optional(v.object({
       wizardId: v.string(),

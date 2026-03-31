@@ -29,6 +29,7 @@ export const getUserPreferences = query({
         completedTours: [],
         seenFeatures: {},
         wizardState: undefined,
+        language: 'en',
       };
     }
 
@@ -260,6 +261,45 @@ export const markTourComplete = mutation({
         dismissedBanners: [],
         completedTours: [args.tourId],
         seenFeatures: {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      });
+    }
+  },
+});
+
+/**
+ * Set language preference for Corti AI (transcription, facts, documents)
+ */
+export const setLanguage = mutation({
+  args: {
+    userId: v.string(),
+    orgId: v.id("organizations"),
+    language: v.string(), // 'en' | 'fr'
+  },
+  handler: async (ctx, args) => {
+    const prefs = await ctx.db
+      .query("userPreferences")
+      .withIndex("by_user_org", (q) =>
+        q.eq("userId", args.userId).eq("orgId", args.orgId)
+      )
+      .first();
+
+    const timestamp = new Date().toISOString();
+
+    if (prefs) {
+      await ctx.db.patch(prefs._id, {
+        language: args.language,
+        updatedAt: timestamp,
+      });
+    } else {
+      await ctx.db.insert("userPreferences", {
+        userId: args.userId,
+        orgId: args.orgId,
+        dismissedBanners: [],
+        completedTours: [],
+        seenFeatures: {},
+        language: args.language,
         createdAt: timestamp,
         updatedAt: timestamp,
       });

@@ -8,6 +8,7 @@ import { api } from 'convex/_generated/api';
 import type { Id } from 'convex/_generated/dataModel';
 import { useUser } from '@clerk/nextjs';
 import { toast } from '@/hooks/use-toast';
+import { useLanguagePreference } from '@/hooks/useLanguagePreference';
 import { CortiClient, CortiEnvironment } from '@corti/sdk';
 
 type State = 'idle' | 'connecting' | 'recording' | 'saving';
@@ -18,6 +19,7 @@ interface QuickNoteButtonProps {
 
 export function QuickNoteButton({ encounterId }: QuickNoteButtonProps) {
   const { user } = useUser();
+  const { language } = useLanguagePreference();
   const [state, setState] = useState<State>('idle');
   const [transcript, setTranscript] = useState('');
 
@@ -95,7 +97,7 @@ export function QuickNoteButton({ encounterId }: QuickNoteButtonProps) {
       });
 
       const socket = await client.transcribe.connect({
-        configuration: { primaryLanguage: 'en', automaticPunctuation: true },
+        configuration: { primaryLanguage: language, automaticPunctuation: true },
         reconnectAttempts: 0,
       });
       wsRef.current = socket;

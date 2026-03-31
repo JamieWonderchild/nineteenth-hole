@@ -26,6 +26,7 @@ interface GenerateInvoiceRequest {
   grandTotal: number; // cents
   patientInfo: PatientInfo;
   dueDate?: string;
+  language?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
       grandTotal,
       patientInfo,
       dueDate,
+      language,
     } = body;
 
     if (!interactionId || !invoiceNumber || !lineItems || lineItems.length === 0) {
@@ -151,7 +153,7 @@ export async function POST(request: NextRequest) {
           data: allFacts,
         },
       ],
-      outputLanguage: 'en',
+      outputLanguage: language ?? 'en',
       documentationMode: 'routed_parallel' as const,
       template: {
         sections: [

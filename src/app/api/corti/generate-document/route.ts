@@ -36,6 +36,7 @@ interface GenerateDocumentRequest {
   documentType: DocumentType;
   patientName?: string;
   acceptedCodes?: { icd10: string[]; cpt: string[] };
+  language?: string;
 }
 
 interface GeneratedSection {
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
         { type: 'facts', data: allFacts },
       ],
       templateKey: template.templateKey,
-      outputLanguage: 'en',
+      outputLanguage: body.language ?? 'en',
       name: body.patientName
         ? `${template.name} - ${body.patientName}`
         : template.name,

@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useQuery } from 'convex/react';
 import { api } from 'convex/_generated/api';
+import { useLanguagePreference } from '@/hooks/useLanguagePreference';
 import { ManualServiceForm } from './ManualServiceForm';
 
 export interface PendingBillingItem {
@@ -48,6 +49,7 @@ export function AddMoreServicesPhase({
   onCancel,
 }: AddMoreServicesPhaseProps) {
   const [screen, setScreen] = useState<Screen>('dictating');
+  const { language } = useLanguagePreference();
 
   // ── Dictation state ───────────────────────────────────────────────────────
   const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected'>('idle');
@@ -117,7 +119,7 @@ export function AddMoreServicesPhase({
       });
 
       const socket = await client.transcribe.connect({
-        configuration: { primaryLanguage: 'en', automaticPunctuation: true },
+        configuration: { primaryLanguage: language, automaticPunctuation: true },
         reconnectAttempts: 0,
       });
       wsRef.current = socket;

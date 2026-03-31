@@ -140,6 +140,7 @@ function validateWorkflowRequest(body: unknown): { valid: true; request: Workflo
       providerNotes: obj.providerNotes as string | undefined,
       evidenceFindings: obj.evidenceFindings as WorkflowRequest['evidenceFindings'],
       priorContext: obj.priorContext as WorkflowRequest['priorContext'],
+      language: typeof obj.language === 'string' ? obj.language : undefined,
     },
   };
 }

@@ -14,6 +14,7 @@ import { api } from 'convex/_generated/api';
 import type { Id } from 'convex/_generated/dataModel';
 import { useUser } from '@clerk/nextjs';
 import { toast } from '@/hooks/use-toast';
+import { useLanguagePreference } from '@/hooks/useLanguagePreference';
 import { CortiClient, CortiEnvironment } from '@corti/sdk';
 import {
   createDictationState,
@@ -39,6 +40,7 @@ const MODE_LABELS: Record<DictationMode, { label: string; icon: React.ReactNode 
 
 export function DictationModal({ encounterId }: DictationModalProps) {
   const { user } = useUser();
+  const { language } = useLanguagePreference();
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<Stage>('idle');
   const [dictationState, setDictationState] = useState<DictationState>(createDictationState());
@@ -118,7 +120,7 @@ export function DictationModal({ encounterId }: DictationModalProps) {
       });
 
       const socket = await client.transcribe.connect({
-        configuration: { primaryLanguage: 'en', automaticPunctuation: true },
+        configuration: { primaryLanguage: language, automaticPunctuation: true },
         reconnectAttempts: 0,
       });
       wsRef.current = socket;

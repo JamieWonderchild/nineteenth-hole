@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from 'convex/_generated/api';
 import { useUser } from '@clerk/nextjs';
+import { useLanguagePreference } from '@/hooks/useLanguagePreference';
 import { PendingBillingItem } from './AddMoreServicesPhase';
 
 interface GeneratingInvoicePhaseProps {
@@ -37,6 +38,7 @@ export function GeneratingInvoicePhase({
   onCancel,
 }: GeneratingInvoicePhaseProps) {
   const { user } = useUser();
+  const { language } = useLanguagePreference();
   const [status, setStatus] = useState<'creating' | 'generating' | 'finalizing' | 'complete' | 'error'>('creating');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [invoiceNumber, setInvoiceNumber] = useState<string | null>(null);
@@ -125,6 +127,7 @@ export function GeneratingInvoicePhase({
             taxRate: draftResult.taxRate,
             grandTotal: draftResult.grandTotal,
             patientInfo,
+            language,
           }),
         });
 

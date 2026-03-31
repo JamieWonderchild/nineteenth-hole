@@ -15,7 +15,9 @@ import {
   Loader2,
   MapPin,
   Tag,
+  Languages,
 } from 'lucide-react';
+import { useLanguagePreference } from '@/hooks/useLanguagePreference';
 import { useUser } from '@clerk/nextjs';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from 'convex/_generated/api';
@@ -59,6 +61,7 @@ export default function SettingsPage() {
   const { orgContext, isLoading, error } = useOrgCtx();
   const { user } = useUser();
   const markSettingsViewed = useMutation(api.userPreferences.markSettingsViewed);
+  const { language, setLanguage } = useLanguagePreference();
   const [showWizard, setShowWizard] = useState(false);
 
   // Get upgrade state to show setup card and wizard
@@ -181,6 +184,41 @@ export default function SettingsPage() {
 
           </>
         )}
+
+        {/* Language preference */}
+        <div className="mb-6 flex items-center gap-3 p-4 rounded-lg border border-border bg-card">
+          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <Languages className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium">Language</p>
+            <p className="text-sm text-muted-foreground">
+              Transcription, AI facts, and document generation language
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setLanguage('en')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                language === 'en'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-accent'
+              }`}
+            >
+              English
+            </button>
+            <button
+              onClick={() => setLanguage('fr')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                language === 'fr'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-accent'
+              }`}
+            >
+              Français
+            </button>
+          </div>
+        </div>
 
         <div className="space-y-2">
           {settingsLinks
