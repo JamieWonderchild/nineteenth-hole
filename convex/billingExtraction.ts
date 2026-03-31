@@ -86,7 +86,7 @@ export const extractFromRecording = action({
 
       // Step 4: Call Corti agent via API route
       console.log('[BillingExtraction] Step 4: Calling Corti agent API...');
-      const apiUrl = process.env.SITE_URL || 'https://[PRODUCT_NAME_DOMAIN]';
+      const apiUrl = process.env.SITE_URL || 'https://heathplatform.com';
       console.log(`[BillingExtraction] API URL: ${apiUrl}/api/corti/extract-billing`);
       const response = await fetch(`${apiUrl}/api/corti/extract-billing`, {
         method: 'POST',
