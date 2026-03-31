@@ -329,6 +329,40 @@ export default function FactsPage() {
 
   const [changelogExpanded, setChangelogExpanded] = useState(false);
 
+  // Versioning — null means "current" (latest canonical), number = pinned recording index (1-based)
+  const [pinnedVersion, setPinnedVersion] = useState<number | null>(null);
+
+  // Reset pinned version when recordings count changes (new recording added)
+  useEffect(() => {
+    setPinnedVersion(null);
+  }, [recordings.length]);
+
+  const activeVersion = pinnedVersion ?? recordings.length;
+  const isViewingCurrent = activeVersion === recordings.length;
+
+  // Snapshot facts for historical versions (recording[activeVersion-1].facts)
+  const snapshotFacts = useMemo(() => {
+    if (isViewingCurrent || activeVersion === 0) return null;
+    const rec = recordings[activeVersion - 1];
+    if (!rec) return null;
+    const recFacts = (rec.facts || []) as Array<{ id: string; text: string; group: string }>;
+    const seen = new Set<string>();
+    return recFacts.filter(f => {
+      const key = `${f.group}::${f.text}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [isViewingCurrent, activeVersion, recordings]);
+
+  const snapshotGroups = useMemo(() => {
+    if (!snapshotFacts) return null;
+    return snapshotFacts.reduce<Record<string, Array<{ id: string; text: string; group: string }>>>((acc, f) => {
+      (acc[f.group] = acc[f.group] || []).push(f);
+      return acc;
+    }, {});
+  }, [snapshotFacts]);
+
   const factGroups = useMemo(() => {
     return dedupedFacts.reduce<Record<string, Array<{ id: string; text: string; group: string }>>>((acc, f) => {
       (acc[f.group] = acc[f.group] || []).push(f);
@@ -600,13 +634,38 @@ export default function FactsPage() {
               <ArrowLeft className="h-3 w-3" />
               Back to encounter
             </AppLink>
-            <h1 className="text-xl font-semibold">
-              {patient?.name || 'Patient'} — Facts
-            </h1>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <h1 className="text-xl font-semibold">
+                {patient?.name || 'Patient'} — Facts
+              </h1>
+              {hasMultipleRecordings && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-muted-foreground mr-0.5">version</span>
+                  {recordings.map((_, idx) => {
+                    const v = idx + 1;
+                    const isActive = activeVersion === v;
+                    const isCurrent = v === recordings.length;
+                    return (
+                      <button
+                        key={v}
+                        onClick={() => setPinnedVersion(isCurrent ? null : v)}
+                        className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full border transition-colors ${
+                          isActive
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground'
+                        }`}
+                      >
+                        {isCurrent ? `v${v} · now` : `v${v}`}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Conflict resolution — only shown when unresolved contradictions exist */}
-          {unresolvedConflicts.length > 0 && (
+          {/* Conflict resolution — only shown when unresolved contradictions exist and viewing current */}
+          {isViewingCurrent && unresolvedConflicts.length > 0 && (
             <div className="rounded-lg border-2 border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800 p-5">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -694,6 +753,37 @@ export default function FactsPage() {
                       </h5>
                       <ul className="space-y-0.5">
                         {groupFacts.map((f) => renderFactItem(f, 0))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : !isViewingCurrent && snapshotFacts !== null && snapshotGroups !== null ? (
+            /* Historical snapshot view for a specific recording version */
+            <div className="rounded-lg border bg-card p-5 space-y-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <h3 className="text-sm font-semibold text-muted-foreground">
+                  {snapshotFacts.length} fact{snapshotFacts.length !== 1 ? 's' : ''} — Recording {activeVersion} snapshot
+                </h3>
+                <span className="text-[11px] text-muted-foreground italic">
+                  State as of recording {activeVersion} of {recordings.length}
+                </span>
+              </div>
+              <div className="space-y-3">
+                {(Object.entries(snapshotGroups) as [string, Array<{ id: string; text: string; group: string }>][]).map(([group, groupFacts]) => {
+                  const colors = getGroupColors(group);
+                  return (
+                    <div key={group} className={`border-l-[3px] ${colors.border} pl-3 py-1 space-y-1`}>
+                      <h5 className={`text-xs font-semibold ${colors.text}`}>
+                        {getGroupLabel(group)}
+                      </h5>
+                      <ul className="space-y-0.5">
+                        {groupFacts.map((f) => (
+                          <li key={f.id} className="text-sm text-foreground opacity-80">
+                            {f.text}
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   );
