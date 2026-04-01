@@ -103,9 +103,6 @@ function applyCommand(cmd: string, s: DictationState): DictationState {
   }
 
   // new line / new paragraph / end list / paragraph break
-  if (s.mode === 'numbered') {
-    return { ...s, numberedCounter: s.numberedCounter + 1 };
-  }
   return { ...s, mode: 'paragraph' };
 }
 
