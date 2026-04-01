@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       : `${encounterContext}CLINICAL FACTS:\n${factsText}`;
 
     const client = createCortiClientFromEnv();
-    const codes = await client.predictCodes(text);
+    const codes = await client.predictCodes(text, encounterType);
 
     // Separate ICD-10 diagnosis, ICD-10 procedure, and CPT codes; sort each by confidence
     const icd10 = codes

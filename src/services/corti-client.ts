@@ -268,8 +268,10 @@ export class CortiClient {
   }
 
   // Medical Coding
-  async predictCodes(text: string): Promise<MedicalCode[]> {
+  async predictCodes(text: string, encounterType?: string): Promise<MedicalCode[]> {
     await this.authenticate();
+
+    const icd10System = encounterType === 'inpatient' ? 'icd10cm-inpatient' : 'icd10cm-outpatient';
 
     const response = await fetch(`${this.getApiBaseUrl()}/v2/tools/coding/`, {
       method: 'POST',
@@ -279,7 +281,7 @@ export class CortiClient {
         'Tenant-Name': this.config.tenant,
       },
       body: JSON.stringify({
-        system: ['icd10cm-outpatient', 'cpt'],
+        system: [icd10System, 'cpt'],
         context: [{ type: 'text', text }],
       }),
     });

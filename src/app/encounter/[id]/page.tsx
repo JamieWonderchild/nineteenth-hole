@@ -717,16 +717,6 @@ export default function ConsultationDetailPage() {
                       Add Recording
                     </Button>
                   </AppLink>
-                  {hasFacts && (
-                    <Button
-                      variant="outline"
-                      className="gap-2"
-                      onClick={() => setShowCompanionModal(true)}
-                    >
-                      <Heart className="h-4 w-4" />
-                      Patient Companion
-                    </Button>
-                  )}
                   <Button
                     className="gap-2"
                     onClick={() => setShowPublishConfirm(true)}
