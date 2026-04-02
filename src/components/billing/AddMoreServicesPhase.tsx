@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Id } from 'convex/_generated/dataModel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -135,6 +135,9 @@ export function AddMoreServicesPhase({
     },
   });
 
+  const handleStartRef = useRef<(() => Promise<void>) | null>(null);
+  useEffect(() => { handleStartRef.current?.(); }, []);
+
   const handleStart = async () => {
     setDictateError(null);
     transcriptRef.current = '';
@@ -145,6 +148,7 @@ export function AddMoreServicesPhase({
       setDictateError(err instanceof Error ? err.message : 'Failed to access microphone');
     }
   };
+  handleStartRef.current = handleStart;
 
   const handleStop = () => {
     stop();
