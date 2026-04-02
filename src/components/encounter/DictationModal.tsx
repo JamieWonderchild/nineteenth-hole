@@ -132,6 +132,7 @@ export function DictationModal({ encounterId }: DictationModalProps) {
       extractAndSaveNoteFacts(
         encounterId, text, createRecording, runReconciliation,
         noteIndex >= 0 ? (count) => setAddendumFactCount({ encounterId, index: noteIndex, factCount: count }) : undefined,
+        language,
       );
       toast({ title: 'Note saved' });
       setOpen(false);

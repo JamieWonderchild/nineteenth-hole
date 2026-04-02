@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status });
     }
 
-    const { text } = await request.json();
+    const { text, language } = await request.json();
 
     if (!text || typeof text !== 'string') {
       return NextResponse.json(
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const client = createCortiClientFromEnv();
-    const facts = await client.extractFacts(text);
+    const facts = await client.extractFacts(text, language || 'en');
 
     return NextResponse.json({ facts });
   } catch (error) {

@@ -96,6 +96,7 @@ export function AddAddendumDialog({
       extractAndSaveNoteFacts(
         encounterId as Id<'encounters'>, text.trim(), createRecording, runReconciliation,
         noteIndex >= 0 ? (count) => setAddendumFactCount({ encounterId: encounterId as Id<'encounters'>, index: noteIndex, factCount: count }) : undefined,
+        language,
       )
       setText('')
       toast({ title: 'Addendum added' })

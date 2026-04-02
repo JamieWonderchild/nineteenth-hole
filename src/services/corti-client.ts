@@ -211,11 +211,34 @@ export class CortiClient {
   }
 
   // Fact Extraction
-  async extractFacts(text: string): Promise<ExtractedFact[]> {
-    return this.request<ExtractedFact[]>('/tools/extract-facts', {
+  async extractFacts(text: string, outputLanguage = 'en'): Promise<{ id: string; text: string; group: string }[]> {
+    await this.authenticate();
+
+    const response = await fetch(`${this.getApiBaseUrl()}/tools/extract-facts`, {
       method: 'POST',
-      body: JSON.stringify({ text }),
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        'Content-Type': 'application/json',
+        'Tenant-Name': this.config.tenant,
+      },
+      body: JSON.stringify({
+        context: [{ type: 'text', text }],
+        outputLanguage,
+      }),
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const facts: { text: string; group: string }[] = data.facts ?? [];
+    return facts.map((f, i) => ({
+      id: `note-fact-${Date.now()}-${i}`,
+      text: f.text,
+      group: f.group,
+    }));
   }
 
   // Document Generation

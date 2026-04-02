@@ -24,13 +24,14 @@ export async function extractAndSaveNoteFacts(
   createRecording: CreateRecordingFn,
   runReconciliation?: RunReconciliationFn,
   setFactCount?: SetFactCountFn,
+  language = 'en',
 ): Promise<void> {
   try {
     console.log('[NoteFactsExtraction] Starting facts extraction, text length:', noteText.length);
     const res = await fetch('/api/corti/facts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: noteText }),
+      body: JSON.stringify({ text: noteText, language }),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');

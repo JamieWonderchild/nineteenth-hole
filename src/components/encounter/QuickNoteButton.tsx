@@ -41,6 +41,7 @@ export function QuickNoteButton({ encounterId }: QuickNoteButtonProps) {
       extractAndSaveNoteFacts(
         encounterId, text, createRecording, runReconciliation,
         noteIndex >= 0 ? (count) => setAddendumFactCount({ encounterId, index: noteIndex, factCount: count }) : undefined,
+        language,
       );
       toast({ title: 'Note saved' });
     } catch {
