@@ -353,6 +353,7 @@ export function VoiceCommandOverlay() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         if (overlayState === 'idle') {
           startListening();
         } else {
@@ -363,8 +364,8 @@ export function VoiceCommandOverlay() {
         cancel();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
   }, [overlayState, startListening, cancel]);
 
   // Cleanup on unmount
