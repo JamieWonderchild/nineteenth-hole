@@ -956,7 +956,14 @@ export default function ConsultationDetailPage() {
                             <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm leading-snug line-clamp-1">{note.text.split('\n')[0]}</p>
-                              <p className="text-xs text-muted-foreground mt-0.5">{formatRelativeDate(note.createdAt)}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-xs text-muted-foreground">{formatRelativeDate(note.createdAt)}</p>
+                                {note.factCount != null && note.factCount > 0 && (
+                                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary leading-none">
+                                    {note.factCount} fact{note.factCount !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
                           </button>

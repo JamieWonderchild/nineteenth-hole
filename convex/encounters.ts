@@ -1251,7 +1251,7 @@ export const addAddendum = mutation({
       });
     }
 
-    return { success: true };
+    return { success: true, noteIndex };
   },
 });
 
@@ -1274,6 +1274,23 @@ export const updateAddendum = mutation({
       addenda,
       updatedAt: new Date().toISOString(),
     });
+  },
+});
+
+// Store how many clinical facts were extracted from a specific note
+export const setAddendumFactCount = mutation({
+  args: {
+    encounterId: v.id("encounters"),
+    index: v.number(),
+    factCount: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const encounter = await ctx.db.get(args.encounterId);
+    if (!encounter) throw new Error("Encounter not found");
+    const addenda = [...(encounter.addenda || [])];
+    if (args.index < 0 || args.index >= addenda.length) return; // no-op if stale
+    addenda[args.index] = { ...addenda[args.index], factCount: args.factCount };
+    await ctx.db.patch(args.encounterId, { addenda });
   },
 });
 

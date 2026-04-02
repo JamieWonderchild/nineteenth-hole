@@ -567,6 +567,7 @@ export default defineSchema({
       text: v.string(),
       providerId: v.string(),
       createdAt: v.string(),
+      factCount: v.optional(v.number()),
     }))),
   }).index("by_org", ["orgId"])
     .index("by_org_location", ["orgId", "locationId"])

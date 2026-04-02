@@ -43,6 +43,7 @@ export function AddAddendumDialog({
 
   const addAddendum = useMutation(api.encounters.addAddendum)
   const createRecording = useMutation(api.recordings.createRecording)
+  const setAddendumFactCount = useMutation(api.encounters.setAddendumFactCount)
   const { runReconciliation } = useNoteReconciliation(encounterId as Id<'encounters'>)
 
   const encounter = useQuery(
@@ -86,12 +87,16 @@ export function AddAddendumDialog({
 
     setIsSaving(true)
     try {
-      await addAddendum({
+      const result = await addAddendum({
         encounterId: encounterId as Id<'encounters'>,
         text: text.trim(),
         providerId: user.id,
       })
-      extractAndSaveNoteFacts(encounterId as Id<'encounters'>, text.trim(), createRecording, runReconciliation)
+      const noteIndex = result?.noteIndex ?? -1
+      extractAndSaveNoteFacts(
+        encounterId as Id<'encounters'>, text.trim(), createRecording, runReconciliation,
+        noteIndex >= 0 ? (count) => setAddendumFactCount({ encounterId: encounterId as Id<'encounters'>, index: noteIndex, factCount: count }) : undefined,
+      )
       setText('')
       toast({ title: 'Addendum added' })
     } catch (error) {

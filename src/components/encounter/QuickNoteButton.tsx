@@ -27,6 +27,7 @@ export function QuickNoteButton({ encounterId }: QuickNoteButtonProps) {
 
   const addAddendum = useMutation(api.encounters.addAddendum);
   const createRecording = useMutation(api.recordings.createRecording);
+  const setAddendumFactCount = useMutation(api.encounters.setAddendumFactCount);
   const { runReconciliation } = useNoteReconciliation(encounterId);
 
   const saveTranscript = async () => {
@@ -35,8 +36,12 @@ export function QuickNoteButton({ encounterId }: QuickNoteButtonProps) {
     setTranscript('');
     if (!text || !user?.id) return;
     try {
-      await addAddendum({ encounterId, text, providerId: user.id });
-      extractAndSaveNoteFacts(encounterId, text, createRecording, runReconciliation);
+      const result = await addAddendum({ encounterId, text, providerId: user.id });
+      const noteIndex = result?.noteIndex ?? -1;
+      extractAndSaveNoteFacts(
+        encounterId, text, createRecording, runReconciliation,
+        noteIndex >= 0 ? (count) => setAddendumFactCount({ encounterId, index: noteIndex, factCount: count }) : undefined,
+      );
       toast({ title: 'Note saved' });
     } catch {
       toast({ title: 'Failed to save note', variant: 'destructive' });
