@@ -227,7 +227,7 @@ export function AddMoreServicesPhase({
             </>
           )}
 
-          {isRecording && (
+          {isRecording && !isExtracting && (
             <>
               <div className="w-20 h-20 rounded-full bg-green-500/10 border-2 border-green-500/30 flex items-center justify-center">
                 <Mic className="h-10 w-10 text-green-600 dark:text-green-400" />
