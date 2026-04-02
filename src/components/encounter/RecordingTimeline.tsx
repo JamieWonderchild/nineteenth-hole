@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { Clock, Mic, FileText, AlertCircle, CheckCircle, RefreshCw, Sparkles, ChevronDown, ChevronRight, AlertTriangle, Pencil } from 'lucide-react';
+import { Clock, Mic, FileText, AlertCircle, CheckCircle, RefreshCw, Sparkles, ChevronDown, ChevronRight, Pencil } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -11,6 +11,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
+type Fact = { id: string; text: string; group: string };
+
 type RecordingData = {
   _id: string;
   _creationTime: number;
@@ -18,7 +20,7 @@ type RecordingData = {
   phase?: string;
   duration?: number;
   transcript?: string;
-  facts?: Array<{ id: string; text: string; group: string }>;
+  facts?: Fact[];
   interactionId?: string;
 };
 
@@ -43,13 +45,7 @@ type ReconciledFact = {
 
 type FactReconciliation = {
   reconciledFacts: ReconciledFact[];
-  summary: {
-    confirmed: number;
-    updated: number;
-    contradicted: number;
-    new: number;
-    unchanged: number;
-  };
+  summary: { confirmed: number; updated: number; contradicted: number; new: number; unchanged: number };
   reconciledAt: string;
   triggerRecordingCount: number;
 };
@@ -65,21 +61,21 @@ interface RecordingTimelineProps {
 
 type TimelineItem =
   | { kind: 'recording'; recording: RecordingData; originalIndex: number; audioSeq: number }
-  | { kind: 'addendum'; addendum: AddendumData; addendumIndex: number; noteSeq: number };
+  | { kind: 'addendum'; addendum: AddendumData; addendumIndex: number; noteSeq: number; noteFacts: Fact[] };
 
 const phaseConfig: Record<string, { label: string; icon: any; color: string }> = {
-  history: { label: 'History', icon: FileText, color: 'bg-blue-100 text-blue-700 border-blue-300' },
-  exam: { label: 'Physical Exam', icon: Mic, color: 'bg-purple-100 text-purple-700 border-purple-300' },
-  assessment: { label: 'Assessment', icon: CheckCircle, color: 'bg-green-100 text-green-700 border-green-300' },
-  'follow-up': { label: 'Follow-up', icon: RefreshCw, color: 'bg-orange-100 text-orange-700 border-orange-300' },
+  history:    { label: 'History',       icon: FileText,    color: 'bg-blue-100 text-blue-700 border-blue-300' },
+  exam:       { label: 'Physical Exam', icon: Mic,         color: 'bg-purple-100 text-purple-700 border-purple-300' },
+  assessment: { label: 'Assessment',    icon: CheckCircle, color: 'bg-green-100 text-green-700 border-green-300' },
+  'follow-up':{ label: 'Follow-up',     icon: RefreshCw,   color: 'bg-orange-100 text-orange-700 border-orange-300' },
 };
 
 const statusConfig: Record<string, { icon: any; color: string; label: string }> = {
-  confirmed: { icon: CheckCircle, color: 'text-green-600', label: 'Confirmed' },
-  updated: { icon: RefreshCw, color: 'text-blue-600', label: 'Updated' },
-  contradicted: { icon: AlertCircle, color: 'text-red-600', label: 'Contradicted' },
-  new: { icon: Sparkles, color: 'text-purple-600', label: 'New' },
-  unchanged: { icon: CheckCircle, color: 'text-gray-400', label: 'Unchanged' },
+  confirmed:   { icon: CheckCircle, color: 'text-green-600',  label: 'Confirmed' },
+  updated:     { icon: RefreshCw,   color: 'text-blue-600',   label: 'Updated' },
+  contradicted:{ icon: AlertCircle, color: 'text-red-600',    label: 'Contradicted' },
+  new:         { icon: Sparkles,    color: 'text-purple-600', label: 'New' },
+  unchanged:   { icon: CheckCircle, color: 'text-gray-400',   label: 'Unchanged' },
 };
 
 export function RecordingTimeline({
@@ -90,16 +86,21 @@ export function RecordingTimeline({
   onEditNote,
   isEditable,
 }: RecordingTimelineProps) {
-  // Only audio recordings drive the facts timeline; phase=note recordings are synthetic
   const audioRecordings = useMemo(
     () => recordings.map((r, i) => ({ recording: r, originalIndex: i })).filter(({ recording }) => recording.phase !== 'note'),
     [recordings]
   );
 
-  // Build a unified sorted timeline of recordings + addenda
+  // Match phase=note recordings to addenda by creation order
+  const noteRecordingsSorted = useMemo(
+    () => [...recordings.filter(r => r.phase === 'note')].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    ),
+    [recordings]
+  );
+
   const timelineItems = useMemo<TimelineItem[]>(() => {
     let audioSeq = 0;
-    let noteSeq = 0;
     const items: TimelineItem[] = [
       ...audioRecordings.map(({ recording, originalIndex }) => ({
         kind: 'recording' as const,
@@ -111,7 +112,8 @@ export function RecordingTimeline({
         kind: 'addendum' as const,
         addendum,
         addendumIndex,
-        noteSeq: noteSeq++,
+        noteSeq: addendumIndex,
+        noteFacts: noteRecordingsSorted[addendumIndex]?.facts || [],
       })),
     ];
     return items.sort((a, b) => {
@@ -119,15 +121,10 @@ export function RecordingTimeline({
       const bTime = b.kind === 'recording' ? b.recording.createdAt : b.addendum.createdAt;
       return new Date(aTime).getTime() - new Date(bTime).getTime();
     });
-  }, [audioRecordings, addenda]);
-
-  const unresolvedCount = useMemo(() => {
-    if (!factReconciliation) return 0;
-    return factReconciliation.reconciledFacts.filter(f => f.status === 'contradicted' && !f.resolution).length;
-  }, [factReconciliation]);
+  }, [audioRecordings, addenda, noteRecordingsSorted]);
 
   const recordingsWithConflicts = useMemo((): Set<number> => {
-    if (!factReconciliation) return new Set<number>();
+    if (!factReconciliation) return new Set();
     const indices = factReconciliation.reconciledFacts
       .filter(f => f.status === 'contradicted' && !f.resolution)
       .flatMap(f => [f.recordingIndex, f.priorRecordingIndex].filter((i): i is number => i !== undefined));
@@ -166,22 +163,20 @@ export function RecordingTimeline({
     return map;
   }, [factReconciliation]);
 
-  const formatDuration = (seconds?: number) => {
-    if (!seconds) return '—';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  // Index reconciled facts by factId for note card lookup
+  const reconciledByFactId = useMemo(() => {
+    if (!factReconciliation) return new Map<string, ReconciledFact>();
+    return new Map(factReconciliation.reconciledFacts.map(f => [f.factId, f]));
+  }, [factReconciliation]);
+
+  const formatDuration = (s?: number) => {
+    if (!s) return '—';
+    return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
   };
+  const formatTime = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+  const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
-  const formatTime = (isoString: string) =>
-    new Date(isoString).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
-
-  const formatDate = (isoString: string) =>
-    new Date(isoString).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-
-  const hasAnything = audioRecordings.length > 0 || addenda.length > 0;
-
-  if (!hasAnything) {
+  if (audioRecordings.length === 0 && addenda.length === 0) {
     return (
       <Card>
         <CardContent className="py-12 text-center">
@@ -212,68 +207,91 @@ export function RecordingTimeline({
 
             <div className="space-y-8">
               {timelineItems.map((item) => {
+
+                // ── Doctor Note card ─────────────────────────────────────
                 if (item.kind === 'addendum') {
-                  const { addendum, addendumIndex, noteSeq } = item;
+                  const { addendum, addendumIndex, noteSeq, noteFacts } = item;
                   const key = `addendum-${addendumIndex}`;
                   const isExpanded = expandedItems.has(key);
-                  const firstLine = addendum.text.split('\n')[0];
 
                   return (
                     <div key={key} className="relative pl-14">
                       <div className="absolute left-0 top-1 h-12 w-12 rounded-full border-4 border-background bg-card flex items-center justify-center z-10">
-                        <div className="h-10 w-10 rounded-full flex items-center justify-center bg-amber-100 text-amber-700 border-amber-300">
-                          <Pencil className="h-5 w-5" />
+                        <div className="h-10 w-10 rounded-full flex items-center justify-center bg-amber-100 text-amber-700 border border-amber-300">
+                          <Pencil className="h-4 w-4" />
                         </div>
                       </div>
 
-                      <Card className="border-2 hover:border-primary/30 transition-colors">
+                      <Card className="border-2 hover:border-primary/30 transition-colors cursor-pointer" onClick={() => toggleItem(key)}>
                         <CardContent className="p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <button
-                              className="flex items-center gap-2 flex-1 min-w-0 text-left"
-                              onClick={() => toggleItem(key)}
-                            >
-                              {isExpanded
-                                ? <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                : <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              }
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h4 className="font-semibold text-sm">
-                                    Doctor Note{noteSeq > 0 ? ` ${noteSeq + 1}` : ''}
-                                  </h4>
-                                  {addendum.factCount != null && addendum.factCount > 0 && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {addendum.factCount} fact{addendum.factCount !== 1 ? 's' : ''}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                                  <Clock className="h-3 w-3" />
-                                  <span>{formatTime(addendum.createdAt)}</span>
-                                  <span>·</span>
-                                  <span>{formatDate(addendum.createdAt)}</span>
-                                </div>
-                                {!isExpanded && (
-                                  <p className="text-sm text-muted-foreground mt-1.5 line-clamp-1">{firstLine}</p>
+                          {/* Header */}
+                          <div className="flex items-start gap-2">
+                            {isExpanded
+                              ? <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                              : <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                            }
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="font-semibold text-sm">
+                                  Doctor Note{noteSeq > 0 ? ` ${noteSeq + 1}` : ''}
+                                </h4>
+                                {addendum.factCount != null && addendum.factCount > 0 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {addendum.factCount} fact{addendum.factCount !== 1 ? 's' : ''}
+                                  </Badge>
                                 )}
                               </div>
-                            </button>
-
-                            {isEditable && onEditNote && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); onEditNote(addendumIndex, addendum.text, addendum.createdAt); }}
-                                className="flex-shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                                title="Edit note"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                            )}
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                                <Clock className="h-3 w-3" />
+                                <span>{formatTime(addendum.createdAt)}</span>
+                                <span>·</span>
+                                <span>{formatDate(addendum.createdAt)}</span>
+                              </div>
+                            </div>
                           </div>
 
-                          {isExpanded && (
-                            <div className="mt-4 pt-4 border-t">
-                              <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{addendum.text}</p>
+                          {/* Note text — always visible, compact */}
+                          <p className={`text-sm text-muted-foreground mt-2 ml-6 leading-relaxed ${isExpanded ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>
+                            {addendum.text}
+                          </p>
+
+                          {/* Expanded: extracted facts + edit link */}
+                          {isExpanded && noteFacts.length > 0 && (
+                            <div className="mt-4 ml-6 pt-3 border-t space-y-1.5">
+                              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                                Extracted facts
+                              </p>
+                              {noteFacts.map((fact) => {
+                                const reconciled = reconciledByFactId.get(fact.id);
+                                const status = reconciled?.status;
+                                const config = status ? statusConfig[status] : null;
+                                const StatusIcon = config?.icon;
+                                return (
+                                  <div key={fact.id} className="flex items-start gap-2 text-sm">
+                                    {StatusIcon
+                                      ? <StatusIcon className={`h-3.5 w-3.5 mt-0.5 flex-shrink-0 ${config!.color}`} />
+                                      : <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/40 flex-shrink-0 mt-[7px]" />
+                                    }
+                                    <p className="text-muted-foreground">
+                                      <span className="font-medium text-foreground capitalize">{fact.group.replace(/-/g, ' ')}:</span>{' '}
+                                      {fact.text}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Edit link */}
+                          {isExpanded && isEditable && onEditNote && (
+                            <div className="mt-3 ml-6 flex justify-end" onClick={e => e.stopPropagation()}>
+                              <button
+                                onClick={() => onEditNote(addendumIndex, addendum.text, addendum.createdAt)}
+                                className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                              >
+                                <Pencil className="h-3 w-3" />
+                                Edit note
+                              </button>
                             </div>
                           )}
                         </CardContent>
@@ -282,7 +300,7 @@ export function RecordingTimeline({
                   );
                 }
 
-                // Recording item
+                // ── Recording card ───────────────────────────────────────
                 const { recording, originalIndex, audioSeq } = item;
                 const phase = phaseConfig[recording.phase || ''] || { label: 'Recording', icon: Mic, color: 'bg-gray-100 text-gray-700 border-gray-300' };
                 const PhaseIcon = phase.icon;
@@ -290,9 +308,8 @@ export function RecordingTimeline({
                 const regularFacts = recording.facts || [];
                 const isExpanded = expandedItems.has(recording._id);
                 const totalFacts = reconciledFacts.length || regularFacts.length;
-
-                const statusCounts = reconciledFacts.reduce((acc, fact) => {
-                  acc[fact.status] = (acc[fact.status] || 0) + 1;
+                const statusCounts = reconciledFacts.reduce((acc, f) => {
+                  acc[f.status] = (acc[f.status] || 0) + 1;
                   return acc;
                 }, {} as Record<string, number>);
 
@@ -304,10 +321,7 @@ export function RecordingTimeline({
                       </div>
                     </div>
 
-                    <Card
-                      className="border-2 hover:border-primary/30 transition-colors cursor-pointer"
-                      onClick={() => toggleItem(recording._id)}
-                    >
+                    <Card className="border-2 hover:border-primary/30 transition-colors cursor-pointer" onClick={() => toggleItem(recording._id)}>
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -345,7 +359,7 @@ export function RecordingTimeline({
                                 return (
                                   <Tooltip key={status}>
                                     <TooltipTrigger asChild>
-                                      <Badge variant="outline" className="gap-1 text-xs cursor-help" onClick={(e) => e.stopPropagation()}>
+                                      <Badge variant="outline" className="gap-1 text-xs cursor-help" onClick={e => e.stopPropagation()}>
                                         <StatusIcon className={`h-3 w-3 ${config.color}`} />
                                         <span>{count}</span>
                                       </Badge>
@@ -368,14 +382,14 @@ export function RecordingTimeline({
                                   const config = statusConfig[fact.status];
                                   const StatusIcon = config.icon;
                                   const displayText = fact.resolution === 'keep-old' && fact.priorText ? fact.priorText : fact.text;
-                                  const isUnresolvedConflict = fact.status === 'contradicted' && !fact.resolution;
+                                  const isUnresolved = fact.status === 'contradicted' && !fact.resolution;
 
-                                  if (isUnresolvedConflict) {
+                                  if (isUnresolved) {
                                     return (
                                       <div key={fact.factId} className="flex items-start gap-2 text-xs py-0.5">
                                         <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500 flex-shrink-0 mt-[5px]" />
                                         <div>
-                                          <span className="text-foreground">{displayText}</span>
+                                          <span>{displayText}</span>
                                           {fact.priorText && (
                                             <span className="text-muted-foreground ml-1.5">
                                               (was: <span className="line-through">{fact.priorText}</span>)
@@ -403,7 +417,7 @@ export function RecordingTimeline({
                                   }
 
                                   return (
-                                    <div key={fact.factId} className="flex items-start gap-2 text-sm group">
+                                    <div key={fact.factId} className="flex items-start gap-2 text-sm">
                                       <StatusIcon className={`h-4 w-4 mt-0.5 flex-shrink-0 ${config.color}`} />
                                       <div className="flex-1 min-w-0">
                                         <p className="text-muted-foreground">
