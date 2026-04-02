@@ -107,16 +107,23 @@ export function VoiceCommandOverlay() {
     }
   }, []);
 
-  // ── Stop recording + classify ──────────────────────────────────────────────
+  // ── Stop recording (send end signal — transcript arrives asynchronously) ────
 
-  const stopAndClassify = useCallback(async () => {
-    if (isCancelledRef.current) return;
+  const triggerStop = useCallback(() => {
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null; }
     if (maxListenTimerRef.current) { clearTimeout(maxListenTimerRef.current); maxListenTimerRef.current = null; }
-
     wsRef.current?.send?.(JSON.stringify({ type: 'end' }));
     if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
+    setOverlayState('processing');
+    setStatusLabel('Processing…');
+    setInterimText('');
+  }, []);
+
+  // ── Classify transcript — called only after 'ended' fires (transcript is final) ──
+
+  const classifyTranscript = useCallback(async () => {
+    if (isCancelledRef.current) return;
 
     const transcript = finalTextRef.current.trim();
     if (!transcript) {
@@ -125,10 +132,6 @@ export function VoiceCommandOverlay() {
       setTimeout(() => { cleanup(); setOverlayState('idle'); }, 1500);
       return;
     }
-
-    setOverlayState('processing');
-    setStatusLabel('Processing…');
-    setInterimText('');
 
     try {
       const res = await fetch('/api/corti/voice-command', {
@@ -294,10 +297,10 @@ export function VoiceCommandOverlay() {
           };
           mr.start(200);
 
-          startSilenceDetection(stream, stopAndClassify);
+          startSilenceDetection(stream, triggerStop);
 
           maxListenTimerRef.current = setTimeout(() => {
-            stopAndClassify();
+            triggerStop();
           }, MAX_LISTEN_MS);
         }
 
@@ -313,7 +316,7 @@ export function VoiceCommandOverlay() {
         }
 
         if (msg.type === 'ended') {
-          if (!isCancelledRef.current) stopAndClassify();
+          if (!isCancelledRef.current) classifyTranscript();
         }
 
         if (msg.type === 'error') {
@@ -337,7 +340,7 @@ export function VoiceCommandOverlay() {
       setOverlayState('error');
       setTimeout(() => { cleanup(); setOverlayState('idle'); }, 1500);
     }
-  }, [cleanup, startSilenceDetection, stopAndClassify]);
+  }, [cleanup, startSilenceDetection, triggerStop, classifyTranscript]);
 
   const cancel = useCallback(() => {
     isCancelledRef.current = true;
