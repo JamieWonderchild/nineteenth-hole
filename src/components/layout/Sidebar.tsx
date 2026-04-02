@@ -99,6 +99,16 @@ export const Sidebar = () => {
           </div>
         </div>
 
+        {/* ⌘K voice command hint */}
+        <div className="px-2 pb-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-muted-foreground">
+            <kbd className="inline-flex items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium shrink-0">
+              ⌘K
+            </kbd>
+            <span className="text-xs whitespace-nowrap">Voice command</span>
+          </div>
+        </div>
+
         {/* Theme toggle */}
         <div className="px-2 pb-2">
           <button

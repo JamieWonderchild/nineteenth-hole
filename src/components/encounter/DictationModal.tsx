@@ -107,7 +107,18 @@ export function DictationModal({ encounterId }: DictationModalProps) {
     }
   }, [open]);
 
+  // voice:start-note event from voice command system
+  const startRecordingRef = useRef<(() => Promise<void>) | null>(null);
+  useEffect(() => {
+    const handler = () => {
+      startRecordingRef.current?.();
+    };
+    window.addEventListener('voice:start-note', handler);
+    return () => window.removeEventListener('voice:start-note', handler);
+  }, []);
+
   const startRecording = async () => {
+    if (stage !== 'idle') return;
     const fresh = createDictationState();
     setDictationState(fresh);
     dictStateRef.current = fresh;
@@ -123,6 +134,7 @@ export function DictationModal({ encounterId }: DictationModalProps) {
       });
     }
   };
+  startRecordingRef.current = startRecording;
 
   const stopRecording = useCallback(() => {
     setStage('processing');
