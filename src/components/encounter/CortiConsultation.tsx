@@ -279,6 +279,12 @@ export function CortiConsultation({
     setPhase("saved")
   }, [])
 
+  // Auto-start recording on mount — user explicitly navigated here to record
+  const handleStartRef = React.useRef<(() => Promise<void>) | null>(null)
+  React.useEffect(() => {
+    handleStartRef.current?.()
+  }, [])
+
   const handleStart = async () => {
     setError(null)
     setConnectionState("connecting")
@@ -566,6 +572,7 @@ export function CortiConsultation({
       })
     }, 1000)
   }
+  handleStartRef.current = handleStart
 
   const handleStop = () => {
     isFlushing.current = true

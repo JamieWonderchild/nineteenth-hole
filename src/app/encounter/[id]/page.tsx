@@ -325,7 +325,7 @@ export default function ConsultationDetailPage() {
       });
       toast({
         title: 'Encounter Published',
-        description: 'The record is now locked. Only addenda can be added.',
+        description: 'The record is now locked. The Patient Companion is now available to share with your patient.',
       });
 
       // Auto-update companion context if companion exists (non-blocking)
@@ -745,7 +745,7 @@ export default function ConsultationDetailPage() {
                   <AppLink href={`/encounter/new?encounterId=${encounterId}`}>
                     <Button variant="outline" className="gap-2">
                       <Mic className="h-4 w-4" />
-                      Add Recording
+                      Ambient Consultation
                     </Button>
                   </AppLink>
                   <Button
