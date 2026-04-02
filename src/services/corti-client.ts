@@ -214,7 +214,7 @@ export class CortiClient {
   async extractFacts(text: string, outputLanguage = 'en'): Promise<{ id: string; text: string; group: string }[]> {
     await this.authenticate();
 
-    const response = await fetch(`${this.getApiBaseUrl()}/tools/extract-facts`, {
+    const response = await fetch(`${this.getApiBaseUrl()}/v2/tools/extract-facts`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.accessToken}`,
