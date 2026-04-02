@@ -66,6 +66,8 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AppLink } from '@/components/navigation/AppLink';
 import { toast } from '@/hooks/use-toast';
+import { extractAndSaveNoteFacts } from '@/lib/noteFactsExtraction';
+import { useNoteReconciliation } from '@/hooks/useNoteReconciliation';
 
 function formatRelativeDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -156,6 +158,9 @@ export default function ConsultationDetailPage() {
   const clearExtractedPatientInfo = useMutation(api.encounters.clearExtractedPatientInfo);
   const resolveFactConflict = useMutation(api.encounters.resolveFactConflict);
   const updateAddendum = useMutation(api.encounters.updateAddendum);
+  const createRecording = useMutation(api.recordings.createRecording);
+  const setAddendumFactCount = useMutation(api.encounters.setAddendumFactCount);
+  const { runReconciliation } = useNoteReconciliation(encounterId as Id<'encounters'>);
 
   // Attachments
   const generateUploadUrl = useMutation(api.evidenceFiles.generateUploadUrl);
@@ -437,7 +442,15 @@ export default function ConsultationDetailPage() {
     if (!viewingNote || !editNoteText.trim()) return;
     setIsSavingNote(true);
     try {
-      await updateAddendum({ encounterId: encounterId as Id<'encounters'>, index: viewingNote.index, text: editNoteText.trim() });
+      const noteIndex = viewingNote.index;
+      await updateAddendum({ encounterId: encounterId as Id<'encounters'>, index: noteIndex, text: editNoteText.trim() });
+      extractAndSaveNoteFacts(
+        encounterId as Id<'encounters'>,
+        editNoteText.trim(),
+        createRecording,
+        runReconciliation,
+        (count) => setAddendumFactCount({ encounterId: encounterId as Id<'encounters'>, index: noteIndex, factCount: count }),
+      );
       setViewingNote(null);
       toast({ title: 'Note updated' });
     } catch {
