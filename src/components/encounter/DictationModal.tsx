@@ -144,7 +144,6 @@ export function DictationModal({ encounterId }: DictationModalProps) {
       {/* Trigger button */}
       <Button
         variant="outline"
-        size="sm"
         className="gap-2"
         onClick={startRecording}
         disabled={stage !== 'idle'}
@@ -223,9 +222,9 @@ export function DictationModal({ encounterId }: DictationModalProps) {
                     Listening…
                   </p>
                 )}
-                {/* Finalized blocks only — no interim preview */}
+                {/* Finalized blocks */}
                 {rendered.blocks.length > 0 && (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 mb-2">
                     {rendered.blocks.map((block, i) => (
                       <div key={i} className="flex items-start gap-2 text-sm leading-relaxed">
                         {block.type === 'bullet' && (
@@ -241,8 +240,25 @@ export function DictationModal({ encounterId }: DictationModalProps) {
                     ))}
                   </div>
                 )}
+                {/* Pending text — final segments not yet block-committed */}
+                {rendered.pendingText && (
+                  <div className="flex items-start gap-2 text-sm leading-relaxed">
+                    {rendered.mode === 'bullet' && (
+                      <span className="mt-0.5 text-primary font-bold flex-shrink-0 opacity-60">•</span>
+                    )}
+                    {rendered.mode === 'numbered' && (
+                      <span className="mt-0.5 text-primary font-medium flex-shrink-0 min-w-[1.5rem] opacity-60">
+                        {dictationState.numberedCounter + 1}.
+                      </span>
+                    )}
+                    <span className="opacity-80">
+                      {rendered.pendingText}
+                      <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 align-middle animate-pulse" />
+                    </span>
+                  </div>
+                )}
                 {/* Empty — connected but no speech yet */}
-                {!isConnecting && rendered.blocks.length === 0 && (
+                {!isConnecting && rendered.blocks.length === 0 && !rendered.pendingText && (
                   <p className="text-muted-foreground italic text-sm">
                     Speak now… say "bullet point" to start a list
                   </p>
@@ -310,7 +326,8 @@ export function DictationModal({ encounterId }: DictationModalProps) {
             {isRecording && (
               <>
                 <p className="text-xs text-muted-foreground">
-                  {rendered.blocks.length} block{rendered.blocks.length !== 1 ? 's' : ''} captured
+                  {rendered.blocks.length + (rendered.pendingText ? 1 : 0)} block
+                  {rendered.blocks.length + (rendered.pendingText ? 1 : 0) !== 1 ? 's' : ''} captured
                 </p>
                 <Button
                   variant="destructive"

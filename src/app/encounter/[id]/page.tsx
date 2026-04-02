@@ -958,7 +958,7 @@ export default function ConsultationDetailPage() {
             <div className="flex gap-6 items-start">
 
               {/* ── Left: clinical ─────────────────────────────────── */}
-              <div className="flex-1 min-w-0 space-y-5">
+              <div className="flex-[3] min-w-0 space-y-5">
 
                 {/* Card Grid — command centre */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1116,7 +1116,7 @@ export default function ConsultationDetailPage() {
               </div>{/* end left column */}
 
               {/* ── Right: billing sidebar (tabbed) ─────────────────── */}
-              <div className="w-96 flex-shrink-0 sticky top-6 self-start">
+              <div className="flex-[2] min-w-[380px] sticky top-6 self-start">
                 <Tabs defaultValue="services">
                   <TabsList className="w-full mb-3">
                     <TabsTrigger value="services" className="flex-1">Services</TabsTrigger>

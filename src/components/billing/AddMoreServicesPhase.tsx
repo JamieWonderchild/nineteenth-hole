@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
-import { CortiClient, CortiEnvironment } from '@corti/sdk';
+import { useState, useRef } from 'react';
 import { Id } from 'convex/_generated/dataModel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +11,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useQuery } from 'convex/react';
 import { api } from 'convex/_generated/api';
 import { useLanguagePreference } from '@/hooks/useLanguagePreference';
+import { useDictation } from '@/hooks/useDictation';
+import { AudioLevelIndicator } from '@/components/encounter/AudioLevelIndicator';
 import { ManualServiceForm } from './ManualServiceForm';
 
 export interface PendingBillingItem {
@@ -52,163 +53,35 @@ export function AddMoreServicesPhase({
   const { language } = useLanguagePreference();
 
   // ── Dictation state ───────────────────────────────────────────────────────
-  const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected'>('idle');
-  const [isRecording, setIsRecording] = useState(false);
   const [transcriptLines, setTranscriptLines] = useState<string[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
   const [dictateError, setDictateError] = useState<string | null>(null);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const wsRef = useRef<any>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const transcriptRef = useRef<string>('');
+  const transcriptRef = useRef('');
 
   // ── Confirmation state ────────────────────────────────────────────────────
   const [extractedItems, setExtractedItems] = useState<ExtractedItem[]>([]);
   const [selected, setSelected] = useState<Map<string, number>>(new Map());
-
-  // ── Manual add state (fallback, inside confirmation) ──────────────────────
   const [showManual, setShowManual] = useState(false);
 
   const catalog = useQuery(api.billingCatalog.getByOrg, { orgId });
-
-  useEffect(() => {
-    return () => cleanup();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Recording helpers ─────────────────────────────────────────────────────
-
-  const cleanup = () => {
-    wsRef.current?.close();
-    wsRef.current = null;
-    if (mediaRecorderRef.current?.state !== 'inactive') {
-      mediaRecorderRef.current?.stop();
-    }
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    streamRef.current = null;
-  };
-
-  const startRecording = async () => {
-    setDictateError(null);
-    setTranscriptLines([]);
-    transcriptRef.current = '';
-    setConnectionState('connecting');
-
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('Microphone access is not supported in this browser.');
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
-      });
-      streamRef.current = stream;
-
-      const res = await fetch('/api/corti/transcribe', { method: 'POST' });
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.error || 'Failed to initialise transcription');
-      }
-      const { accessToken, tenantName, environment } = await res.json();
-
-      const client = new CortiClient({
-        tenantName,
-        environment: environment === 'us' ? CortiEnvironment.Us : CortiEnvironment.Eu,
-        auth: { accessToken },
-      });
-
-      const socket = await client.transcribe.connect({
-        configuration: { primaryLanguage: language, automaticPunctuation: true },
-        reconnectAttempts: 0,
-      });
-      wsRef.current = socket;
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      socket.on('message', (msg: any) => {
-        if (msg.type === 'CONFIG_ACCEPTED') {
-          setConnectionState('connected');
-          setIsRecording(true);
-          startAudioCapture(stream, socket);
-        }
-
-        if (msg.type === 'transcript') {
-          const { text, isFinal } = msg.data ?? {};
-          if (isFinal && text) {
-            transcriptRef.current = (transcriptRef.current + ' ' + text).trim();
-            setTranscriptLines(transcriptRef.current.split(/[.!?]+/).map((s: string) => s.trim()).filter(Boolean));
-          }
-        }
-
-        if (msg.type === 'ended') {
-          setIsRecording(false);
-          setConnectionState('idle');
-          cleanup();
-          runExtraction();
-        }
-
-        if (msg.type === 'error') {
-          setDictateError((msg as any).message || 'Transcription error');
-          setIsRecording(false);
-          setConnectionState('idle');
-          cleanup();
-        }
-      });
-
-      socket.on('error', (err: Error) => {
-        setDictateError(err.message || 'Connection error');
-        setIsRecording(false);
-        setConnectionState('idle');
-        cleanup();
-      });
-    } catch (err: any) {
-      setDictateError(err.message || 'Failed to access microphone');
-      setConnectionState('idle');
-      cleanup();
-    }
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const startAudioCapture = (stream: MediaStream, socket: any) => {
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus' : 'audio/mp4';
-    const mr = new MediaRecorder(stream, { mimeType });
-    mediaRecorderRef.current = mr;
-    mr.ondataavailable = (e) => {
-      if (e.data.size > 0 && socket.readyState === 1 /* OPEN */) socket.sendAudio(e.data);
-    };
-    mr.start(250);
-  };
-
-  const stopRecording = () => {
-    if (wsRef.current?.readyState === 1 /* OPEN */) {
-      wsRef.current.send(JSON.stringify({ type: 'end' }));
-    }
-    if (mediaRecorderRef.current?.state !== 'inactive') {
-      mediaRecorderRef.current?.stop();
-    }
-    setIsRecording(false);
-    setIsExtracting(true); // show spinner immediately while waiting for 'ended'
-  };
 
   const runExtraction = async () => {
     const transcript = transcriptRef.current.trim();
     if (!transcript) {
       setDictateError('Nothing was transcribed. Please try again.');
+      setIsExtracting(false);
       return;
     }
     if (!catalog || catalog.length === 0) {
       setDictateError('Your billing catalog is empty. Add items to your catalog first.');
+      setIsExtracting(false);
       return;
     }
 
-    setIsExtracting(true);
     setDictateError(null);
 
     try {
-      // Send transcript directly to billing extraction — no fact extraction needed for short dictations
       const factsToUse = [{ id: 'dictated-0', text: transcript, group: 'actions' }];
-
       const extractRes = await fetch('/api/corti/extract-billing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -226,20 +99,49 @@ export function AddMoreServicesPhase({
       const { extraction } = await extractRes.json();
 
       const items: ExtractedItem[] = extraction?.extractedItems ?? [];
-
       setExtractedItems(items);
-
-      // Pre-select all extracted items
       const initial = new Map<string, number>();
       items.forEach(item => initial.set(item.catalogItemId, item.quantity));
       setSelected(initial);
-
       setIsExtracting(false);
       setScreen('confirming');
-    } catch (err: any) {
-      setDictateError(err.message || 'Failed to process recording');
+    } catch (err: unknown) {
+      setDictateError(err instanceof Error ? err.message : 'Failed to process recording');
       setIsExtracting(false);
     }
+  };
+
+  const { state: dictState, audioLevel, start, stop } = useDictation({
+    language,
+    onFinalSegment: (text) => {
+      const next = (transcriptRef.current + ' ' + text).trim();
+      transcriptRef.current = next;
+      setTranscriptLines(next.split(/[.!?]+/).map(s => s.trim()).filter(Boolean));
+    },
+    onEnded: () => {
+      setIsExtracting(true);
+      runExtraction();
+    },
+    onError: (message) => {
+      setDictateError(message);
+      setIsExtracting(false);
+    },
+  });
+
+  const handleStart = async () => {
+    setDictateError(null);
+    transcriptRef.current = '';
+    setTranscriptLines([]);
+    try {
+      await start();
+    } catch (err: unknown) {
+      setDictateError(err instanceof Error ? err.message : 'Failed to access microphone');
+    }
+  };
+
+  const handleStop = () => {
+    stop();
+    setIsExtracting(true); // show spinner immediately while waiting for 'ended'
   };
 
   // ── Confirmation handlers ─────────────────────────────────────────────────
@@ -273,7 +175,6 @@ export function AddMoreServicesPhase({
   };
 
   const handleManualAdd = (item: PendingBillingItem) => {
-    // Include any already-selected extracted items so they aren't lost
     const extractedPending: PendingBillingItem[] = extractedItems
       .filter(i => selected.has(i.catalogItemId))
       .map(i => ({
@@ -294,6 +195,9 @@ export function AddMoreServicesPhase({
     return <Badge variant="outline" className="text-xs py-0">{confidence}</Badge>;
   };
 
+  const isConnecting = dictState === 'connecting';
+  const isRecording = dictState === 'recording';
+
   // ── Dictation screen ──────────────────────────────────────────────────────
 
   if (screen === 'dictating') {
@@ -307,33 +211,35 @@ export function AddMoreServicesPhase({
         </div>
 
         <div className="flex flex-col items-center gap-4 py-6">
-          {connectionState === 'connecting' && (
+          {isConnecting && (
             <>
-              <div className="w-20 h-20 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
+              <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
+                <Loader2 className="h-10 w-10 text-muted-foreground animate-spin" />
               </div>
-              <p className="font-medium text-sm">Connecting…</p>
+              <p className="font-medium text-sm text-muted-foreground">Connecting…</p>
             </>
           )}
 
           {isRecording && (
             <>
-              <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center animate-pulse">
-                <Mic className="h-10 w-10 text-red-500" />
+              <div className="w-20 h-20 rounded-full bg-green-500/10 border-2 border-green-500/30 flex items-center justify-center">
+                <Mic className="h-10 w-10 text-green-600 dark:text-green-400" />
               </div>
-              <div className="text-center">
-                <p className="font-medium">Recording…</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Describe the additional services you performed
-                </p>
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-sm font-medium text-green-600 dark:text-green-400">Recording</span>
+                <AudioLevelIndicator level={audioLevel} />
               </div>
+              <p className="text-sm text-muted-foreground text-center">
+                Describe the additional services you performed
+              </p>
               {transcriptLines.length > 0 && (
                 <div className="w-full bg-muted rounded-lg p-3 text-sm text-muted-foreground">
                   {transcriptLines.join('. ')}
                 </div>
               )}
-              <Button onClick={stopRecording} variant="destructive" size="lg">
-                <Square className="mr-2 h-4 w-4" />
+              <Button onClick={handleStop} variant="outline" size="lg" className="gap-2">
+                <Square className="h-4 w-4 fill-current" />
                 Stop
               </Button>
             </>
@@ -341,24 +247,24 @@ export function AddMoreServicesPhase({
 
           {isExtracting && (
             <>
-              <div className="w-20 h-20 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
+              <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
+                <Loader2 className="h-10 w-10 text-muted-foreground animate-spin" />
               </div>
               <div className="text-center">
                 <p className="font-medium">Matching to catalog…</p>
                 {transcriptLines.length > 0 && (
                   <p className="text-xs text-muted-foreground mt-2 max-w-xs">
-                    "{transcriptLines.join('. ')}"
+                    &ldquo;{transcriptLines.join('. ')}&rdquo;
                   </p>
                 )}
               </div>
             </>
           )}
 
-          {!isRecording && !isExtracting && connectionState === 'idle' && (
+          {!isRecording && !isExtracting && !isConnecting && (
             <>
-              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-                <Mic className="h-10 w-10 text-primary" />
+              <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
+                <Mic className="h-10 w-10 text-muted-foreground" />
               </div>
               <div className="text-center">
                 <p className="font-medium">Ready to record</p>
@@ -366,8 +272,8 @@ export function AddMoreServicesPhase({
                   Describe any additional services you performed
                 </p>
               </div>
-              <Button onClick={startRecording} size="lg" disabled={catalog === undefined}>
-                <Mic className="mr-2 h-4 w-4" />
+              <Button onClick={handleStart} size="lg" className="gap-2" disabled={catalog === undefined}>
+                <Mic className="h-4 w-4" />
                 {catalog === undefined ? 'Loading catalog…' : 'Start Recording'}
               </Button>
             </>
@@ -406,15 +312,13 @@ export function AddMoreServicesPhase({
         </p>
       </div>
 
-      {/* Transcript */}
       {transcriptLines.length > 0 && (
         <div className="bg-muted rounded-lg p-3 text-sm text-muted-foreground">
           <p className="text-xs font-medium mb-1 text-foreground">You said:</p>
-          "{transcriptLines.join('. ')}"
+          &ldquo;{transcriptLines.join('. ')}&rdquo;
         </div>
       )}
 
-      {/* Matched items */}
       {extractedItems.length === 0 ? (
         <div className="text-center py-4 text-sm text-muted-foreground">
           No catalog matches found. Add the service manually below.
@@ -478,7 +382,6 @@ export function AddMoreServicesPhase({
         </div>
       )}
 
-      {/* Manual add fallback */}
       <div className="border border-dashed border-border rounded-lg overflow-hidden">
         <button
           onClick={() => setShowManual(v => !v)}
@@ -490,7 +393,6 @@ export function AddMoreServicesPhase({
           </span>
           {showManual ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
         </button>
-
         {showManual && (
           <div className="px-4 pb-4 pt-3 border-t border-dashed border-border">
             <ManualServiceForm orgId={orgId} onAdd={handleManualAdd} />
@@ -498,7 +400,6 @@ export function AddMoreServicesPhase({
         )}
       </div>
 
-      {/* Footer */}
       <div className="border-t pt-4 space-y-3">
         <div className="flex justify-between items-center">
           <span className="text-sm text-muted-foreground">
