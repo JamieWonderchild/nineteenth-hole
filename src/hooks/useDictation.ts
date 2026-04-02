@@ -145,18 +145,15 @@ export function useDictation({
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       socket.on('message', (msg: any) => {
-        console.log('[useDictation] message:', msg.type, msg);
         if (msg.type === 'CONFIG_ACCEPTED') {
           startAudioCapture(stream, socket);
           setState('recording');
         }
         if (msg.type === 'transcript') {
           const { text, isFinal } = msg.data ?? {};
-          console.log('[useDictation] transcript isFinal=%s text=%o rawMsg=%o', isFinal, text, msg);
           if (isFinal && text) {
             onFinalSegmentRef.current(text);
           } else if (!isFinal && text) {
-            console.log('[useDictation] calling onInterimSegment, handler present:', !!onInterimSegmentRef.current);
             onInterimSegmentRef.current?.(text);
           }
         }
