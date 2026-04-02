@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { Clock, Mic, FileText, AlertCircle, CheckCircle, RefreshCw, Sparkles, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Clock, Mic, FileText, AlertCircle, CheckCircle, RefreshCw, Sparkles, ChevronDown, ChevronRight, AlertTriangle, Pencil } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -75,6 +75,11 @@ const phaseConfig: Record<string, { label: string; icon: any; color: string }> =
     icon: RefreshCw,
     color: 'bg-orange-100 text-orange-700 border-orange-300',
   },
+  note: {
+    label: 'Doctor Note',
+    icon: Pencil,
+    color: 'bg-amber-100 text-amber-700 border-amber-300',
+  },
 };
 
 const statusConfig: Record<string, { icon: any; color: string; label: string }> = {
@@ -106,6 +111,9 @@ const statusConfig: Record<string, { icon: any; color: string; label: string }> 
 };
 
 export function RecordingTimeline({ recordings, factReconciliation, onResolveConflict }: RecordingTimelineProps) {
+  const audioRecordings = useMemo(() => recordings.filter(r => r.phase !== 'note'), [recordings]);
+  const noteEntries = useMemo(() => recordings.filter(r => r.phase === 'note'), [recordings]);
+
   const unresolvedCount = useMemo(() => {
     if (!factReconciliation) return 0;
     return factReconciliation.reconciledFacts.filter(
@@ -197,6 +205,11 @@ export function RecordingTimeline({ recordings, factReconciliation, onResolveCon
     );
   }
 
+  const headerLabel = [
+    audioRecordings.length > 0 && `${audioRecordings.length} recording${audioRecordings.length !== 1 ? 's' : ''}`,
+    noteEntries.length > 0 && `${noteEntries.length} note${noteEntries.length !== 1 ? 's' : ''}`,
+  ].filter(Boolean).join(' · ');
+
   return (
     <TooltipProvider>
       <Card>
@@ -205,7 +218,7 @@ export function RecordingTimeline({ recordings, factReconciliation, onResolveCon
             <Clock className="h-5 w-5 text-primary" />
             <h3 className="text-lg font-semibold">Recording Timeline</h3>
             <Badge variant="outline" className="ml-auto">
-              {recordings.length} recording{recordings.length !== 1 ? 's' : ''}
+              {headerLabel}
             </Badge>
           </div>
 
@@ -217,6 +230,7 @@ export function RecordingTimeline({ recordings, factReconciliation, onResolveCon
             {/* Timeline items */}
             <div className="space-y-8">
               {recordings.map((recording, index) => {
+                const isNote = recording.phase === 'note';
                 const phase = phaseConfig[recording.phase || ''] || {
                   label: 'Recording',
                   icon: Mic,
@@ -227,6 +241,9 @@ export function RecordingTimeline({ recordings, factReconciliation, onResolveCon
                 const regularFacts = recording.facts || [];
                 const isExpanded = expandedRecordings.has(recording._id);
                 const totalFacts = reconciledFacts.length || regularFacts.length;
+                // Sequential label counts only within its own type
+                const audioIndex = isNote ? -1 : recordings.slice(0, index).filter(r => r.phase !== 'note').length;
+                const noteIndex = isNote ? recordings.slice(0, index).filter(r => r.phase === 'note').length : -1;
 
                 // Count fact status changes for this recording
                 const statusCounts = reconciledFacts.reduce(
@@ -265,10 +282,11 @@ export function RecordingTimeline({ recordings, factReconciliation, onResolveCon
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <h4 className="font-semibold text-sm">
-                                  Recording {index + 1}
-                                  {recording.phase && ` - ${phase.label}`}
+                                  {isNote
+                                    ? `Doctor Note${noteIndex > 0 ? ` ${noteIndex + 1}` : ''}`
+                                    : `Recording ${audioIndex + 1}${recording.phase ? ` – ${phase.label}` : ''}`}
                                 </h4>
-                                {recording.duration && (
+                                {!isNote && recording.duration && (
                                   <Badge variant="secondary" className="text-xs">
                                     {formatDuration(recording.duration)}
                                   </Badge>

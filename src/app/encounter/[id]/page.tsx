@@ -15,6 +15,7 @@ import { DictationModal } from '@/components/encounter/DictationModal';
 import { RecordingTimeline } from '@/components/encounter/RecordingTimeline';
 import { PlannedServicesWidget } from '@/components/billing/PlannedServicesWidget';
 import { MedicalCodingPanel } from '@/components/encounter/MedicalCodingPanel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -997,6 +998,43 @@ export default function ConsultationDetailPage() {
                   />
                 </div>
 
+                {/* Quick Notes / Addenda — above attachments */}
+                {encounter?.addenda && encounter.addenda.length > 0 && (
+                  <div className="rounded-lg border bg-card p-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                      Notes
+                    </p>
+                    <div className="space-y-2">
+                      {encounter.addenda.map((note, i) => (
+                        <div key={i} className="text-sm space-y-0.5">
+                          <div className="space-y-0.5">
+                            {note.text.split('\n').map((line, j) => {
+                              const bullet = line.match(/^-\s+(.+)/);
+                              const numbered = line.match(/^(\d+)\.\s+(.+)/);
+                              if (bullet) return (
+                                <div key={j} className="flex items-start gap-2">
+                                  <span className="text-primary font-bold mt-0.5 flex-shrink-0">•</span>
+                                  <span>{bullet[1]}</span>
+                                </div>
+                              );
+                              if (numbered) return (
+                                <div key={j} className="flex items-start gap-2">
+                                  <span className="text-primary font-medium mt-0.5 flex-shrink-0 min-w-[1.2rem]">{numbered[1]}.</span>
+                                  <span>{numbered[2]}</span>
+                                </div>
+                              );
+                              return line ? <p key={j}>{line}</p> : null;
+                            })}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(note.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Attachments */}
                 <div
                   className="rounded-lg border bg-card p-4"
@@ -1075,67 +1113,42 @@ export default function ConsultationDetailPage() {
                   )}
                 </div>
 
-                {/* Quick Notes / Addenda */}
-                {encounter?.addenda && encounter.addenda.length > 0 && (
-                  <div className="rounded-lg border bg-card p-4">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                      Notes
-                    </p>
-                    <div className="space-y-2">
-                      {encounter.addenda.map((note, i) => (
-                        <div key={i} className="text-sm space-y-0.5">
-                          <div className="space-y-0.5">
-                            {note.text.split('\n').map((line, j) => {
-                              const bullet = line.match(/^-\s+(.+)/);
-                              const numbered = line.match(/^(\d+)\.\s+(.+)/);
-                              if (bullet) return (
-                                <div key={j} className="flex items-start gap-2">
-                                  <span className="text-primary font-bold mt-0.5 flex-shrink-0">•</span>
-                                  <span>{bullet[1]}</span>
-                                </div>
-                              );
-                              if (numbered) return (
-                                <div key={j} className="flex items-start gap-2">
-                                  <span className="text-primary font-medium mt-0.5 flex-shrink-0 min-w-[1.2rem]">{numbered[1]}.</span>
-                                  <span>{numbered[2]}</span>
-                                </div>
-                              );
-                              return line ? <p key={j}>{line}</p> : null;
-                            })}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(note.createdAt).toLocaleString()}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
               </div>{/* end left column */}
 
-              {/* ── Right: billing sidebar ──────────────────────────── */}
-              <div className="w-80 flex-shrink-0 space-y-4 sticky top-6 self-start">
-                {orgContext?.orgId && (
-                  <PlannedServicesWidget
-                    encounterId={encounterId as Id<"encounters">}
-                    orgId={orgContext.orgId as Id<"organizations">}
-                    facts={computeFactsFromDetail()}
-                    encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
-                  />
-                )}
-                <MedicalCodingPanel
-                  encounterId={encounterId as Id<'encounters'>}
-                  facts={computeFactsFromDetail()}
-                  transcript={encounter.transcription}
-                  existingIcd10={encounter.icd10Codes ?? []}
-                  existingCpt={encounter.cptCodes ?? []}
-                  isEditable={isEditable}
-                  addenda={encounter.addenda ?? []}
-                  encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
-                  reconciledAt={detail?.factReconciliation?.reconciledAt}
-                  unresolvedContradictions={unresolvedContradictions}
-                />
+              {/* ── Right: billing sidebar (tabbed) ─────────────────── */}
+              <div className="w-96 flex-shrink-0 sticky top-6 self-start">
+                <Tabs defaultValue="services">
+                  <TabsList className="w-full mb-3">
+                    <TabsTrigger value="services" className="flex-1">Services</TabsTrigger>
+                    <TabsTrigger value="codes" className="flex-1">Codes</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="services" className="mt-0">
+                    {orgContext?.orgId ? (
+                      <PlannedServicesWidget
+                        encounterId={encounterId as Id<"encounters">}
+                        orgId={orgContext.orgId as Id<"organizations">}
+                        facts={computeFactsFromDetail()}
+                        encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-8">Billing not configured</p>
+                    )}
+                  </TabsContent>
+                  <TabsContent value="codes" className="mt-0">
+                    <MedicalCodingPanel
+                      encounterId={encounterId as Id<'encounters'>}
+                      facts={computeFactsFromDetail()}
+                      transcript={encounter.transcription}
+                      existingIcd10={encounter.icd10Codes ?? []}
+                      existingCpt={encounter.cptCodes ?? []}
+                      isEditable={isEditable}
+                      addenda={encounter.addenda ?? []}
+                      encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
+                      reconciledAt={detail?.factReconciliation?.reconciledAt}
+                      unresolvedContradictions={unresolvedContradictions}
+                    />
+                  </TabsContent>
+                </Tabs>
               </div>{/* end right sidebar */}
 
             </div>

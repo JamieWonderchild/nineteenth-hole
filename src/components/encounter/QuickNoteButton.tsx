@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { Mic, Square, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMutation } from 'convex/react';
@@ -9,174 +9,99 @@ import type { Id } from 'convex/_generated/dataModel';
 import { useUser } from '@clerk/nextjs';
 import { toast } from '@/hooks/use-toast';
 import { useLanguagePreference } from '@/hooks/useLanguagePreference';
-import { CortiClient, CortiEnvironment } from '@corti/sdk';
-
-type State = 'idle' | 'connecting' | 'recording' | 'saving';
+import { useDictation } from '@/hooks/useDictation';
+import { extractAndSaveNoteFacts } from '@/lib/noteFactsExtraction';
 
 interface QuickNoteButtonProps {
   encounterId: Id<'encounters'>;
 }
 
+
 export function QuickNoteButton({ encounterId }: QuickNoteButtonProps) {
   const { user } = useUser();
   const { language } = useLanguagePreference();
-  const [state, setState] = useState<State>('idle');
-  const [transcript, setTranscript] = useState('');
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const wsRef = useRef<any>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const transcriptRef = useRef<string>('');
+  const [transcript, setTranscript] = useState('');
+  const transcriptRef = useRef('');
 
   const addAddendum = useMutation(api.encounters.addAddendum);
+  const createRecording = useMutation(api.recordings.createRecording);
 
-  const cleanup = useCallback(() => {
-    wsRef.current?.close();
-    wsRef.current = null;
-    if (mediaRecorderRef.current?.state !== 'inactive') {
-      mediaRecorderRef.current?.stop();
-    }
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    streamRef.current = null;
-    mediaRecorderRef.current = null;
-  }, []);
-
-  useEffect(() => () => cleanup(), [cleanup]);
-
-  const saveTranscript = useCallback(async () => {
+  const saveTranscript = async () => {
     const text = transcriptRef.current.trim();
-    if (!text || !user?.id) {
-      setState('idle');
-      return;
-    }
-    setState('saving');
+    transcriptRef.current = '';
+    setTranscript('');
+    if (!text || !user?.id) return;
     try {
       await addAddendum({ encounterId, text, providerId: user.id });
+      extractAndSaveNoteFacts(encounterId, text, createRecording);
       toast({ title: 'Note saved' });
     } catch {
       toast({ title: 'Failed to save note', variant: 'destructive' });
     }
-    transcriptRef.current = '';
-    setTranscript('');
-    setState('idle');
-  }, [addAddendum, encounterId, user?.id]);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const startAudioCapture = (stream: MediaStream, socket: any) => {
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus'
-      : 'audio/mp4';
-    const mr = new MediaRecorder(stream, { mimeType });
-    mediaRecorderRef.current = mr;
-    mr.ondataavailable = (e) => {
-      if (e.data.size > 0 && socket.readyState === 1 /* OPEN */) socket.sendAudio(e.data);
-    };
-    mr.start(250);
   };
 
-  const startRecording = async () => {
-    transcriptRef.current = '';
-    setTranscript('');
-    setState('connecting');
+  const { state, audioLevel: _audioLevel, start, stop } = useDictation({
+    language,
+    onFinalSegment: (text) => {
+      const next = (transcriptRef.current + ' ' + text).trim();
+      transcriptRef.current = next;
+      setTranscript(next);
+    },
+    onEnded: saveTranscript,
+    onError: (message) => {
+      toast({ title: message, variant: 'destructive' });
+    },
+  });
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
-      });
-      streamRef.current = stream;
-
-      const res = await fetch('/api/corti/transcribe', { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to connect to transcription service');
-      const { accessToken, tenantName, environment } = await res.json();
-
-      const client = new CortiClient({
-        tenantName,
-        environment: environment === 'us' ? CortiEnvironment.Us : CortiEnvironment.Eu,
-        auth: { accessToken },
-      });
-
-      const socket = await client.transcribe.connect({
-        configuration: { primaryLanguage: language, automaticPunctuation: true },
-        reconnectAttempts: 0,
-      });
-      wsRef.current = socket;
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      socket.on('message', (msg: any) => {
-        if (msg.type === 'CONFIG_ACCEPTED') {
-          startAudioCapture(stream, socket);
-          setState('recording');
-        }
-
-        if (msg.type === 'transcript') {
-          const { text, isFinal } = msg.data ?? {};
-          if (isFinal && text) {
-            transcriptRef.current = (transcriptRef.current + ' ' + text).trim();
-            setTranscript(transcriptRef.current);
-          }
-        }
-
-        if (msg.type === 'ended') {
-          cleanup();
-          saveTranscript();
-        }
-
-        if (msg.type === 'error') {
-          cleanup();
-          setState('idle');
-          toast({ title: (msg as any).message || 'Transcription error', variant: 'destructive' });
-        }
-      });
-
-      socket.on('error', (err: Error) => {
-        cleanup();
-        setState('idle');
-        toast({ title: err.message || 'Connection error', variant: 'destructive' });
-      });
-    } catch (err: any) {
-      cleanup();
-      setState('idle');
-      toast({
-        title: 'Could not start recording',
-        description: err.message,
-        variant: 'destructive',
-      });
+  const handleClick = async () => {
+    if (state === 'idle') {
+      transcriptRef.current = '';
+      setTranscript('');
+      try {
+        await start();
+      } catch (err: unknown) {
+        toast({
+          title: 'Could not start recording',
+          description: err instanceof Error ? err.message : undefined,
+          variant: 'destructive',
+        });
+      }
+    } else if (state === 'recording') {
+      stop();
     }
   };
 
-  const stopRecording = () => {
-    if (wsRef.current?.readyState === 1 /* OPEN */) {
-      wsRef.current.send(JSON.stringify({ type: 'end' }));
-    }
-    if (mediaRecorderRef.current?.state !== 'inactive') {
-      mediaRecorderRef.current?.stop();
-    }
-  };
+  const isActive = state === 'recording';
+  const isBusy = state === 'connecting';
 
   return (
     <div className="relative">
       <Button
         variant="ghost"
         size="icon"
-        className={`h-8 w-8 ${state === 'recording' ? 'text-red-500 hover:text-red-600' : 'text-muted-foreground hover:text-foreground'}`}
-        onClick={state === 'idle' ? startRecording : state === 'recording' ? stopRecording : undefined}
+        className={`h-8 w-8 transition-colors ${
+          isActive
+            ? 'text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300'
+            : 'text-muted-foreground hover:text-foreground'
+        }`}
+        onClick={handleClick}
         title={state === 'idle' ? 'Quick note' : state === 'recording' ? 'Stop recording' : undefined}
-        disabled={state === 'connecting' || state === 'saving'}
+        disabled={isBusy}
       >
-        {state === 'saving' || state === 'connecting' ? (
+        {isBusy ? (
           <Loader2 className="h-4 w-4 animate-spin" />
-        ) : state === 'recording' ? (
+        ) : isActive ? (
           <Square className="h-3.5 w-3.5 fill-current" />
         ) : (
           <Mic className="h-4 w-4" />
         )}
       </Button>
 
-      {state === 'recording' && (
+      {isActive && (
         <div className="absolute right-0 top-10 z-50 w-72 rounded-lg border bg-card shadow-lg p-3 space-y-2">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
             <span className="text-xs font-medium">Recording — tap to stop</span>
           </div>
           <p className="text-sm min-h-[2.5rem] leading-relaxed">

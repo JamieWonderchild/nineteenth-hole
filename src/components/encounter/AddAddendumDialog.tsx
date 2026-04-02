@@ -12,12 +12,16 @@ import {
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Loader2, Plus } from 'lucide-react'
+import { Loader2, Plus, Mic, Square } from 'lucide-react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from 'convex/_generated/api'
 import { useUser } from '@clerk/nextjs'
 import { toast } from '@/hooks/use-toast'
 import type { Id } from 'convex/_generated/dataModel'
+import { useLanguagePreference } from '@/hooks/useLanguagePreference'
+import { useDictation } from '@/hooks/useDictation'
+import { AudioLevelIndicator } from './AudioLevelIndicator'
+import { extractAndSaveNoteFacts } from '@/lib/noteFactsExtraction'
 
 interface AddAddendumDialogProps {
   open: boolean
@@ -25,24 +29,55 @@ interface AddAddendumDialogProps {
   encounterId: string
 }
 
+
 export function AddAddendumDialog({
   open,
   onOpenChange,
   encounterId,
 }: AddAddendumDialogProps) {
   const { user } = useUser()
+  const { language } = useLanguagePreference()
   const [text, setText] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
   const addAddendum = useMutation(api.encounters.addAddendum)
+  const createRecording = useMutation(api.recordings.createRecording)
 
-  // Fetch current encounter to show existing addenda
   const encounter = useQuery(
     api.encounters.getById,
     open ? { id: encounterId as Id<'encounters'> } : 'skip'
   )
 
   const existingAddenda = encounter?.addenda || []
+
+  const { state: dictState, audioLevel, start: startDictation, stop: stopDictation } = useDictation({
+    language,
+    onFinalSegment: (segment) => {
+      setText((prev) => (prev ? prev + ' ' + segment : segment))
+    },
+    onEnded: () => {
+      // Text is already in the textarea; nothing extra to do
+    },
+    onError: (message) => {
+      toast({ title: message, variant: 'destructive' })
+    },
+  })
+
+  const handleMicClick = async () => {
+    if (dictState === 'idle') {
+      try {
+        await startDictation()
+      } catch (err: unknown) {
+        toast({
+          title: 'Could not start recording',
+          description: err instanceof Error ? err.message : undefined,
+          variant: 'destructive',
+        })
+      }
+    } else if (dictState === 'recording') {
+      stopDictation()
+    }
+  }
 
   const handleSubmit = async () => {
     if (!user?.id || !text.trim()) return
@@ -54,11 +89,10 @@ export function AddAddendumDialog({
         text: text.trim(),
         providerId: user.id,
       })
-
+      extractAndSaveNoteFacts(encounterId as Id<'encounters'>, text.trim(), createRecording)
       setText('')
       toast({ title: 'Addendum added' })
     } catch (error) {
-      console.error('Failed to add addendum:', error)
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to add addendum',
@@ -68,6 +102,9 @@ export function AddAddendumDialog({
       setIsSaving(false)
     }
   }
+
+  const isRecording = dictState === 'recording'
+  const isConnecting = dictState === 'connecting'
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -101,10 +138,39 @@ export function AddAddendumDialog({
 
           {/* New addendum */}
           <div className="space-y-2">
-            <Label htmlFor="addendum-text">New Addendum</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="addendum-text">New Addendum</Label>
+              {/* Mic toggle */}
+              <button
+                type="button"
+                onClick={handleMicClick}
+                disabled={isConnecting}
+                title={isRecording ? 'Stop dictating' : 'Dictate note'}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                  isRecording
+                    ? 'bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800'
+                    : 'text-muted-foreground hover:text-foreground border border-transparent hover:border-border'
+                }`}
+              >
+                {isConnecting ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : isRecording ? (
+                  <>
+                    <Square className="h-3 w-3 fill-current" />
+                    <AudioLevelIndicator level={audioLevel} />
+                    Stop
+                  </>
+                ) : (
+                  <>
+                    <Mic className="h-3 w-3" />
+                    Dictate
+                  </>
+                )}
+              </button>
+            </div>
             <Textarea
               id="addendum-text"
-              placeholder="Add a note, correction, or update..."
+              placeholder={isRecording ? 'Listening… speak your note' : 'Add a note, correction, or update...'}
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={3}
