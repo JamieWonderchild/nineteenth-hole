@@ -16,12 +16,12 @@ export default function BillingPage() {
   const router = useAppRouter();
   const { orgContext } = useOrgCtx();
 
-  const currentTab = searchParams.get('tab') || 'overview';
+  const currentTab = searchParams.get('tab') || 'invoices';
 
   const handleTabChange = (tab: string) => {
     // Validate tab value
     if (tab !== 'overview' && tab !== 'catalog' && tab !== 'invoices') {
-      tab = 'overview';
+      tab = 'invoices';
     }
     router.push('/billing', { additionalParams: { tab } });
   };
@@ -49,8 +49,8 @@ export default function BillingPage() {
           {/* Tabs */}
           <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-4">
             <TabsList>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="invoices">Invoices</TabsTrigger>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="catalog">Catalog</TabsTrigger>
             </TabsList>
 
