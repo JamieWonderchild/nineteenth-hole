@@ -26,14 +26,25 @@ export async function extractAndSaveNoteFacts(
   setFactCount?: SetFactCountFn,
 ): Promise<void> {
   try {
+    console.log('[NoteFactsExtraction] Starting facts extraction, text length:', noteText.length);
     const res = await fetch('/api/corti/facts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: noteText }),
     });
-    if (!res.ok) return;
-    const { facts } = await res.json();
-    if (!Array.isArray(facts) || facts.length === 0) return;
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error('[NoteFactsExtraction] /api/corti/facts returned', res.status, body);
+      return;
+    }
+    const data = await res.json();
+    console.log('[NoteFactsExtraction] Facts response:', data);
+    const { facts } = data;
+    if (!Array.isArray(facts) || facts.length === 0) {
+      console.warn('[NoteFactsExtraction] No facts returned from extraction');
+      return;
+    }
+    console.log('[NoteFactsExtraction] Saving', facts.length, 'facts as note recording');
     await createRecording({ encounterId, phase: 'note', facts });
     if (setFactCount) {
       setFactCount(facts.length).catch((err) =>
@@ -45,7 +56,7 @@ export async function extractAndSaveNoteFacts(
         console.error('[NoteFactsExtraction] Reconciliation failed:', err)
       );
     }
-  } catch {
-    // Non-blocking — facts extraction failure must not surface to the user
+  } catch (err) {
+    console.error('[NoteFactsExtraction] Unexpected error:', err);
   }
 }
