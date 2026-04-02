@@ -144,6 +144,9 @@ export default function ConsultationDetailPage() {
   );
 
   const [isUnpublishing, setIsUnpublishing] = useState(false);
+  const [viewingNote, setViewingNote] = useState<{ index: number; text: string; createdAt: string } | null>(null);
+  const [editNoteText, setEditNoteText] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
 
   const deleteDraft = useMutation(api.encounters.deleteDraftConsultation);
   const publishConsultation = useMutation(api.encounters.publishConsultation);
@@ -152,6 +155,7 @@ export default function ConsultationDetailPage() {
   const updatePatient = useMutation(api.patients.updatePatient);
   const clearExtractedPatientInfo = useMutation(api.encounters.clearExtractedPatientInfo);
   const resolveFactConflict = useMutation(api.encounters.resolveFactConflict);
+  const updateAddendum = useMutation(api.encounters.updateAddendum);
 
   // Attachments
   const generateUploadUrl = useMutation(api.evidenceFiles.generateUploadUrl);
@@ -428,6 +432,20 @@ export default function ConsultationDetailPage() {
       console.error(err);
     }
   }, [resolveFactConflict, encounterId]);
+
+  const handleSaveNote = async () => {
+    if (!viewingNote || !editNoteText.trim()) return;
+    setIsSavingNote(true);
+    try {
+      await updateAddendum({ encounterId: encounterId as Id<'encounters'>, index: viewingNote.index, text: editNoteText.trim() });
+      setViewingNote(null);
+      toast({ title: 'Note updated' });
+    } catch {
+      toast({ title: 'Failed to update note', variant: 'destructive' });
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
 
   const handleCreateCompanion = useCallback(async () => {
     if (!encounter || !patient || !detail?.recordings) return;
@@ -814,141 +832,31 @@ export default function ConsultationDetailPage() {
             </div>
           )}
 
-          {/* Patient Details */}
-          {patient && (
-            <div className="rounded-lg border bg-card px-4 py-3">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Patient</p>
-                <AppLink
-                  href={`/patient-records/${patient._id}`}
-                  className="text-xs text-primary hover:underline flex items-center gap-0.5"
-                >
-                  Full record <ChevronRight className="h-3 w-3" />
-                </AppLink>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 text-sm">
-                {[
-                  { field: 'age', label: 'Age', icon: null, value: patient.age },
-                  { field: 'sex', label: 'Sex', icon: null, value: patient.sex },
-                  { field: 'weight', label: 'Weight', icon: Weight, value: patient.weight ? `${patient.weight}${patient.weightUnit ? ` ${patient.weightUnit}` : ''}` : undefined },
-                ].map(({ field, label, icon: Icon, value }) => (
-                  <div key={field} className="group">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5 flex items-center gap-1">
-                      {Icon && <Icon className="h-3 w-3" />}
-                      {label}
-                    </p>
-                    {editingPatientField === field ? (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          autoFocus
-                          value={editPatientValue}
-                          onChange={(e) => setEditPatientValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') savePatientEdit();
-                            if (e.key === 'Escape') cancelPatientEdit();
-                          }}
-                          onBlur={savePatientEdit}
-                          className="h-6 text-sm w-full"
-                        />
-                      </div>
-                    ) : isEditable ? (
-                      <p
-                        className={`text-sm cursor-pointer flex items-center gap-1 ${value ? '' : 'text-muted-foreground/40 italic'}`}
-                        onClick={() => startPatientEdit(field, field === 'weight' ? (patient.weight || '') : (value || ''))}
-                      >
-                        <span className="truncate">{value || `Add`}</span>
-                        <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground flex-shrink-0" />
-                      </p>
-                    ) : (
-                      <p className={`text-sm ${value ? '' : 'text-muted-foreground/40 italic'}`}>
-                        <span className="truncate">{value || '—'}</span>
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Patient Enrichment Banner (hidden when published) */}
-          {isEditable && enrichableFields.length > 0 && (
-            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
-                  <p className="text-sm font-medium">
-                    New patient info detected from recording
-                  </p>
-                </div>
-                <button
-                  onClick={handleEnrichmentDismiss}
-                  className="text-muted-foreground hover:text-foreground p-0.5"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-x-6 gap-y-2">
-                {enrichableFields.map((field) => (
-                  <label
-                    key={field.key}
-                    className="flex items-center gap-2 text-sm cursor-pointer"
-                  >
-                    <Checkbox
-                      checked={enrichmentCheckedState[field.key] ?? true}
-                      onCheckedChange={(checked) =>
-                        setEnrichmentChecked((prev) => ({
-                          ...prev,
-                          [field.key]: !!checked,
-                        }))
-                      }
-                    />
-                    <span className="text-muted-foreground">{field.label}:</span>
-                    <span className="font-medium">{field.value}</span>
-                  </label>
-                ))}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={handleEnrichmentUpdate}
-                  disabled={isEnrichmentUpdating || !Object.values(enrichmentCheckedState).some(Boolean)}
-                >
-                  {isEnrichmentUpdating ? (
-                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                  ) : (
-                    <Check className="h-3.5 w-3.5 mr-1.5" />
-                  )}
-                  Update Patient
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleEnrichmentDismiss}
-                >
-                  Dismiss
-                </Button>
-              </div>
-            </div>
-          )}
-
           {/* Draft empty state */}
           {status === 'draft' && !hasRecordings && (
-            <div className="flex flex-col items-center justify-center py-16 space-y-4 rounded-lg border bg-card">
-              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <Mic className="h-8 w-8 text-primary" />
+            <div className="space-y-4">
+              {patient && (
+                <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-2.5">
+                  <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                  <span className="text-sm font-medium">{patient.name}</span>
+                  {patientSnapshot && <span className="text-sm text-muted-foreground">· {patientSnapshot}</span>}
+                  <AppLink href={`/patient-records/${patient._id}`} className="ml-auto text-xs text-primary hover:underline flex items-center gap-0.5 flex-shrink-0">
+                    Record <ChevronRight className="h-3 w-3" />
+                  </AppLink>
+                </div>
+              )}
+              <div className="flex flex-col items-center justify-center py-16 space-y-4 rounded-lg border bg-card">
+                <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Mic className="h-8 w-8 text-primary" />
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="text-lg font-medium">Ready to begin</p>
+                  <p className="text-sm text-muted-foreground">Start a recording to capture encounter findings</p>
+                </div>
+                <AppLink href={`/encounter/new?encounterId=${encounterId}`}>
+                  <Button className="gap-2"><Mic className="h-4 w-4" />Begin Encounter</Button>
+                </AppLink>
               </div>
-              <div className="text-center space-y-1">
-                <p className="text-lg font-medium">Ready to begin</p>
-                <p className="text-sm text-muted-foreground">
-                  Start a recording to capture encounter findings
-                </p>
-              </div>
-              <AppLink href={`/encounter/new?encounterId=${encounterId}`}>
-                <Button className="gap-2">
-                  <Mic className="h-4 w-4" />
-                  Begin Encounter
-                </Button>
-              </AppLink>
             </div>
           )}
 
@@ -972,12 +880,8 @@ export default function ConsultationDetailPage() {
                         <CardIcon className="h-5 w-5" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium group-hover:text-primary transition-colors">
-                          {card.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {card.subtitle}
-                        </p>
+                        <p className="text-sm font-medium group-hover:text-primary transition-colors">{card.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{card.subtitle}</p>
                       </div>
                       <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </AppLink>
@@ -985,10 +889,45 @@ export default function ConsultationDetailPage() {
                 })}
               </div>
 
+              {/* Patient enrichment banner */}
+              {isEditable && enrichableFields.length > 0 && (
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
+                      <p className="text-sm font-medium">New patient info detected from recording</p>
+                    </div>
+                    <button onClick={handleEnrichmentDismiss} className="text-muted-foreground hover:text-foreground p-0.5">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-x-6 gap-y-2">
+                    {enrichableFields.map((field) => (
+                      <label key={field.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={enrichmentCheckedState[field.key] ?? true}
+                          onCheckedChange={(checked) => setEnrichmentChecked((prev) => ({ ...prev, [field.key]: !!checked }))}
+                        />
+                        <span className="text-muted-foreground">{field.label}:</span>
+                        <span className="font-medium">{field.value}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" onClick={handleEnrichmentUpdate}
+                      disabled={isEnrichmentUpdating || !Object.values(enrichmentCheckedState).some(Boolean)}>
+                      {isEnrichmentUpdating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Check className="h-3.5 w-3.5 mr-1.5" />}
+                      Update Patient
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={handleEnrichmentDismiss}>Dismiss</Button>
+                  </div>
+                </div>
+              )}
+
               {/* ── Two-column body ───────────────────────────────────── */}
               <div className="flex gap-6 items-start">
 
-                {/* Left: clinical narrative */}
+                {/* Left: timeline + notes + planned services */}
                 <div className="flex-1 min-w-0 space-y-5">
 
                   {/* Recording Timeline */}
@@ -1000,124 +939,33 @@ export default function ConsultationDetailPage() {
                     />
                   </div>
 
-                  {/* Notes */}
+                  {/* Notes — compact list, click to open modal */}
                   {encounter?.addenda && encounter.addenda.length > 0 && (
                     <div className="rounded-lg border bg-card p-4">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                        Notes
-                      </p>
-                      <div className="space-y-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notes</p>
+                        <span className="text-xs text-muted-foreground">{encounter.addenda.length}</span>
+                      </div>
+                      <div className="space-y-0.5">
                         {encounter.addenda.map((note, i) => (
-                          <div key={i} className="text-sm space-y-0.5">
-                            <div className="space-y-0.5">
-                              {note.text.split('\n').map((line, j) => {
-                                const bullet = line.match(/^-\s+(.+)/);
-                                const numbered = line.match(/^(\d+)\.\s+(.+)/);
-                                if (bullet) return (
-                                  <div key={j} className="flex items-start gap-2">
-                                    <span className="text-primary font-bold mt-0.5 flex-shrink-0">•</span>
-                                    <span>{bullet[1]}</span>
-                                  </div>
-                                );
-                                if (numbered) return (
-                                  <div key={j} className="flex items-start gap-2">
-                                    <span className="text-primary font-medium mt-0.5 flex-shrink-0 min-w-[1.2rem]">{numbered[1]}.</span>
-                                    <span>{numbered[2]}</span>
-                                  </div>
-                                );
-                                return line ? <p key={j}>{line}</p> : null;
-                              })}
+                          <button
+                            key={i}
+                            onClick={() => { setViewingNote({ index: i, text: note.text, createdAt: note.createdAt }); setEditNoteText(note.text); }}
+                            className="w-full text-left flex items-start gap-3 px-2.5 py-2 rounded-md hover:bg-muted/50 transition-colors group"
+                          >
+                            <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm leading-snug line-clamp-1">{note.text.split('\n')[0]}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{formatRelativeDate(note.createdAt)}</p>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(note.createdAt).toLocaleString()}
-                            </p>
-                          </div>
+                            <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+                          </button>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Attachments */}
-                  <div
-                    className="rounded-lg border bg-card p-4"
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => { e.preventDefault(); handleFileUpload(e.dataTransfer.files); }}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Attachments</p>
-                        {evidenceFiles && evidenceFiles.length > 0 && (
-                          <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                            {evidenceFiles.length}
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploading}
-                        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-                      >
-                        {isUploading ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Upload className="h-3.5 w-3.5" />
-                        )}
-                        Attach file
-                      </button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        className="hidden"
-                        accept="application/pdf,image/jpeg,image/png,image/webp"
-                        multiple
-                        onChange={(e) => handleFileUpload(e.target.files)}
-                      />
-                    </div>
-                    {evidenceFiles === undefined ? (
-                      <div className="flex justify-center py-4">
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : evidenceFiles.length === 0 ? (
-                      <p className="text-xs text-muted-foreground py-1">
-                        No attachments — drag and drop or click &quot;Attach file&quot; above
-                      </p>
-                    ) : (
-                      <div className="divide-y">
-                        {evidenceFiles.map((file) => (
-                          <div key={file._id} className="flex items-center gap-2 py-2 first:pt-0 last:pb-0">
-                            <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                            <span className="text-sm flex-1 truncate">{file.fileName}</span>
-                            <span className="text-xs text-muted-foreground flex-shrink-0">
-                              {file.fileSize < 1024 * 1024
-                                ? `${(file.fileSize / 1024).toFixed(1)} KB`
-                                : `${(file.fileSize / (1024 * 1024)).toFixed(1)} MB`}
-                            </span>
-                            {file.url && (
-                              <button
-                                onClick={() => window.open(file.url!, '_blank')}
-                                className="text-muted-foreground hover:text-foreground transition-colors"
-                                title="Open"
-                              >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDeleteFile(file._id)}
-                              className="text-muted-foreground hover:text-destructive transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                </div>{/* end left column */}
-
-                {/* Right: billing & coding */}
-                <div className="w-[420px] flex-shrink-0 sticky top-6 self-start space-y-4">
+                  {/* Planned Services */}
                   {orgContext?.orgId && (
                     <PlannedServicesWidget
                       encounterId={encounterId as Id<"encounters">}
@@ -1126,6 +974,52 @@ export default function ConsultationDetailPage() {
                       encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
                     />
                   )}
+
+                </div>{/* end left column */}
+
+                {/* Right: patient + coding + attachments */}
+                <div className="w-[360px] flex-shrink-0 sticky top-6 self-start space-y-4">
+
+                  {/* Patient Details (compact) */}
+                  {patient && (
+                    <div className="rounded-lg border bg-card p-3">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Patient</p>
+                        <AppLink href={`/patient-records/${patient._id}`} className="text-xs text-primary hover:underline flex items-center gap-0.5">
+                          Record <ChevronRight className="h-3 w-3" />
+                        </AppLink>
+                      </div>
+                      <div className="flex flex-wrap gap-x-5 gap-y-2">
+                        {[
+                          { field: 'age', label: 'Age', icon: null, value: patient.age },
+                          { field: 'sex', label: 'Sex', icon: null, value: patient.sex },
+                          { field: 'weight', label: 'Weight', icon: Weight, value: patient.weight ? `${patient.weight}${patient.weightUnit ? ` ${patient.weightUnit}` : ''}` : undefined },
+                        ].map(({ field, label, icon: Icon, value }) => (
+                          <div key={field} className="group">
+                            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                              {Icon && <Icon className="h-3 w-3" />}{label}
+                            </p>
+                            {editingPatientField === field ? (
+                              <Input autoFocus value={editPatientValue}
+                                onChange={(e) => setEditPatientValue(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') savePatientEdit(); if (e.key === 'Escape') cancelPatientEdit(); }}
+                                onBlur={savePatientEdit} className="h-6 text-sm w-20" />
+                            ) : isEditable ? (
+                              <p className={`text-sm cursor-pointer flex items-center gap-1 ${value ? '' : 'text-muted-foreground/40 italic'}`}
+                                onClick={() => startPatientEdit(field, field === 'weight' ? (patient.weight || '') : (value || ''))}>
+                                <span>{value || 'Add'}</span>
+                                <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground flex-shrink-0" />
+                              </p>
+                            ) : (
+                              <p className={`text-sm ${value ? '' : 'text-muted-foreground/40 italic'}`}>{value || '—'}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Medical Coding */}
                   <MedicalCodingPanel
                     encounterId={encounterId as Id<'encounters'>}
                     facts={computeFactsFromDetail()}
@@ -1138,6 +1032,55 @@ export default function ConsultationDetailPage() {
                     reconciledAt={detail?.factReconciliation?.reconciledAt}
                     unresolvedContradictions={unresolvedContradictions}
                   />
+
+                  {/* Attachments (compact) */}
+                  <div
+                    className="rounded-lg border bg-card p-3"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => { e.preventDefault(); handleFileUpload(e.dataTransfer.files); }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Attachments</p>
+                        {evidenceFiles && evidenceFiles.length > 0 && (
+                          <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">{evidenceFiles.length}</span>
+                        )}
+                      </div>
+                      <button onClick={() => fileInputRef.current?.click()} disabled={isUploading}
+                        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
+                        {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                        Attach
+                      </button>
+                      <input ref={fileInputRef} type="file" className="hidden"
+                        accept="application/pdf,image/jpeg,image/png,image/webp" multiple
+                        onChange={(e) => handleFileUpload(e.target.files)} />
+                    </div>
+                    {evidenceFiles === undefined ? (
+                      <div className="flex justify-center py-3"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+                    ) : evidenceFiles.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-1">No attachments — drag and drop or click Attach</p>
+                    ) : (
+                      <div className="divide-y">
+                        {evidenceFiles.map((file) => (
+                          <div key={file._id} className="flex items-center gap-2 py-1.5 first:pt-0 last:pb-0">
+                            <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            <span className="text-xs flex-1 truncate">{file.fileName}</span>
+                            {file.url && (
+                              <button onClick={() => window.open(file.url!, '_blank')}
+                                className="text-muted-foreground hover:text-foreground transition-colors">
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            <button onClick={() => handleDeleteFile(file._id)}
+                              className="text-muted-foreground hover:text-destructive transition-colors">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                 </div>{/* end right column */}
 
               </div>{/* end two-column body */}
@@ -1146,6 +1089,46 @@ export default function ConsultationDetailPage() {
           )}{/* end main content */}
 
         </div>
+
+        {/* Note view / edit modal */}
+        <Dialog open={!!viewingNote} onOpenChange={(o) => { if (!o) setViewingNote(null); }}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                Note
+              </DialogTitle>
+            </DialogHeader>
+            {viewingNote && (
+              <div className="space-y-4 pt-1">
+                <p className="text-xs text-muted-foreground">{new Date(viewingNote.createdAt).toLocaleString()}</p>
+                {isEditable ? (
+                  <textarea
+                    className="w-full min-h-[220px] text-sm leading-relaxed bg-transparent resize-none outline-none focus:outline-none border rounded-md p-3 font-mono"
+                    value={editNoteText}
+                    onChange={(e) => setEditNoteText(e.target.value)}
+                    autoFocus
+                  />
+                ) : (
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap min-h-[80px] rounded-md border bg-muted/30 p-3">
+                    {viewingNote.text}
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button variant="outline" size="sm" onClick={() => setViewingNote(null)}>
+                    {isEditable ? 'Cancel' : 'Close'}
+                  </Button>
+                  {isEditable && (
+                    <Button size="sm" onClick={handleSaveNote} disabled={isSavingNote || !editNoteText.trim()}>
+                      {isSavingNote && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                      Save Note
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Delete confirmation */}
         <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>

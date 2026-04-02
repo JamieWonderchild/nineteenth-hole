@@ -1255,6 +1255,28 @@ export const addAddendum = mutation({
   },
 });
 
+// Update an existing addendum (note) in-place
+export const updateAddendum = mutation({
+  args: {
+    encounterId: v.id("encounters"),
+    index: v.number(),
+    text: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const encounter = await ctx.db.get(args.encounterId);
+    if (!encounter) throw new Error("Encounter not found");
+    const addenda = [...(encounter.addenda || [])];
+    if (args.index < 0 || args.index >= addenda.length) {
+      throw new Error("Invalid note index");
+    }
+    addenda[args.index] = { ...addenda[args.index], text: args.text };
+    await ctx.db.patch(args.encounterId, {
+      addenda,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
 // Update draft details (reason, appointment, patient)
 export const updateDraftDetails = mutation({
   args: {
