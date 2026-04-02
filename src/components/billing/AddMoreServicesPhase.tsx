@@ -54,6 +54,7 @@ export function AddMoreServicesPhase({
 
   // ── Dictation state ───────────────────────────────────────────────────────
   const [transcriptLines, setTranscriptLines] = useState<string[]>([]);
+  const [interimText, setInterimText] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [dictateError, setDictateError] = useState<string | null>(null);
   const transcriptRef = useRef('');
@@ -117,12 +118,18 @@ export function AddMoreServicesPhase({
       const next = (transcriptRef.current + ' ' + text).trim();
       transcriptRef.current = next;
       setTranscriptLines(next.split(/[.!?]+/).map(s => s.trim()).filter(Boolean));
+      setInterimText('');
+    },
+    onInterimSegment: (text) => {
+      setInterimText(text);
     },
     onEnded: () => {
+      setInterimText('');
       setIsExtracting(true);
       runExtraction();
     },
     onError: (message) => {
+      setInterimText('');
       setDictateError(message);
       setIsExtracting(false);
     },
@@ -233,9 +240,12 @@ export function AddMoreServicesPhase({
               <p className="text-sm text-muted-foreground text-center">
                 Describe the additional services you performed
               </p>
-              {transcriptLines.length > 0 && (
+              {(transcriptLines.length > 0 || interimText) && (
                 <div className="w-full bg-muted rounded-lg p-3 text-sm text-muted-foreground">
                   {transcriptLines.join('. ')}
+                  {interimText && (
+                    <span className="opacity-60 italic">{transcriptLines.length > 0 ? ' ' : ''}{interimText}</span>
+                  )}
                 </div>
               )}
               <Button onClick={handleStop} variant="outline" size="lg" className="gap-2">

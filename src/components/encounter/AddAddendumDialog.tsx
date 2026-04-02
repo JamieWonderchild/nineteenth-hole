@@ -39,6 +39,7 @@ export function AddAddendumDialog({
   const { user } = useUser()
   const { language } = useLanguagePreference()
   const [text, setText] = useState('')
+  const [interimText, setInterimText] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
   const addAddendum = useMutation(api.encounters.addAddendum)
@@ -57,11 +58,16 @@ export function AddAddendumDialog({
     language,
     onFinalSegment: (segment) => {
       setText((prev) => (prev ? prev + ' ' + segment : segment))
+      setInterimText('')
+    },
+    onInterimSegment: (segment) => {
+      setInterimText(segment)
     },
     onEnded: () => {
-      // Text is already in the textarea; nothing extra to do
+      setInterimText('')
     },
     onError: (message) => {
+      setInterimText('')
       toast({ title: message, variant: 'destructive' })
     },
   })
@@ -183,6 +189,9 @@ export function AddAddendumDialog({
               onChange={(e) => setText(e.target.value)}
               rows={3}
             />
+            {interimText && (
+              <p className="text-xs text-muted-foreground opacity-60 italic px-1">{interimText}</p>
+            )}
           </div>
         </div>
 

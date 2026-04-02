@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Mic, Square, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMutation } from 'convex/react';
@@ -23,6 +23,7 @@ export function QuickNoteButton({ encounterId }: QuickNoteButtonProps) {
   const { language } = useLanguagePreference();
 
   const [transcript, setTranscript] = useState('');
+  const [interimText, setInterimText] = useState('');
   const transcriptRef = useRef('');
 
   const addAddendum = useMutation(api.encounters.addAddendum);
@@ -30,10 +31,11 @@ export function QuickNoteButton({ encounterId }: QuickNoteButtonProps) {
   const setAddendumFactCount = useMutation(api.encounters.setAddendumFactCount);
   const { runReconciliation } = useNoteReconciliation(encounterId);
 
-  const saveTranscript = async () => {
+  const saveTranscript = useCallback(async () => {
     const text = transcriptRef.current.trim();
     transcriptRef.current = '';
     setTranscript('');
+    setInterimText('');
     if (!text || !user?.id) return;
     try {
       const result = await addAddendum({ encounterId, text, providerId: user.id });
@@ -47,7 +49,7 @@ export function QuickNoteButton({ encounterId }: QuickNoteButtonProps) {
     } catch {
       toast({ title: 'Failed to save note', variant: 'destructive' });
     }
-  };
+  }, [addAddendum, encounterId, user?.id, createRecording, runReconciliation, setAddendumFactCount, language]);
 
   const { state, audioLevel: _audioLevel, start, stop } = useDictation({
     language,
@@ -55,6 +57,10 @@ export function QuickNoteButton({ encounterId }: QuickNoteButtonProps) {
       const next = (transcriptRef.current + ' ' + text).trim();
       transcriptRef.current = next;
       setTranscript(next);
+      setInterimText('');
+    },
+    onInterimSegment: (text) => {
+      setInterimText(text);
     },
     onEnded: saveTranscript,
     onError: (message) => {
@@ -113,8 +119,13 @@ export function QuickNoteButton({ encounterId }: QuickNoteButtonProps) {
             <span className="text-xs font-medium">Recording — tap to stop</span>
           </div>
           <p className="text-sm min-h-[2.5rem] leading-relaxed">
-            {transcript
-              ? transcript
+            {transcript || interimText
+              ? <>
+                  {transcript && <span>{transcript}</span>}
+                  {interimText && (
+                    <span className="text-muted-foreground opacity-60 italic">{transcript ? ' ' : ''}{interimText}</span>
+                  )}
+                </>
               : <span className="text-muted-foreground italic text-xs">Listening…</span>
             }
           </p>
