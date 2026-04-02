@@ -11,6 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import { useLanguagePreference } from '@/hooks/useLanguagePreference';
 import { useDictation } from '@/hooks/useDictation';
 import { extractAndSaveNoteFacts } from '@/lib/noteFactsExtraction';
+import { useNoteReconciliation } from '@/hooks/useNoteReconciliation';
 
 interface QuickNoteButtonProps {
   encounterId: Id<'encounters'>;
@@ -26,6 +27,7 @@ export function QuickNoteButton({ encounterId }: QuickNoteButtonProps) {
 
   const addAddendum = useMutation(api.encounters.addAddendum);
   const createRecording = useMutation(api.recordings.createRecording);
+  const { runReconciliation } = useNoteReconciliation(encounterId);
 
   const saveTranscript = async () => {
     const text = transcriptRef.current.trim();
@@ -34,7 +36,7 @@ export function QuickNoteButton({ encounterId }: QuickNoteButtonProps) {
     if (!text || !user?.id) return;
     try {
       await addAddendum({ encounterId, text, providerId: user.id });
-      extractAndSaveNoteFacts(encounterId, text, createRecording);
+      extractAndSaveNoteFacts(encounterId, text, createRecording, runReconciliation);
       toast({ title: 'Note saved' });
     } catch {
       toast({ title: 'Failed to save note', variant: 'destructive' });

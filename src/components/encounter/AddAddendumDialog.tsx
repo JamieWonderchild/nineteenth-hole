@@ -22,6 +22,7 @@ import { useLanguagePreference } from '@/hooks/useLanguagePreference'
 import { useDictation } from '@/hooks/useDictation'
 import { AudioLevelIndicator } from './AudioLevelIndicator'
 import { extractAndSaveNoteFacts } from '@/lib/noteFactsExtraction'
+import { useNoteReconciliation } from '@/hooks/useNoteReconciliation'
 
 interface AddAddendumDialogProps {
   open: boolean
@@ -42,6 +43,7 @@ export function AddAddendumDialog({
 
   const addAddendum = useMutation(api.encounters.addAddendum)
   const createRecording = useMutation(api.recordings.createRecording)
+  const { runReconciliation } = useNoteReconciliation(encounterId as Id<'encounters'>)
 
   const encounter = useQuery(
     api.encounters.getById,
@@ -89,7 +91,7 @@ export function AddAddendumDialog({
         text: text.trim(),
         providerId: user.id,
       })
-      extractAndSaveNoteFacts(encounterId as Id<'encounters'>, text.trim(), createRecording)
+      extractAndSaveNoteFacts(encounterId as Id<'encounters'>, text.trim(), createRecording, runReconciliation)
       setText('')
       toast({ title: 'Addendum added' })
     } catch (error) {

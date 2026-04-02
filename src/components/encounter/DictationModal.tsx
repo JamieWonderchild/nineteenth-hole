@@ -18,6 +18,7 @@ import { useLanguagePreference } from '@/hooks/useLanguagePreference';
 import { useDictation } from '@/hooks/useDictation';
 import { AudioLevelIndicator } from './AudioLevelIndicator';
 import { extractAndSaveNoteFacts } from '@/lib/noteFactsExtraction';
+import { useNoteReconciliation } from '@/hooks/useNoteReconciliation';
 import {
   createDictationState,
   processSegment,
@@ -53,6 +54,7 @@ export function DictationModal({ encounterId }: DictationModalProps) {
 
   const addAddendum = useMutation(api.encounters.addAddendum);
   const createRecording = useMutation(api.recordings.createRecording);
+  const { runReconciliation } = useNoteReconciliation(encounterId);
 
   const enterReview = useCallback(() => {
     const finalized = finalizeState(dictStateRef.current);
@@ -124,8 +126,8 @@ export function DictationModal({ encounterId }: DictationModalProps) {
     setStage('saving');
     try {
       await addAddendum({ encounterId, text, providerId: user.id });
-      // Fire-and-forget: extract clinical facts and save as a note recording
-      extractAndSaveNoteFacts(encounterId, text, createRecording);
+      // Fire-and-forget: extract clinical facts, save as a note recording, and reconcile
+      extractAndSaveNoteFacts(encounterId, text, createRecording, runReconciliation);
       toast({ title: 'Note saved' });
       setOpen(false);
     } catch {
