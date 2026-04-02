@@ -236,6 +236,14 @@ export function OrgContextProvider({ children }: { children: React.ReactNode }) 
       return; // Has a working org context — all good
     }
 
+    // Clerk session has an active org — wait for Convex to confirm it.
+    // The auto-switch effect handles the case where the org doesn't exist in Convex
+    // (it clears clerkOrgId, at which point this effect will redirect).
+    if (clerkOrgId) {
+      debugLog.debug('OrgContextProvider', 'Skip redirect: Clerk session has orgId, waiting for org context to load', { clerkOrgId });
+      return;
+    }
+
     // Still loading Clerk memberships or Convex memberships — wait
     if (userMemberships?.isLoading || convexMemberships === undefined) {
       debugLog.debug('OrgContextProvider', 'Skip redirect: waiting for memberships to load');

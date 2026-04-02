@@ -6,9 +6,8 @@ import { Building2, MapPin, Users, Check, Loader2, CheckCircle2, Sparkles } from
 import { useAppRouter } from '@/hooks/useAppRouter';
 import { useMutation } from 'convex/react';
 import { api } from 'convex/_generated/api';
-import { useUser, useOrganizationList, useAuth } from '@clerk/nextjs';
+import { useUser, useOrganizationList } from '@clerk/nextjs';
 import { debugLog } from '@/lib/debug-logger';
-import { pollForClerkSession } from '@/lib/session-verification';
 
 interface CompleteStepProps {
   onNext: () => void;
@@ -25,7 +24,6 @@ export function CompleteStep({
   const router = useAppRouter();
   const { user } = useUser();
   const { createOrganization, setActive } = useOrganizationList();
-  const auth = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [creationStatus, setCreationStatus] = useState<string>('');
   const [setupComplete, setSetupComplete] = useState(false);
@@ -263,84 +261,16 @@ export function CompleteStep({
     }
   };
 
-  const handleGetStarted = async () => {
+  const handleGetStarted = () => {
     const redirectPath = recommendedPlan !== 'solo'
       ? `/settings/billing?plan=${recommendedPlan}&new=true`
       : '/';
 
-    debugLog.info('CompleteStep', 'User clicked Get Started, verifying org context is stable');
-
-    // Re-enter loading state to show we're finalizing
-    setSetupComplete(false);
-    setIsSubmitting(true);
-    setStatusSteps([
-      { label: 'Creating your organization', status: 'complete', message: 'Organization created' },
-      { label: 'Activating your account', status: 'complete', message: 'Account activated' },
-      { label: 'Setting up your practice', status: 'complete', message: 'Practice configured' },
-      { label: 'Finalizing setup', status: 'loading', message: 'Ensuring everything is ready...' },
-    ]);
-
-    try {
-      // Poll for Clerk session to be fully stable with org context
-      const maxWaitTime = 10000; // 10 seconds max
-      const startTime = Date.now();
-      let sessionStable = false;
-
-      debugLog.info('CompleteStep', 'Polling for stable Clerk session with org context');
-
-      while (!sessionStable && (Date.now() - startTime) < maxWaitTime) {
-        // Check if Clerk session has the org ID and it's stable
-        const currentOrgId = auth.orgId;
-
-        if (currentOrgId) {
-          debugLog.debug('CompleteStep', 'Clerk session has orgId, verifying stability', {
-            orgId: currentOrgId,
-            elapsed: Date.now() - startTime,
-          });
-
-          // Wait a bit to ensure it's stable (not in flux)
-          await new Promise(resolve => setTimeout(resolve, 1000));
-
-          // Check again - if it's the same, we're stable
-          if (auth.orgId === currentOrgId) {
-            sessionStable = true;
-            debugLog.info('CompleteStep', 'Clerk session is stable', {
-              orgId: currentOrgId,
-              totalTime: Date.now() - startTime,
-            });
-          }
-        } else {
-          debugLog.debug('CompleteStep', 'Waiting for Clerk session to have orgId', {
-            elapsed: Date.now() - startTime,
-          });
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-
-      if (!sessionStable) {
-        debugLog.warn('CompleteStep', 'Session stability timeout - proceeding anyway');
-      }
-
-      // Mark complete and redirect
-      setStatusSteps(prev => {
-        const updated = [...prev];
-        updated[3] = { ...updated[3], status: 'complete', message: 'All set!' };
-        return updated;
-      });
-
-      // Small delay to show the checkmark
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      debugLog.info('CompleteStep', 'Redirecting to dashboard', { redirectPath });
-      // Use window.location for hard refresh to ensure Clerk session fully reloads
-      window.location.href = redirectPath;
-    } catch (error) {
-      debugLog.error('CompleteStep', 'Error during final setup', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      // Proceed anyway
-      window.location.href = redirectPath;
-    }
+    debugLog.info('CompleteStep', 'Redirecting to dashboard', { redirectPath });
+    // Soft navigation — avoids a full page reload which can cause a brief flash
+    // back to /onboarding before the org context loads. The session was already
+    // verified during handleComplete's polling step.
+    router.push(redirectPath);
   };
 
   // Show setup progress screen while creating
