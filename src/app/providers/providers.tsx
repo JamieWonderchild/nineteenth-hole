@@ -9,6 +9,7 @@ import { BannerSystem } from "@/components/banners/BannerSystem";
 import { UpgradeDetector } from "@/components/upgrade/UpgradeDetector";
 import { FirstLoginDetector } from "@/components/welcome/FirstLoginDetector";
 import { MigrationDetector } from "@/components/migration/MigrationDetector";
+import { VoiceCommandOverlay } from "@/components/VoiceCommandOverlay";
 import { useOrgCtx } from "./org-context-provider";
 import { useUser } from "@clerk/nextjs";
 import type { Id } from 'convex/_generated/dataModel';
@@ -37,6 +38,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <OrgContextProvider>
             <AppFeatures />
             {children}
+            <VoiceCommandOverlay />
             {/* <MobileToggle /> */}
           </OrgContextProvider>
         </NavigationProvider>
