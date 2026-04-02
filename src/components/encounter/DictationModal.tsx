@@ -49,6 +49,7 @@ export function DictationModal({ encounterId }: DictationModalProps) {
   const [stage, setStage] = useState<Stage>('idle');
   const [dictationState, setDictationState] = useState<DictationState>(createDictationState());
   const [editableText, setEditableText] = useState('');
+  const [interimText, setInterimText] = useState('');
 
   const dictStateRef = useRef<DictationState>(createDictationState());
 
@@ -71,11 +72,17 @@ export function DictationModal({ encounterId }: DictationModalProps) {
       const next = processSegment(text, dictStateRef.current);
       dictStateRef.current = next;
       setDictationState({ ...next });
+      setInterimText('');
+    },
+    onInterimSegment: (text) => {
+      setInterimText(text);
     },
     onEnded: () => {
+      setInterimText('');
       enterReview();
     },
     onError: (message) => {
+      setInterimText('');
       setStage('idle');
       setOpen(false);
       toast({ title: message, variant: 'destructive' });
@@ -95,6 +102,7 @@ export function DictationModal({ encounterId }: DictationModalProps) {
       setDictationState(fresh);
       dictStateRef.current = fresh;
       setEditableText('');
+      setInterimText('');
       setStage('idle');
     }
   }, [open]);
@@ -261,6 +269,25 @@ export function DictationModal({ encounterId }: DictationModalProps) {
                     )}
                     <span className="opacity-80">
                       {rendered.pendingText}
+                      {!interimText && (
+                        <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 align-middle animate-pulse" />
+                      )}
+                    </span>
+                  </div>
+                )}
+                {/* Interim text — live preview, greyed out, replaced by next interim */}
+                {interimText && (
+                  <div className="flex items-start gap-2 text-sm leading-relaxed">
+                    {rendered.mode === 'bullet' && (
+                      <span className="mt-0.5 text-primary font-bold flex-shrink-0 opacity-30">•</span>
+                    )}
+                    {rendered.mode === 'numbered' && (
+                      <span className="mt-0.5 text-primary font-medium flex-shrink-0 min-w-[1.5rem] opacity-30">
+                        {dictationState.numberedCounter + 1}.
+                      </span>
+                    )}
+                    <span className="text-muted-foreground opacity-60 italic">
+                      {interimText}
                       <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 align-middle animate-pulse" />
                     </span>
                   </div>

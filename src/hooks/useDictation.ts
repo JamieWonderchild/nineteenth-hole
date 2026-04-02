@@ -9,6 +9,8 @@ interface UseDictationOptions {
   language: string;
   /** Called for each final (committed) transcript segment */
   onFinalSegment: (text: string) => void;
+  /** Called for each interim (non-final) transcript preview */
+  onInterimSegment?: (text: string) => void;
   /** Called when Corti signals the session has fully ended */
   onEnded: () => void;
   /** Called on any error; component is responsible for showing a toast */
@@ -27,6 +29,7 @@ interface UseDictationReturn {
 export function useDictation({
   language,
   onFinalSegment,
+  onInterimSegment,
   onEnded,
   onError,
 }: UseDictationOptions): UseDictationReturn {
@@ -43,9 +46,11 @@ export function useDictation({
 
   // Keep callback refs stable so the WebSocket closure always calls the latest version
   const onFinalSegmentRef = useRef(onFinalSegment);
+  const onInterimSegmentRef = useRef(onInterimSegment);
   const onEndedRef = useRef(onEnded);
   const onErrorRef = useRef(onError);
   useEffect(() => { onFinalSegmentRef.current = onFinalSegment; }, [onFinalSegment]);
+  useEffect(() => { onInterimSegmentRef.current = onInterimSegment; }, [onInterimSegment]);
   useEffect(() => { onEndedRef.current = onEnded; }, [onEnded]);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
 
@@ -133,7 +138,7 @@ export function useDictation({
       });
 
       const socket = await client.transcribe.connect({
-        configuration: { primaryLanguage: language, automaticPunctuation: true },
+        configuration: { primaryLanguage: language, automaticPunctuation: true, interimResults: true },
         reconnectAttempts: 0,
       });
       wsRef.current = socket;
@@ -148,6 +153,8 @@ export function useDictation({
           const { text, isFinal } = msg.data ?? {};
           if (isFinal && text) {
             onFinalSegmentRef.current(text);
+          } else if (!isFinal && text) {
+            onInterimSegmentRef.current?.(text);
           }
         }
         if (msg.type === 'ended') {
