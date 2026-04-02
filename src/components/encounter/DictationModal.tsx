@@ -75,6 +75,7 @@ export function DictationModal({ encounterId }: DictationModalProps) {
       setInterimText('');
     },
     onInterimSegment: (text) => {
+      console.log('[DictationModal] onInterimSegment:', text);
       setInterimText(text);
     },
     onEnded: () => {
