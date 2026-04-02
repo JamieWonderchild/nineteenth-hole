@@ -949,41 +949,11 @@ export default function ConsultationDetailPage() {
                       recordings={detail?.recordings || []}
                       factReconciliation={detail?.factReconciliation}
                       onResolveConflict={isEditable ? handleResolveConflict : undefined}
+                      addenda={encounter.addenda ?? []}
+                      onEditNote={(index, text, createdAt) => { setViewingNote({ index, text, createdAt }); setEditNoteText(text); }}
+                      isEditable={isEditable}
                     />
                   </div>
-
-                  {/* Notes — compact list, click to open modal */}
-                  {encounter?.addenda && encounter.addenda.length > 0 && (
-                    <div className="rounded-lg border bg-card p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notes</p>
-                        <span className="text-xs text-muted-foreground">{encounter.addenda.length}</span>
-                      </div>
-                      <div className="space-y-0.5">
-                        {encounter.addenda.map((note, i) => (
-                          <button
-                            key={i}
-                            onClick={() => { setViewingNote({ index: i, text: note.text, createdAt: note.createdAt }); setEditNoteText(note.text); }}
-                            className="w-full text-left flex items-start gap-3 px-2.5 py-2 rounded-md hover:bg-muted/50 transition-colors group"
-                          >
-                            <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm leading-snug line-clamp-1">{note.text.split('\n')[0]}</p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <p className="text-xs text-muted-foreground">{formatRelativeDate(note.createdAt)}</p>
-                                {note.factCount != null && note.factCount > 0 && (
-                                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary leading-none">
-                                    {note.factCount} fact{note.factCount !== 1 ? 's' : ''}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   {/* Planned Services */}
                   {orgContext?.orgId && (
