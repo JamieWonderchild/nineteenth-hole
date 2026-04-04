@@ -2249,7 +2249,8 @@ Classify urgency, draft a patient notification, and suggest a follow-up action. 
       icd10Codes?: string[];
       keyFacts: Record<string, string[]>;
       planText?: string;
-    }>
+    }>,
+    existingProfile: PatientProfileResult | null = null
   ): Promise<PatientProfileResult | null> {
     const agentId = this.agents.get('provider-patient-profile');
     if (!agentId) {
@@ -2257,31 +2258,53 @@ Classify urgency, draft a patient notification, and suggest a follow-up action. 
       return null;
     }
 
-    const encounterSummaries = encounters
-      .slice(0, 20) // Cap at 20 most recent
-      .map((e, i) => {
-        const factLines = Object.entries(e.keyFacts)
-          .filter(([, facts]) => facts.length > 0)
-          .map(([group, facts]) => `  [${group}]: ${facts.slice(0, 5).join('; ')}`)
-          .join('\n');
-        return `Encounter ${i + 1} (${e.date}):\n  Chief complaint: ${e.chiefComplaint ?? 'not recorded'}\n  ICD-10: ${(e.icd10Codes ?? []).join(', ') || 'none'}\n${factLines}\n  Plan: ${(e.planText ?? '').substring(0, 400)}`;
-      })
-      .join('\n\n---\n\n');
+    const formatEncounter = (e: typeof encounters[0], index: number) => {
+      const factLines = Object.entries(e.keyFacts)
+        .filter(([, facts]) => facts.length > 0)
+        .map(([group, facts]) => `  [${group}]: ${facts.slice(0, 5).join('; ')}`)
+        .join('\n');
+      return `Encounter ${index + 1} (${e.date}):\n  Chief complaint: ${e.chiefComplaint ?? 'not recorded'}\n  ICD-10: ${(e.icd10Codes ?? []).join(', ') || 'none'}\n${factLines}\n  Plan: ${(e.planText ?? '').substring(0, 400)}`;
+    };
 
-    const prompt = `Build a living patient profile from the following encounter history.
-
-PATIENT:
+    const patientHeader = `PATIENT:
 - Name: ${patientInfo.name ?? 'Unknown'}
 - Age: ${patientInfo.age ?? 'Unknown'}
 - Sex: ${patientInfo.sex ?? 'Unknown'}
 - Weight: ${patientInfo.weight ?? 'Unknown'}
-- Known allergies: ${(patientInfo.allergies ?? []).join(', ') || 'none documented'}
+- Known allergies: ${(patientInfo.allergies ?? []).join(', ') || 'none documented'}`;
+
+    let prompt: string;
+
+    if (existingProfile) {
+      // Incremental update: merge existing profile with the single new encounter
+      const newEncounter = formatEncounter(encounters[0], 0);
+      prompt = `You have an existing patient profile. A new encounter has just been added. Update the profile to reflect any new information, changes, or resolved items. Keep everything that has not changed.
+
+${patientHeader}
+
+EXISTING PROFILE:
+${JSON.stringify(existingProfile, null, 2)}
+
+NEW ENCOUNTER:
+${newEncounter}
+
+Return the updated profile as JSON only.`;
+    } else {
+      // Initial synthesis from all encounters
+      const encounterSummaries = encounters
+        .slice(0, 20)
+        .map(formatEncounter)
+        .join('\n\n---\n\n');
+      prompt = `Build a living patient profile from the following encounter history.
+
+${patientHeader}
 
 ENCOUNTER HISTORY (${encounters.length} total, showing up to 20 most recent, newest first):
 
 ${encounterSummaries}
 
 Synthesize all encounters into a comprehensive living patient profile. Return JSON only.`;
+    }
 
     try {
       let task = await this.client.sendTextMessage(agentId, prompt);

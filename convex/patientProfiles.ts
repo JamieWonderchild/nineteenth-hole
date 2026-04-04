@@ -39,6 +39,8 @@ export const buildPatientProfile = action({
       }
 
       // Step 2: Call Corti agent via API route
+      // If a profile already exists, only send the new encounter as a delta update.
+      // Otherwise, send all encounters for the initial synthesis.
       const apiUrl = process.env.SITE_URL || 'https://healthplatform.com';
       const response = await fetch(`${apiUrl}/api/corti/build-patient-profile`, {
         method: 'POST',
@@ -46,6 +48,7 @@ export const buildPatientProfile = action({
         body: JSON.stringify({
           patientInfo: contextData.patientInfo,
           encounters: contextData.encounters,
+          existingProfile: contextData.existingProfile ?? null,
         }),
       });
 
@@ -110,17 +113,26 @@ export const getPatientContextData = internalMutation({
       allergies: patient.allergies ?? [],
     };
 
-    // Get all published encounters for this patient, newest first
+    // Check if a completed profile already exists
+    const existingProfile = await ctx.db
+      .query("patientProfiles")
+      .withIndex("by_patient", q => q.eq("patientId", args.patientId))
+      .first();
+
+    const hasExistingProfile = existingProfile?.buildStatus === 'completed' &&
+      existingProfile.clinicalNarrative !== '';
+
+    // If a profile exists, only fetch the newest encounter for an incremental update.
+    // Otherwise fetch all published encounters for initial synthesis (cap at 20).
     const rawEncounters = await ctx.db
       .query("encounters")
       .withIndex("by_patient_status", q =>
         q.eq("patientId", args.patientId).eq("status", "published")
       )
       .order("desc")
-      .take(20);
+      .take(hasExistingProfile ? 1 : 20);
 
-    const encounters = rawEncounters.map(enc => {
-      // Group facts by category
+    const mapEncounter = (enc: typeof rawEncounters[0]) => {
       const keyFacts: Record<string, string[]> = {};
       const PROFILE_GROUPS = ['medications', 'allergies', 'assessment', 'plan', 'past-medical-history', 'chief-complaint'];
       for (const fact of enc.facts ?? []) {
@@ -129,12 +141,9 @@ export const getPatientContextData = internalMutation({
           keyFacts[fact.group].push(fact.text);
         }
       }
-
-      // Plan section text from SOAP note
       const planSection = enc.generatedDocuments?.soapNote?.sections?.find(
         (s: { key: string; content: string }) => s.key === 'corti-plan'
       );
-
       return {
         date: enc.date ?? enc.createdAt?.split('T')[0] ?? 'unknown',
         chiefComplaint: enc.chiefComplaint ?? enc.reasonForVisit ?? undefined,
@@ -142,9 +151,22 @@ export const getPatientContextData = internalMutation({
         keyFacts,
         planText: planSection?.content?.substring(0, 500) ?? undefined,
       };
-    });
+    };
 
-    return { patientInfo, encounters };
+    const encounters = rawEncounters.map(mapEncounter);
+
+    // Strip internal Convex fields before passing to the agent
+    const profileForAgent = hasExistingProfile ? {
+      activeProblems: existingProfile.activeProblems,
+      currentMedications: existingProfile.currentMedications,
+      allergies: existingProfile.allergies,
+      riskFactors: existingProfile.riskFactors,
+      clinicalNarrative: existingProfile.clinicalNarrative,
+      careGaps: existingProfile.careGaps,
+      keyHistory: existingProfile.keyHistory,
+    } : null;
+
+    return { patientInfo, encounters, existingProfile: profileForAgent };
   },
 });
 

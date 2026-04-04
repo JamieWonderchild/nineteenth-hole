@@ -6,7 +6,7 @@ export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { patientInfo, encounters } = body;
+    const { patientInfo, encounters, existingProfile } = body;
 
     if (!encounters || !Array.isArray(encounters)) {
       return NextResponse.json(
@@ -18,7 +18,8 @@ export async function POST(request: NextRequest) {
     const orchestrator = await getClinicalOrchestrator();
     const profile = await orchestrator.buildPatientProfileFromEncounters(
       patientInfo || {},
-      encounters
+      encounters,
+      existingProfile ?? null
     );
 
     if (!profile) {
