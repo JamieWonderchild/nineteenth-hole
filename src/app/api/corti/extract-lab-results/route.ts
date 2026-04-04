@@ -8,16 +8,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { soapContent, facts } = body;
 
-    if (!soapContent || typeof soapContent !== 'string') {
-      return NextResponse.json(
-        { error: 'Missing required field: soapContent (string)' },
-        { status: 400 }
-      );
-    }
-
     const orchestrator = await getClinicalOrchestrator();
     const extraction = await orchestrator.extractLabResultsFromConsultation(
-      soapContent,
+      soapContent || '',
       facts || []
     );
 
