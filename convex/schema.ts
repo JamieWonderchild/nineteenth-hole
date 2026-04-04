@@ -649,6 +649,31 @@ export default defineSchema({
     .index("by_org", ["orgId"]),
 
   // ============================================================================
+  // Appointments (scheduling)
+  // ============================================================================
+  appointments: defineTable({
+    orgId: v.id("organizations"),
+    providerId: v.string(),
+    locationId: v.optional(v.id("locations")),
+    patientId: v.optional(v.id("patients")),   // null = patient not yet in system
+    patientName: v.string(),                    // always stored for display
+    scheduledDate: v.string(),                  // YYYY-MM-DD
+    scheduledTime: v.optional(v.string()),      // "09:30"
+    duration: v.optional(v.number()),           // minutes
+    type: v.string(),                           // 'new-patient' | 'follow-up' | 'telehealth' | 'procedure' | 'other'
+    status: v.string(),                         // 'scheduled' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled' | 'no-show'
+    reason: v.optional(v.string()),             // chief complaint / reason for visit
+    encounterId: v.optional(v.id("encounters")),// set when encounter is created from appointment
+    followUpId: v.optional(v.id("followUps")), // set if auto-created from a follow-up
+    notes: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  }).index("by_org_date", ["orgId", "scheduledDate"])
+    .index("by_provider_date", ["providerId", "scheduledDate"])
+    .index("by_patient", ["patientId"])
+    .index("by_org_status", ["orgId", "status"]),
+
+  // ============================================================================
   // Follow-up Tracking
   // ============================================================================
   followUps: defineTable({

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { usePathname } from 'next/navigation';
-import { Home, Stethoscope, Users, BarChart, DollarSign, Settings, Shield, BrainCircuit, HelpCircle, Sun, Moon } from 'lucide-react';
+import { Home, Stethoscope, Users, BarChart, DollarSign, Settings, Shield, BrainCircuit, HelpCircle, Sun, Moon, CalendarDays } from 'lucide-react';
 import { UserButton, useUser } from '@clerk/nextjs';
 import { isSuperadmin } from '@/lib/superadmin';
 import { AppLink } from '@/components/navigation/AppLink';
@@ -11,8 +11,9 @@ import { useTheme } from 'next-themes';
 const baseNavItems = [
   { path: '/', label: 'Home', icon: Home },
   { path: '/encounter', label: 'Encounter', icon: Stethoscope },
-  { path: '/case-reasoning', label: 'Case Reasoning', icon: BrainCircuit },
+  { path: '/schedule', label: 'Schedule', icon: CalendarDays },
   { path: '/patient-records', label: 'Patients', icon: Users },
+  { path: '/case-reasoning', label: 'Case Reasoning', icon: BrainCircuit },
   { path: '/billing', label: 'Billing', icon: DollarSign },
   { path: '/analytics', label: 'Analytics', icon: BarChart },
   { path: '/settings', label: 'Settings', icon: Settings },

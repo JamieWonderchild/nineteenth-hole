@@ -11,6 +11,7 @@
 import type * as admin from "../admin.js";
 import type * as adminDiagnostics from "../adminDiagnostics.js";
 import type * as analytics from "../analytics.js";
+import type * as appointments from "../appointments.js";
 import type * as auditLogs from "../auditLogs.js";
 import type * as billingCatalog from "../billingCatalog.js";
 import type * as billingDashboard from "../billingDashboard.js";
@@ -63,6 +64,7 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   adminDiagnostics: typeof adminDiagnostics;
   analytics: typeof analytics;
+  appointments: typeof appointments;
   auditLogs: typeof auditLogs;
   billingCatalog: typeof billingCatalog;
   billingDashboard: typeof billingDashboard;
