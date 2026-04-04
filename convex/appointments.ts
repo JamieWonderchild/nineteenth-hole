@@ -48,6 +48,24 @@ export const getByOrgAndDate = query({
   },
 });
 
+export const getByOrgAndDateRange = query({
+  args: {
+    orgId: v.id("organizations"),
+    startDate: v.string(), // YYYY-MM-DD
+    endDate: v.string(),   // YYYY-MM-DD
+  },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("appointments")
+      .withIndex("by_org_date", (q) =>
+        q.eq("orgId", args.orgId)
+          .gte("scheduledDate", args.startDate)
+          .lte("scheduledDate", args.endDate)
+      )
+      .collect();
+  },
+});
+
 export const getUpcomingByOrg = query({
   args: {
     orgId: v.id("organizations"),

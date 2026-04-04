@@ -1,23 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  ChevronLeft,
-  ChevronRight,
-  CalendarDays,
-  PlusCircle,
-  Play,
-  Clock,
-  User,
-  ExternalLink,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, PlusCircle, Play, ExternalLink, User } from 'lucide-react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from 'convex/_generated/api';
 import { useAuth } from '@clerk/nextjs';
@@ -27,70 +17,141 @@ import { toast } from '@/hooks/use-toast';
 import { BillingGuard } from '@/components/billing/BillingGuard';
 import { Id } from 'convex/_generated/dataModel';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+// ─── Calendar constants ────────────────────────────────────────────────────────
+const START_HOUR = 7;
+const END_HOUR = 20;
+const SLOT_HEIGHT = 48; // px per 30 min
+const HOUR_HEIGHT = SLOT_HEIGHT * 2;
+const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i);
 
-const APPOINTMENT_TYPES = [
+const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const APPT_TYPES = [
   { value: 'new-patient', label: 'New Patient' },
-  { value: 'follow-up', label: 'Follow-up' },
-  { value: 'telehealth', label: 'Telehealth' },
-  { value: 'procedure', label: 'Procedure' },
-  { value: 'other', label: 'Other' },
+  { value: 'follow-up',   label: 'Follow-up'   },
+  { value: 'telehealth',  label: 'Telehealth'   },
+  { value: 'procedure',   label: 'Procedure'    },
+  { value: 'other',       label: 'Other'        },
 ];
 
-const TYPE_COLORS: Record<string, string> = {
-  'new-patient': 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800',
-  'follow-up': 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800',
-  'telehealth': 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800',
-  'procedure': 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800',
-  'other': 'bg-muted text-muted-foreground border-border',
+const TYPE_STYLE: Record<string, { bg: string; text: string; border: string }> = {
+  'new-patient': { bg: 'bg-blue-100 dark:bg-blue-900/50',    text: 'text-blue-900 dark:text-blue-100',    border: 'border-blue-300 dark:border-blue-700'    },
+  'follow-up':   { bg: 'bg-emerald-100 dark:bg-emerald-900/50', text: 'text-emerald-900 dark:text-emerald-100', border: 'border-emerald-300 dark:border-emerald-700' },
+  'telehealth':  { bg: 'bg-violet-100 dark:bg-violet-900/50',   text: 'text-violet-900 dark:text-violet-100',   border: 'border-violet-300 dark:border-violet-700'   },
+  'procedure':   { bg: 'bg-amber-100 dark:bg-amber-900/50',   text: 'text-amber-900 dark:text-amber-100',   border: 'border-amber-300 dark:border-amber-700'   },
+  'other':       { bg: 'bg-muted',                             text: 'text-muted-foreground',               border: 'border-border'                            },
 };
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  scheduled: { label: 'Scheduled', className: 'bg-muted text-muted-foreground' },
-  confirmed: { label: 'Confirmed', className: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' },
-  'in-progress': { label: 'In Progress', className: 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400' },
-  completed: { label: 'Completed', className: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' },
-  cancelled: { label: 'Cancelled', className: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' },
-  'no-show': { label: 'No Show', className: 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400' },
+const STATUS_LABEL: Record<string, string> = {
+  scheduled: 'Scheduled', confirmed: 'Confirmed', 'in-progress': 'In Progress',
+  completed: 'Completed', cancelled: 'Cancelled', 'no-show': 'No Show',
 };
 
-function toLocalDateString(date: Date): string {
-  return date.toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function toLocalDate(d: Date): string { return d.toLocaleDateString('en-CA'); }
+
+function getWeekDates(anchor: string): string[] {
+  const [y, m, d] = anchor.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const dow = date.getDay();
+  const mon = new Date(date);
+  mon.setDate(date.getDate() - (dow === 0 ? 6 : dow - 1));
+  return Array.from({ length: 7 }, (_, i) => {
+    const nd = new Date(mon); nd.setDate(mon.getDate() + i); return toLocalDate(nd);
+  });
 }
 
-function formatDisplayDate(dateStr: string): string {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-  const today = toLocalDateString(new Date());
-  const tomorrow = toLocalDateString(new Date(Date.now() + 86400000));
-  if (dateStr === today) return 'Today';
-  if (dateStr === tomorrow) return 'Tomorrow';
-  return `${DAYS[date.getDay()]}, ${MONTHS[date.getMonth()]} ${date.getDate()}`;
+function formatHour(h: number): string {
+  if (h === 12) return '12 PM';
+  return h < 12 ? `${h} AM` : `${h - 12} PM`;
 }
 
+function getApptPos(time: string, duration: number) {
+  const [h, m] = time.split(':').map(Number);
+  const mins = (h - START_HOUR) * 60 + m;
+  return { top: (mins / 30) * SLOT_HEIGHT, height: Math.max((duration / 30) * SLOT_HEIGHT, 22) };
+}
+
+function currentTimeTop(): number | null {
+  const now = new Date();
+  const h = now.getHours(), m = now.getMinutes();
+  if (h < START_HOUR || h >= END_HOUR) return null;
+  return ((h - START_HOUR) * 60 + m) / 30 * SLOT_HEIGHT;
+}
+
+function weekLabel(dates: string[]): string {
+  const [ay, am, ad] = dates[0].split('-').map(Number);
+  const [, bm, bd] = dates[6].split('-').map(Number);
+  if (am === bm) return `${MONTHS[am - 1]} ${ad}–${bd}, ${ay}`;
+  return `${MONTHS_SHORT[am - 1]} ${ad} – ${MONTHS_SHORT[bm - 1]} ${bd}, ${ay}`;
+}
+
+type Appt = {
+  _id: Id<'appointments'>;
+  patientId?: Id<'patients'>;
+  patientName: string;
+  scheduledDate: string;
+  scheduledTime?: string;
+  duration?: number;
+  type: string;
+  reason?: string;
+  status: string;
+  encounterId?: Id<'encounters'>;
+};
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function SchedulePage() {
   const router = useAppRouter();
   const { userId } = useAuth();
   const { orgContext } = useOrgCtx();
+  const isMobile = useIsMobile();
+  const gridRef = useRef<HTMLDivElement>(null);
 
-  const today = toLocalDateString(new Date());
-  const [selectedDate, setSelectedDate] = useState(today);
+  const today = toLocalDate(new Date());
+  const [anchor, setAnchor] = useState(today);
+  const [timeTop, setTimeTop] = useState<number | null>(currentTimeTop);
+  const [selectedAppt, setSelectedAppt] = useState<Appt | null>(null);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [bookDate, setBookDate] = useState(today);
+  const [bookTime, setBookTime] = useState('');
   const [startingId, setStartingId] = useState<string | null>(null);
 
-  // Booking form state
-  const [patientName, setPatientName] = useState('');
-  const [apptTime, setApptTime] = useState('');
-  const [apptType, setApptType] = useState('follow-up');
-  const [apptReason, setApptReason] = useState('');
-  const [apptDuration, setApptDuration] = useState('30');
+  // Booking form
+  const [bName, setBName] = useState('');
+  const [bType, setBType] = useState('follow-up');
+  const [bReason, setBReason] = useState('');
+  const [bDuration, setBDuration] = useState('30');
   const [booking, setBooking] = useState(false);
 
-  const appointments = useQuery(
-    api.appointments.getByOrgAndDate,
-    orgContext ? { orgId: orgContext.orgId as Id<'organizations'>, date: selectedDate } : 'skip'
+  // Tick current time
+  useEffect(() => {
+    const id = setInterval(() => setTimeTop(currentTimeTop()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Auto-scroll to current time on mount
+  useEffect(() => {
+    if (!gridRef.current) return;
+    const top = currentTimeTop();
+    if (top !== null) gridRef.current.scrollTop = Math.max(0, top - 160);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const weekDates = useMemo(
+    () => (isMobile ? [anchor] : getWeekDates(anchor)),
+    [anchor, isMobile]
+  );
+
+  const appts = useQuery(
+    api.appointments.getByOrgAndDateRange,
+    orgContext
+      ? { orgId: orgContext.orgId as Id<'organizations'>, startDate: weekDates[0], endDate: weekDates[weekDates.length - 1] }
+      : 'skip'
   );
 
   const orgPatients = useQuery(
@@ -98,50 +159,69 @@ export default function SchedulePage() {
     orgContext ? { orgId: orgContext.orgId as Id<'organizations'> } : 'skip'
   );
 
-  const createAppointment = useMutation(api.appointments.create);
-  const createDraft = useMutation(api.encounters.createDraftConsultation);
+  const createAppt    = useMutation(api.appointments.create);
+  const createDraft   = useMutation(api.encounters.createDraftConsultation);
   const linkEncounter = useMutation(api.appointments.linkEncounter);
+  const updateStatus  = useMutation(api.appointments.updateStatus);
 
-  function navigate(days: number) {
-    const [y, m, d] = selectedDate.split('-').map(Number);
-    const next = new Date(y, m - 1, d + days);
-    setSelectedDate(toLocalDateString(next));
+  const byDate = useMemo(() => {
+    const map = new Map<string, Appt[]>();
+    weekDates.forEach(d => map.set(d, []));
+    appts?.forEach(a => {
+      const arr = map.get(a.scheduledDate) ?? [];
+      arr.push(a as Appt);
+      map.set(a.scheduledDate, arr);
+    });
+    return map;
+  }, [appts, weekDates]);
+
+  function navigate(delta: number) {
+    const [y, m, d] = anchor.split('-').map(Number);
+    setAnchor(toLocalDate(new Date(y, m - 1, d + delta)));
+  }
+
+  function openBooking(date: string, time: string) {
+    setBookDate(date); setBookTime(time);
+    setBName(''); setBReason('');
+    setBookingOpen(true);
+  }
+
+  function handleColClick(date: string, e: React.MouseEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relY = e.clientY - rect.top;
+    const mins = Math.round(relY / SLOT_HEIGHT) * 30;
+    const h = START_HOUR + Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h < START_HOUR || h >= END_HOUR) return;
+    openBooking(date, `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
   }
 
   async function handleBook() {
-    if (!patientName.trim() || !orgContext || !userId) return;
+    if (!bName.trim() || !orgContext || !userId) return;
     setBooking(true);
     try {
-      // Try to match patient by name
-      const matched = orgPatients?.find(
-        (p) => p.name.toLowerCase() === patientName.trim().toLowerCase()
-      );
-
-      await createAppointment({
+      const matched = orgPatients?.find(p => p.name.toLowerCase() === bName.trim().toLowerCase());
+      await createAppt({
         orgId: orgContext.orgId as Id<'organizations'>,
         providerId: userId,
         patientId: matched?._id as Id<'patients'> | undefined,
-        patientName: patientName.trim(),
-        scheduledDate: selectedDate,
-        scheduledTime: apptTime || undefined,
-        duration: apptDuration ? Number(apptDuration) : undefined,
-        type: apptType,
-        reason: apptReason.trim() || undefined,
+        patientName: bName.trim(),
+        scheduledDate: bookDate,
+        scheduledTime: bookTime || undefined,
+        duration: bDuration ? Number(bDuration) : undefined,
+        type: bType,
+        reason: bReason.trim() || undefined,
       });
-
-      toast({ title: 'Appointment booked', description: `${patientName} on ${formatDisplayDate(selectedDate)}` });
+      toast({ title: 'Appointment booked' });
       setBookingOpen(false);
-      setPatientName('');
-      setApptTime('');
-      setApptReason('');
-    } catch (e) {
+    } catch {
       toast({ title: 'Error', description: 'Failed to book appointment.', variant: 'destructive' });
     } finally {
       setBooking(false);
     }
   }
 
-  async function handleStartEncounter(appt: { _id: Id<'appointments'>; patientId?: Id<'patients'>; patientName: string; reason?: string; scheduledTime?: string }) {
+  async function handleStart(appt: Appt) {
     if (!orgContext || !userId) return;
     setStartingId(appt._id);
     try {
@@ -154,234 +234,298 @@ export default function SchedulePage() {
       });
       await linkEncounter({ appointmentId: appt._id, encounterId });
       router.push(`/encounter/${encounterId}`);
-    } catch (e) {
+    } catch {
       toast({ title: 'Error', description: 'Failed to start encounter.', variant: 'destructive' });
       setStartingId(null);
     }
   }
 
-  const isToday = selectedDate === today;
+  async function handleStatus(appt: Appt, status: string) {
+    await updateStatus({ appointmentId: appt._id, status });
+    setSelectedAppt(null);
+    toast({ title: status === 'no-show' ? 'Marked as no-show' : 'Appointment cancelled' });
+  }
 
   return (
     <Layout>
       <BillingGuard feature="Schedule">
-        <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-5">
+        {/* Full-viewport calendar – no padding from Layout's main */}
+        <div className="flex flex-col h-screen overflow-hidden">
 
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-primary/10 rounded-lg">
-                <CalendarDays className="h-5 w-5 text-primary" />
+          {/* ── Top bar ──────────────────────────────────────────────── */}
+          <div className="shrink-0 flex items-center justify-between px-4 sm:px-5 h-14 border-b bg-background z-10">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center rounded-lg border overflow-hidden">
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none border-r" onClick={() => navigate(isMobile ? -1 : -7)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none" onClick={() => navigate(isMobile ? 1 : 7)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
-              <h1 className="text-2xl font-bold leading-none">Schedule</h1>
-            </div>
-            <Button onClick={() => setBookingOpen(true)} className="w-full sm:w-auto">
-              <PlusCircle className="w-4 h-4 mr-2" />
-              Book Appointment
-            </Button>
-          </div>
-
-          {/* Date navigation */}
-          <div className="flex items-center justify-between">
-            <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold">{formatDisplayDate(selectedDate)}</h2>
-              {!isToday && (
-                <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setSelectedDate(today)}>
+              <h2 className="text-sm sm:text-base font-semibold ml-1">
+                {isMobile
+                  ? (anchor === today ? 'Today' : (() => { const [y,m,d]=anchor.split('-').map(Number); return `${DAYS_SHORT[new Date(y,m-1,d).getDay()]} ${MONTHS_SHORT[m-1]} ${d}`; })())
+                  : weekLabel(weekDates)
+                }
+              </h2>
+              {anchor !== today && (
+                <Button variant="outline" size="sm" className="h-7 text-xs ml-1" onClick={() => setAnchor(today)}>
                   Today
                 </Button>
               )}
             </div>
-
-            <Button variant="outline" size="icon" onClick={() => navigate(1)}>
-              <ChevronRight className="h-4 w-4" />
+            <Button size="sm" className="gap-1.5" onClick={() => openBooking(isMobile ? anchor : today, '')}>
+              <PlusCircle className="h-3.5 w-3.5" />
+              Book
             </Button>
           </div>
 
-          {/* Appointments */}
-          {appointments === undefined ? (
-            <div className="flex justify-center py-16">
-              <div className="animate-spin h-8 w-8 border-4 border-gray-200 rounded-full border-t-primary" />
-            </div>
-          ) : appointments.length === 0 ? (
-            <div className="py-16 text-center space-y-3">
-              <CalendarDays className="h-12 w-12 text-muted-foreground/30 mx-auto" />
-              <p className="text-muted-foreground font-medium">No appointments {isToday ? 'today' : 'on this day'}</p>
-              <p className="text-sm text-muted-foreground/60">
-                <button onClick={() => setBookingOpen(true)} className="text-primary hover:underline">
-                  Book one now
-                </button>
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {appointments.map((appt) => {
-                const typeColor = TYPE_COLORS[appt.type] ?? TYPE_COLORS.other;
-                const statusCfg = STATUS_CONFIG[appt.status] ?? STATUS_CONFIG.scheduled;
-                const isStarting = startingId === appt._id;
-                const isActive = appt.status === 'in-progress' || appt.status === 'completed' || appt.status === 'cancelled' || appt.status === 'no-show';
+          {/* ── Calendar body ─────────────────────────────────────────── */}
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
 
+            {/* Day column headers */}
+            <div className="shrink-0 flex border-b bg-background">
+              <div className="w-12 sm:w-14 shrink-0" /> {/* gutter */}
+              {weekDates.map(date => {
+                const [y, m, d] = date.split('-').map(Number);
+                const dow = new Date(y, m - 1, d).getDay();
+                const isToday = date === today;
                 return (
-                  <Card key={appt._id} className={cn(appt.status === 'cancelled' && 'opacity-50')}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-4">
-                        {/* Time column */}
-                        <div className="w-14 shrink-0 text-center">
-                          {appt.scheduledTime ? (
-                            <>
-                              <p className="text-sm font-semibold tabular-nums">{appt.scheduledTime}</p>
-                              {appt.duration && (
-                                <p className="text-[10px] text-muted-foreground mt-0.5">{appt.duration}m</p>
-                              )}
-                            </>
-                          ) : (
-                            <Clock className="h-4 w-4 text-muted-foreground mx-auto mt-0.5" />
-                          )}
-                        </div>
-
-                        {/* Divider */}
-                        <div className="w-px self-stretch bg-border shrink-0" />
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                <User className="h-4 w-4 text-primary" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold truncate">{appt.patientName}</p>
-                                {appt.reason && (
-                                  <p className="text-xs text-muted-foreground truncate mt-0.5">{appt.reason}</p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-                              <Badge variant="outline" className={`text-[10px] px-1.5 py-0.5 ${typeColor}`}>
-                                {APPOINTMENT_TYPES.find(t => t.value === appt.type)?.label ?? appt.type}
-                              </Badge>
-                              <Badge variant="secondary" className={`text-[10px] px-1.5 py-0.5 ${statusCfg.className}`}>
-                                {statusCfg.label}
-                              </Badge>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="flex items-center gap-2 mt-3">
-                            {appt.encounterId ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs gap-1.5"
-                                onClick={() => router.push(`/encounter/${appt.encounterId}`)}
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                                View Encounter
-                              </Button>
-                            ) : !isActive && (
-                              <Button
-                                size="sm"
-                                className="h-7 text-xs gap-1.5"
-                                disabled={isStarting}
-                                onClick={() => handleStartEncounter({
-                                  _id: appt._id,
-                                  patientId: appt.patientId as Id<'patients'> | undefined,
-                                  patientName: appt.patientName,
-                                  reason: appt.reason,
-                                  scheduledTime: appt.scheduledTime,
-                                })}
-                              >
-                                <Play className="h-3 w-3" />
-                                {isStarting ? 'Starting…' : 'Start Encounter'}
-                              </Button>
-                            )}
-                            {appt.patientId && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 text-xs text-muted-foreground"
-                                onClick={() => router.push(`/patient-records/${appt.patientId}`)}
-                              >
-                                View Patient
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div
+                    key={date}
+                    className="flex-1 flex flex-col items-center py-2 border-l border-border/40 first:border-l-0 select-none cursor-pointer hover:bg-muted/40 transition-colors"
+                    onClick={() => openBooking(date, '')}
+                  >
+                    <span className={cn('text-[10px] font-semibold uppercase tracking-wider', isToday ? 'text-primary' : 'text-muted-foreground')}>
+                      {DAYS_SHORT[dow]}
+                    </span>
+                    <div className={cn(
+                      'mt-1 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold tabular-nums',
+                      isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'
+                    )}>
+                      {d}
+                    </div>
+                  </div>
                 );
               })}
             </div>
-          )}
 
+            {/* Scrollable time grid */}
+            <div ref={gridRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+              <div className="flex relative" style={{ height: `${HOURS.length * HOUR_HEIGHT}px` }}>
+
+                {/* Time gutter */}
+                <div className="w-12 sm:w-14 shrink-0 relative select-none">
+                  {HOURS.map(h => (
+                    <div key={h} style={{ height: HOUR_HEIGHT }} className="relative border-b border-border/20">
+                      <span className="absolute top-0 right-2 -translate-y-2.5 text-[10px] text-muted-foreground tabular-nums">
+                        {formatHour(h)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Day columns */}
+                {weekDates.map(date => {
+                  const isToday = date === today;
+                  const timed   = (byDate.get(date) ?? []).filter(a => a.scheduledTime);
+                  const untimed = (byDate.get(date) ?? []).filter(a => !a.scheduledTime);
+
+                  return (
+                    <div
+                      key={date}
+                      className={cn(
+                        'flex-1 relative border-l border-border/40 first:border-l-0',
+                        isToday && 'bg-primary/[0.018]'
+                      )}
+                      onClick={e => handleColClick(date, e)}
+                    >
+                      {/* Grid lines */}
+                      {HOURS.map(h => (
+                        <div key={h} style={{ height: HOUR_HEIGHT }} className="border-b border-border/25">
+                          <div className="h-1/2 border-b border-dashed border-border/15" />
+                        </div>
+                      ))}
+
+                      {/* Current time indicator */}
+                      {isToday && timeTop !== null && (
+                        <div
+                          className="absolute left-0 right-0 z-20 flex items-center pointer-events-none"
+                          style={{ top: timeTop }}
+                        >
+                          <div className="w-2 h-2 rounded-full bg-red-500 shrink-0 -ml-1 shadow" />
+                          <div className="flex-1 h-px bg-red-500 opacity-80" />
+                        </div>
+                      )}
+
+                      {/* Untimed appointments (banner at top) */}
+                      {untimed.map(appt => {
+                        const s = TYPE_STYLE[appt.type] ?? TYPE_STYLE.other;
+                        return (
+                          <div
+                            key={appt._id}
+                            className={cn('absolute top-1 left-1 right-1 z-10 rounded px-1.5 py-0.5 text-[10px] font-semibold truncate cursor-pointer border', s.bg, s.text, s.border)}
+                            onClick={e => { e.stopPropagation(); setSelectedAppt(appt); }}
+                          >
+                            {appt.patientName}
+                          </div>
+                        );
+                      })}
+
+                      {/* Timed appointments */}
+                      {timed.map(appt => {
+                        const { top, height } = getApptPos(appt.scheduledTime!, appt.duration ?? 30);
+                        const s = TYPE_STYLE[appt.type] ?? TYPE_STYLE.other;
+                        return (
+                          <div
+                            key={appt._id}
+                            className={cn(
+                              'absolute left-1 right-1 z-10 rounded border px-1.5 py-1 cursor-pointer overflow-hidden transition-opacity',
+                              s.bg, s.text, s.border,
+                              appt.status === 'cancelled' && 'opacity-40'
+                            )}
+                            style={{ top, height }}
+                            onClick={e => { e.stopPropagation(); setSelectedAppt(appt); }}
+                          >
+                            <p className="text-[11px] font-semibold leading-tight truncate">{appt.patientName}</p>
+                            {height > 38 && appt.reason && (
+                              <p className="text-[10px] leading-tight truncate opacity-70 mt-0.5">{appt.reason}</p>
+                            )}
+                            {height > 54 && appt.scheduledTime && (
+                              <p className="text-[10px] opacity-60 mt-0.5 tabular-nums">{appt.scheduledTime}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Book Appointment Dialog */}
+        {/* ── Appointment detail dialog ──────────────────────────────── */}
+        <Dialog open={!!selectedAppt} onOpenChange={() => setSelectedAppt(null)}>
+          {selectedAppt && (() => {
+            const s = TYPE_STYLE[selectedAppt.type] ?? TYPE_STYLE.other;
+            const [y, m, d] = selectedAppt.scheduledDate.split('-').map(Number);
+            const dateLabel = `${DAYS_SHORT[new Date(y,m-1,d).getDay()]} ${MONTHS_SHORT[m-1]} ${d}`;
+            const canAct = !['cancelled','no-show','completed'].includes(selectedAppt.status);
+            return (
+              <DialogContent className="max-w-sm">
+                <DialogHeader>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <User className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <DialogTitle className="leading-snug">{selectedAppt.patientName}</DialogTitle>
+                      <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                        <Badge variant="outline" className={cn('text-xs border', s.bg, s.text, s.border)}>
+                          {APPT_TYPES.find(t => t.value === selectedAppt.type)?.label ?? selectedAppt.type}
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs">{STATUS_LABEL[selectedAppt.status] ?? selectedAppt.status}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                </DialogHeader>
+
+                <div className="text-sm space-y-1.5 pt-1">
+                  <p className="text-muted-foreground tabular-nums">
+                    {dateLabel}
+                    {selectedAppt.scheduledTime && ` · ${selectedAppt.scheduledTime}`}
+                    {selectedAppt.duration && ` · ${selectedAppt.duration}m`}
+                  </p>
+                  {selectedAppt.reason && <p>{selectedAppt.reason}</p>}
+                </div>
+
+                <div className="flex flex-col gap-2 pt-2">
+                  {selectedAppt.encounterId ? (
+                    <Button onClick={() => { router.push(`/encounter/${selectedAppt.encounterId}`); setSelectedAppt(null); }}>
+                      <ExternalLink className="h-4 w-4 mr-2" /> View Encounter
+                    </Button>
+                  ) : canAct && (
+                    <Button disabled={startingId === selectedAppt._id} onClick={() => handleStart(selectedAppt)}>
+                      <Play className="h-4 w-4 mr-2" />
+                      {startingId === selectedAppt._id ? 'Starting…' : 'Start Encounter'}
+                    </Button>
+                  )}
+
+                  {selectedAppt.patientId && (
+                    <Button variant="outline" onClick={() => { router.push(`/patient-records/${selectedAppt.patientId}`); setSelectedAppt(null); }}>
+                      View Patient Record
+                    </Button>
+                  )}
+
+                  {canAct && (
+                    <div className="flex gap-2 pt-1">
+                      <Button variant="ghost" size="sm" className="flex-1 text-xs text-muted-foreground" onClick={() => handleStatus(selectedAppt, 'no-show')}>No Show</Button>
+                      <Button variant="ghost" size="sm" className="flex-1 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => handleStatus(selectedAppt, 'cancelled')}>Cancel</Button>
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            );
+          })()}
+        </Dialog>
+
+        {/* ── Booking dialog ─────────────────────────────────────────── */}
         <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
               <DialogTitle>Book Appointment</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 pt-1">
+            <div className="space-y-3 pt-1">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Patient name</label>
+                <label className="text-sm font-medium">Patient</label>
                 <Input
-                  placeholder="Full name"
-                  value={patientName}
-                  onChange={(e) => setPatientName(e.target.value)}
+                  list="patient-list"
+                  placeholder="Patient name"
+                  value={bName}
+                  onChange={e => setBName(e.target.value)}
                   autoFocus
                 />
+                <datalist id="patient-list">
+                  {orgPatients?.map(p => <option key={p._id} value={p.name} />)}
+                </datalist>
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Date</label>
+                  <Input type="date" value={bookDate} onChange={e => setBookDate(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
                   <label className="text-sm font-medium">Time</label>
-                  <Input
-                    type="time"
-                    value={apptTime}
-                    onChange={(e) => setApptTime(e.target.value)}
-                  />
+                  <Input type="time" value={bookTime} onChange={e => setBookTime(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Type</label>
+                  <Select value={bType} onValueChange={setBType}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {APPT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Duration (min)</label>
-                  <Input
-                    type="number"
-                    value={apptDuration}
-                    onChange={(e) => setApptDuration(e.target.value)}
-                    placeholder="30"
-                  />
+                  <Input type="number" value={bDuration} onChange={e => setBDuration(e.target.value)} />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Type</label>
-                <Select value={apptType} onValueChange={setApptType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {APPOINTMENT_TYPES.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">Reason <span className="text-muted-foreground font-normal">(optional)</span></label>
-                <Input
-                  placeholder="Chief complaint or reason for visit"
-                  value={apptReason}
-                  onChange={(e) => setApptReason(e.target.value)}
-                />
+                <Input placeholder="Chief complaint / reason for visit" value={bReason} onChange={e => setBReason(e.target.value)} />
               </div>
-              <Button
-                className="w-full"
-                onClick={handleBook}
-                disabled={!patientName.trim() || booking}
-              >
-                {booking ? 'Booking…' : `Book for ${formatDisplayDate(selectedDate)}`}
+
+              <Button className="w-full" onClick={handleBook} disabled={!bName.trim() || booking}>
+                {booking ? 'Booking…' : 'Confirm Appointment'}
               </Button>
             </div>
           </DialogContent>
