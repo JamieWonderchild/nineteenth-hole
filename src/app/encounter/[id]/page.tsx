@@ -17,7 +17,6 @@ import { PlannedServicesWidget } from '@/components/billing/PlannedServicesWidge
 import { MedicalCodingPanel } from '@/components/encounter/MedicalCodingPanel';
 import { OrderSuggestionsPanel } from '@/components/encounter/OrderSuggestionsPanel';
 import { ResultsTriagePanel } from '@/components/encounter/ResultsTriagePanel';
-import { PatientProfileCard } from '@/components/patient/PatientProfileCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -1010,11 +1009,6 @@ export default function ConsultationDetailPage() {
                         ))}
                       </div>
                     </div>
-                  )}
-
-                  {/* Clinical Profile (prior published encounters) */}
-                  {encounter.patientId && (
-                    <PatientProfileCard patientId={encounter.patientId as Id<'patients'>} />
                   )}
 
                   {/* Medical Coding */}
