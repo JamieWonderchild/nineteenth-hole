@@ -407,45 +407,41 @@ export default function NewEncounterPage() {
 
         {/* Mode + encounter type selectors — shown before first recording */}
         {!sessionData && !encounterId && (
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Recording mode */}
-            <div className="flex rounded-lg border overflow-hidden">
-              <button
-                onClick={() => setRecordingMode('ambient')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
-                  recordingMode === 'ambient'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-background text-muted-foreground hover:bg-muted'
-                }`}
-              >
-                <Radio className="h-3.5 w-3.5" />
-                Ambient Consultation
-              </button>
-              <button
-                onClick={() => setRecordingMode('dictate')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors border-l ${
-                  recordingMode === 'dictate'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-background text-muted-foreground hover:bg-muted'
-                }`}
-              >
-                <FileText className="h-3.5 w-3.5" />
-                Dictate Note
-              </button>
+          <div className="flex flex-col items-center gap-6 py-4">
+            {/* Mode cards */}
+            <div className="grid grid-cols-2 gap-4 w-full max-w-lg">
+              {([
+                { mode: 'ambient' as const, icon: Radio, title: 'Ambient Consultation', desc: 'Listens to the full room conversation' },
+                { mode: 'dictate' as const, icon: FileText, title: 'Dictate Note', desc: 'You speak directly to dictate' },
+              ]).map(({ mode, icon: Icon, title, desc }) => (
+                <button
+                  key={mode}
+                  onClick={() => setRecordingMode(mode)}
+                  className={`flex flex-col items-center gap-2 rounded-xl border-2 p-5 text-center transition-colors ${
+                    recordingMode === mode
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-card hover:border-primary/40 hover:bg-muted/40'
+                  }`}
+                >
+                  <Icon className={`h-6 w-6 ${recordingMode === mode ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <span className={`text-sm font-semibold ${recordingMode === mode ? 'text-primary' : 'text-foreground'}`}>{title}</span>
+                  <span className="text-xs text-muted-foreground">{desc}</span>
+                </button>
+              ))}
             </div>
 
-            {/* Encounter type */}
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground font-medium">Type</span>
-              <div className="flex rounded-lg border overflow-hidden">
+            {/* Encounter type — subtle secondary control */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Encounter type</span>
+              <div className="flex rounded-lg border overflow-hidden text-xs">
                 {(['outpatient', 'inpatient', 'ed'] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => setEncounterType(t)}
-                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                    className={`px-3 py-1.5 font-medium transition-colors ${
                       encounterType === t
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-background text-muted-foreground hover:bg-muted'
+                        ? 'bg-muted text-foreground'
+                        : 'bg-background text-muted-foreground hover:bg-muted/60'
                     }`}
                   >
                     {t === 'outpatient' ? 'Outpatient' : t === 'inpatient' ? 'Inpatient' : 'ED'}
