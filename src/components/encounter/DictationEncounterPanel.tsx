@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Mic, Square, Loader2 } from 'lucide-react';
+import { Mic, Square, Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { useLanguagePreference } from '@/hooks/useLanguagePreference';
@@ -21,7 +21,7 @@ interface DictationEncounterPanelProps {
   encounterId?: string;
 }
 
-type Stage = 'idle' | 'recording' | 'done';
+type Stage = 'idle' | 'recording' | 'processing' | 'done';
 
 export function DictationEncounterPanel({ onSessionComplete, encounterId }: DictationEncounterPanelProps) {
   const { language } = useLanguagePreference();
@@ -83,6 +83,7 @@ export function DictationEncounterPanel({ onSessionComplete, encounterId }: Dict
   }, [dictState]);
 
   const handleStop = () => {
+    setStage('processing');
     stop();
   };
 
@@ -119,13 +120,25 @@ export function DictationEncounterPanel({ onSessionComplete, encounterId }: Dict
           <span className="text-sm font-semibold">Dictate Note</span>
         </div>
         <div className="flex items-center gap-3">
-          {stage === 'recording' && (
+          {stage === 'recording' && dictState === 'recording' && (
             <AudioLevelIndicator level={audioLevel} className="w-16" />
           )}
-          {(stage === 'idle' || dictState === 'connecting') && (
+          {(stage === 'idle' || dictState === 'connecting') && stage !== 'processing' && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Connecting…
+            </div>
+          )}
+          {stage === 'processing' && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Processing…
+            </div>
+          )}
+          {stage === 'done' && (
+            <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Ready
             </div>
           )}
         </div>
@@ -133,14 +146,19 @@ export function DictationEncounterPanel({ onSessionComplete, encounterId }: Dict
 
       {/* Transcript area */}
       <div className="px-5 py-4 min-h-[200px]">
-        {renderedText ? (
+        {stage === 'processing' && !renderedText ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+            Finalising transcript…
+          </div>
+        ) : renderedText ? (
           <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{renderedText}</p>
         ) : (
           <p className="text-sm text-muted-foreground italic">
             {stage === 'recording' ? 'Listening…' : 'Starting microphone…'}
           </p>
         )}
-        {interimText && (
+        {stage === 'recording' && interimText && (
           <span className="text-sm text-muted-foreground italic"> {interimText}</span>
         )}
       </div>
@@ -151,6 +169,12 @@ export function DictationEncounterPanel({ onSessionComplete, encounterId }: Dict
           <Button variant="destructive" size="sm" onClick={handleStop} className="gap-1.5">
             <Square className="h-3.5 w-3.5 fill-current" />
             Stop
+          </Button>
+        )}
+        {stage === 'processing' && (
+          <Button size="sm" disabled className="gap-1.5">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Processing…
           </Button>
         )}
         {stage === 'done' && (

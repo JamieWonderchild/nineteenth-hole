@@ -727,7 +727,13 @@ export default function ConsultationDetailPage() {
                   <AppLink href={`/encounter/new?encounterId=${encounterId}`}>
                     <Button className="gap-2">
                       <Mic className="h-4 w-4" />
-                      Begin Encounter
+                      Ambient
+                    </Button>
+                  </AppLink>
+                  <AppLink href={`/encounter/new?encounterId=${encounterId}&mode=dictate`}>
+                    <Button variant="outline" className="gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Dictate
                     </Button>
                   </AppLink>
                   <Button
