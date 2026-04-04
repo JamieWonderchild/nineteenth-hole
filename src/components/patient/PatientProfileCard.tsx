@@ -1,9 +1,9 @@
 'use client';
 
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from 'convex/_generated/api';
 import type { Id } from 'convex/_generated/dataModel';
-import { Brain, AlertTriangle, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { Brain, AlertTriangle, ChevronDown, ChevronUp, Clock, RotateCw } from 'lucide-react';
 import { useState } from 'react';
 
 interface PatientProfileCardProps {
@@ -25,6 +25,29 @@ const PROBLEM_CHIP: Record<string, string> = {
 export function PatientProfileCard({ patientId }: PatientProfileCardProps) {
   const profile = useQuery(api.patientProfiles.getByPatient, { patientId });
   const [narrativeExpanded, setNarrativeExpanded] = useState(true);
+  const [isRerunning, setIsRerunning] = useState(false);
+
+  const markProcessing = useMutation(api.patientProfiles.markProcessing);
+  const buildProfile = useAction(api.patientProfiles.buildPatientProfile);
+
+  async function handleRerun() {
+    if (!profile || isRerunning) return;
+    setIsRerunning(true);
+    try {
+      await markProcessing({
+        patientId: profile.patientId,
+        orgId: profile.orgId,
+        encounterId: profile.triggerEncounterId,
+      });
+      await buildProfile({
+        patientId: profile.patientId,
+        orgId: profile.orgId,
+        encounterId: profile.triggerEncounterId,
+      });
+    } finally {
+      setIsRerunning(false);
+    }
+  }
 
   // Still loading from Convex
   if (profile === undefined) return null;
@@ -71,9 +94,21 @@ export function PatientProfileCard({ patientId }: PatientProfileCardProps) {
           <Brain className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold text-gray-800">Clinical Profile</span>
         </div>
-        <span className="text-xs text-muted-foreground">
-          Built from {profile.encounterCount} encounter{profile.encounterCount !== 1 ? 's' : ''}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            Built from {profile.encounterCount} encounter{profile.encounterCount !== 1 ? 's' : ''}
+          </span>
+          {profile.buildStatus !== 'processing' && (
+            <button
+              onClick={handleRerun}
+              disabled={isRerunning}
+              className="text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+              title="Regenerate profile"
+            >
+              <RotateCw className={`h-3.5 w-3.5 ${isRerunning ? 'animate-spin' : ''}`} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="divide-y divide-gray-100">

@@ -18,6 +18,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  RotateCw,
 } from 'lucide-react';
 
 interface SuggestedOrder {
@@ -62,7 +63,9 @@ export function OrderSuggestionsPanel({
   isEditable = true,
 }: OrderSuggestionsPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isRerunning, setIsRerunning] = useState(false);
 
+  const rerun = useMutation(api.orderOrchestration.rerunExtraction);
   const acceptOrder = useMutation(api.orderOrchestration.acceptOrder);
   const dismissOrder = useMutation(api.orderOrchestration.dismissOrder);
   const acceptAllOrders = useMutation(api.orderOrchestration.acceptAllOrders);
@@ -83,7 +86,17 @@ export function OrderSuggestionsPanel({
 
   const isProcessing = orderExtractionStatus === 'processing';
 
-  if (!isProcessing && orders.length === 0) return null;
+  async function handleRerun() {
+    if (isRerunning) return;
+    setIsRerunning(true);
+    try {
+      await rerun({ encounterId });
+    } finally {
+      setIsRerunning(false);
+    }
+  }
+
+  if (!isEditable && !isProcessing && orders.length === 0) return null;
 
   async function handleAccept(orderId: string) {
     try {
@@ -141,6 +154,16 @@ export function OrderSuggestionsPanel({
               Accept all
             </button>
           )}
+          {isEditable && !isProcessing && (
+            <button
+              onClick={e => { e.stopPropagation(); handleRerun(); }}
+              disabled={isRerunning}
+              className="text-gray-400 hover:text-gray-600 disabled:opacity-40 transition-colors"
+              title="Re-extract orders"
+            >
+              <RotateCw className={`h-3.5 w-3.5 ${isRerunning ? 'animate-spin' : ''}`} />
+            </button>
+          )}
           {isCollapsed ? (
             <ChevronDown className="h-4 w-4 text-gray-400" />
           ) : (
@@ -156,6 +179,18 @@ export function OrderSuggestionsPanel({
             <div className="px-4 py-6 flex flex-col items-center gap-2 text-gray-400">
               <Loader2 className="h-5 w-5 animate-spin" />
               <p className="text-xs">Extracting orders from the plan section…</p>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!isProcessing && orders.length === 0 && (
+            <div className="px-4 py-4 text-center text-xs text-gray-400 dark:text-muted-foreground">
+              No orders extracted.{' '}
+              {isEditable && (
+                <button onClick={handleRerun} className="text-indigo-600 dark:text-indigo-400 hover:underline">
+                  Run extraction
+                </button>
+              )}
             </div>
           )}
 

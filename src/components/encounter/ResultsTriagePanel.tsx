@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQuery } from 'convex/react';
+import { useAction, useMutation, useQuery } from 'convex/react';
 import { api } from 'convex/_generated/api';
 import type { Id } from 'convex/_generated/dataModel';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import {
   FlaskConical,
   Plus,
   Loader2,
+  RotateCw,
   Send,
   Check,
   ChevronDown,
@@ -419,6 +420,19 @@ export function ResultsTriagePanel({
 }: ResultsTriagePanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isRerunning, setIsRerunning] = useState(false);
+
+  const rerunExtraction = useAction(api.resultsTriage.extractLabResultsFromConsultation);
+
+  async function handleRerun() {
+    if (isRerunning) return;
+    setIsRerunning(true);
+    try {
+      await rerunExtraction({ encounterId });
+    } finally {
+      setIsRerunning(false);
+    }
+  }
 
   const results = useQuery(api.resultsTriage.getResultsByEncounter, { encounterId }) ?? [];
 
@@ -457,6 +471,16 @@ export function ResultsTriagePanel({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {isEditable && (
+            <button
+              onClick={e => { e.stopPropagation(); handleRerun(); }}
+              disabled={isRerunning}
+              className="text-gray-400 dark:text-muted-foreground hover:text-gray-600 dark:hover:text-foreground disabled:opacity-40 transition-colors"
+              title="Re-extract lab results from consultation"
+            >
+              <RotateCw className={`h-3.5 w-3.5 ${isRerunning ? 'animate-spin' : ''}`} />
+            </button>
+          )}
           {isEditable && (
             <button
               onClick={e => { e.stopPropagation(); setShowAddForm(f => !f); setIsCollapsed(false); }}

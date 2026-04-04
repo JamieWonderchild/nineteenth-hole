@@ -175,6 +175,23 @@ export const updateOrderExtractionStatus = internalMutation({
 });
 
 /**
+ * Public: Reset order extraction status to 'processing' and re-run.
+ * Used by the manual re-run button in OrderSuggestionsPanel.
+ */
+export const rerunExtraction = mutation({
+  args: { encounterId: v.id("encounters") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.encounterId, {
+      orderExtractionStatus: 'processing',
+      updatedAt: new Date().toISOString(),
+    });
+    await ctx.scheduler.runAfter(0, api.orderOrchestration.extractOrdersFromDocument, {
+      encounterId: args.encounterId,
+    });
+  },
+});
+
+/**
  * Accept a single suggested order
  */
 export const acceptOrder = mutation({
