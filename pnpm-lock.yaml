@@ -117,7 +117,7 @@ importers:
         specifier: ^6.9.3
         version: 6.10.0
       stripe:
-        specifier: ^20.3.1
+        specifier: ^20.4.1
         version: 20.4.1(@types/node@20.19.37)
       svix:
         specifier: ^1.85.0
