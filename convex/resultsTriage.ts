@@ -240,7 +240,9 @@ export const getResultsByEncounter = query({
 });
 
 /**
- * Internal: Get SOAP content + facts for lab extraction
+ * Internal: Get facts + context for lab extraction.
+ * Facts are the primary source — reconciled facts if available, raw recording facts otherwise.
+ * SOAP content is included as supplementary context if it exists.
  */
 export const getEncounterForLabExtraction = internalMutation({
   args: { encounterId: v.id("encounters") },
@@ -251,7 +253,33 @@ export const getEncounterForLabExtraction = internalMutation({
 
     const patient = await ctx.db.get(encounter.patientId);
 
-    // Concatenate all SOAP sections for the extractor
+    // Facts are the source of truth — prefer reconciled facts, fall back to raw
+    let facts: Array<{ text: string; group: string }> = [];
+    if (encounter.factReconciliation?.reconciledFacts?.length) {
+      facts = encounter.factReconciliation.reconciledFacts.map(
+        (f: { text: string; group: string }) => ({ text: f.text, group: f.group })
+      );
+    } else if (encounter.facts?.length) {
+      facts = encounter.facts.map((f: { text: string; group: string }) => ({
+        text: f.text,
+        group: f.group,
+      }));
+    } else {
+      // Fall back to recording-level facts
+      const recordings = await ctx.db
+        .query("recordings")
+        .withIndex("by_encounter", q => q.eq("encounterId", args.encounterId))
+        .collect();
+      for (const rec of recordings) {
+        for (const f of rec.facts ?? []) {
+          facts.push({ text: f.text, group: f.group });
+        }
+      }
+    }
+
+    if (facts.length === 0) return null;
+
+    // SOAP content as supplementary context if already generated
     const soapSections = encounter.generatedDocuments?.soapNote?.sections ?? [];
     const soapContent = soapSections
       .map((s: { key: string; content?: string; text?: string }) =>
@@ -259,28 +287,82 @@ export const getEncounterForLabExtraction = internalMutation({
       )
       .join('\n\n');
 
-    // Get facts
-    let facts: Array<{ text: string; group: string }> = [];
-    if (encounter.factReconciliation) {
-      facts = encounter.factReconciliation.reconciledFacts.map(
-        (f: { text: string; group: string }) => ({ text: f.text, group: f.group })
-      );
-    } else if (encounter.facts) {
-      facts = encounter.facts.map((f: { text: string; group: string }) => ({
-        text: f.text,
-        group: f.group,
-      }));
-    }
-
     return {
       encounterId: args.encounterId,
       patientId: encounter.patientId,
       orgId: encounter.orgId,
       providerId: encounter.providerId,
-      soapContent,
       facts,
+      soapContent,
       patientName: patient?.name,
     };
+  },
+});
+
+/**
+ * Internal: Upsert a lab result by test name within an encounter.
+ * Updates the value if the result already exists; creates it if new.
+ * Re-triggers triage if the value changed.
+ */
+export const upsertLabResult = internalMutation({
+  args: {
+    encounterId: v.id("encounters"),
+    patientId: v.id("patients"),
+    orgId: v.id("organizations"),
+    providerId: v.string(),
+    testName: v.string(),
+    resultValue: v.string(),
+    referenceRange: v.optional(v.string()),
+    units: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const timestamp = new Date().toISOString();
+
+    // Check if this test already exists for this encounter
+    const existing = await ctx.db
+      .query("labResults")
+      .withIndex("by_encounter", q => q.eq("encounterId", args.encounterId))
+      .filter(q => q.eq(q.field("testName"), args.testName))
+      .first();
+
+    if (existing) {
+      // Only update (and re-triage) if the value actually changed
+      if (existing.resultValue !== args.resultValue) {
+        await ctx.db.patch(existing._id, {
+          resultValue: args.resultValue,
+          referenceRange: args.referenceRange ?? existing.referenceRange,
+          units: args.units ?? existing.units,
+          triageStatus: 'pending',
+          urgency: undefined,
+          urgencyReason: undefined,
+          updatedAt: timestamp,
+        });
+        await ctx.scheduler.runAfter(0, api.resultsTriage.triageResult, {
+          labResultId: existing._id,
+        });
+      }
+      return existing._id;
+    }
+
+    // New result — insert and triage
+    const labResultId = await ctx.db.insert("labResults", {
+      encounterId: args.encounterId,
+      patientId: args.patientId,
+      orgId: args.orgId,
+      providerId: args.providerId,
+      testName: args.testName,
+      resultValue: args.resultValue,
+      referenceRange: args.referenceRange,
+      units: args.units,
+      resultedAt: timestamp,
+      triageStatus: 'pending',
+      entryMethod: 'auto',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+
+    await ctx.scheduler.runAfter(0, api.resultsTriage.triageResult, { labResultId });
+    return labResultId;
   },
 });
 
@@ -330,10 +412,11 @@ export const extractLabResultsFromConsultation = action({
         return { success: true, count: 0 };
       }
 
-      // Create a lab result record for each extracted result
+      // Upsert: update existing record if test name already exists, create if new
+      let upsertCount = 0;
       for (const result of results) {
         if (!result.testName?.trim() || !result.resultValue?.trim()) continue;
-        await ctx.runMutation(api.resultsTriage.createLabResult, {
+        await ctx.runMutation(internal.resultsTriage.upsertLabResult, {
           encounterId: args.encounterId,
           patientId: data.patientId,
           orgId: data.orgId,
@@ -342,11 +425,11 @@ export const extractLabResultsFromConsultation = action({
           resultValue: result.resultValue.trim(),
           referenceRange: result.referenceRange?.trim() || undefined,
           units: result.units?.trim() || undefined,
-          entryMethod: 'auto',
         });
+        upsertCount++;
       }
 
-      console.log(`[LabExtractor] Created ${results.length} lab result record(s)`);
+      console.log(`[LabExtractor] Upserted ${upsertCount} lab result record(s)`);
       return { success: true, count: results.length };
 
     } catch (error) {

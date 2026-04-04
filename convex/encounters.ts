@@ -596,14 +596,8 @@ export const saveGeneratedDocuments = mutation({
       const existingPlanContent = encounter.suggestedOrders?.planSectionContent ?? '';
 
       if (newPlanContent.trim() !== existingPlanContent.trim() && newPlanContent.trim().length > 0) {
-        await ctx.db.patch(args.encounterId, {
-          orderExtractionStatus: 'processing',
-          labExtractionStatus: 'processing',
-        });
+        await ctx.db.patch(args.encounterId, { orderExtractionStatus: 'processing' });
         await ctx.scheduler.runAfter(0, api.orderOrchestration.extractOrdersFromDocument, {
-          encounterId: args.encounterId,
-        });
-        await ctx.scheduler.runAfter(0, api.resultsTriage.extractLabResultsFromConsultation, {
           encounterId: args.encounterId,
         });
       }
@@ -1631,6 +1625,13 @@ export const saveFactReconciliation = mutation({
       factReconciliation: args.factReconciliation,
       updatedAt: new Date().toISOString(),
     });
+
+    // Reactively maintain lab results from reconciled facts
+    if (encounter.patientId && encounter.orgId) {
+      await ctx.scheduler.runAfter(0, api.resultsTriage.extractLabResultsFromConsultation, {
+        encounterId: args.encounterId,
+      });
+    }
 
     return { success: true };
   },
