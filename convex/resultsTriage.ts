@@ -384,10 +384,6 @@ export const extractLabResultsFromConsultation = action({
         return { success: false, error: 'Encounter not found' };
       }
 
-      if (!data.soapContent.trim()) {
-        return { success: true, count: 0 };
-      }
-
       const apiUrl = process.env.SITE_URL || 'https://healthplatform.com';
       const response = await fetch(`${apiUrl}/api/corti/extract-lab-results`, {
         method: 'POST',

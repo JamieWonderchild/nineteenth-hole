@@ -480,16 +480,14 @@ export function ResultsTriagePanel({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {isEditable && (
-            <button
-              onClick={e => { e.stopPropagation(); handleRerun(); }}
-              disabled={isRerunning}
-              className="text-gray-400 dark:text-muted-foreground hover:text-gray-600 dark:hover:text-foreground disabled:opacity-40 transition-colors"
-              title="Re-extract lab results from consultation"
-            >
-              <RotateCw className={`h-3.5 w-3.5 ${isRerunning ? 'animate-spin' : ''}`} />
-            </button>
-          )}
+          <button
+            onClick={e => { e.stopPropagation(); handleRerun(); }}
+            disabled={isRerunning}
+            className="text-gray-400 dark:text-muted-foreground hover:text-gray-600 dark:hover:text-foreground disabled:opacity-40 transition-colors"
+            title="Re-extract lab results from consultation"
+          >
+            <RotateCw className={`h-3.5 w-3.5 ${isRerunning ? 'animate-spin' : ''}`} />
+          </button>
           {isEditable && (
             <button
               onClick={e => { e.stopPropagation(); setShowAddForm(f => !f); setIsCollapsed(false); }}
