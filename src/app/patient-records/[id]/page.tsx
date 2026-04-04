@@ -71,17 +71,17 @@ export default function PatientDetailPage() {
 
               {/* Continue Draft Encounter Banner */}
               {draftConsultation && (
-                <div className="flex items-center justify-between p-4 rounded-lg border border-yellow-200 bg-yellow-50">
+                <div className="flex items-center justify-between p-4 rounded-lg border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30">
                   <div>
-                    <p className="text-sm font-medium text-yellow-800">
+                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
                       Draft encounter in progress
                     </p>
                     {draftConsultation.reasonForVisit && (
-                      <p className="text-xs text-yellow-700">
+                      <p className="text-xs text-yellow-700 dark:text-yellow-400">
                         {draftConsultation.reasonForVisit}
                       </p>
                     )}
-                    <p className="text-xs text-yellow-600">
+                    <p className="text-xs text-yellow-600 dark:text-yellow-500">
                       Created {new Date(draftConsultation.createdAt).toLocaleDateString()}
                     </p>
                   </div>

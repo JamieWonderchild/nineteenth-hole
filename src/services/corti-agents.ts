@@ -954,7 +954,7 @@ Your task is to parse clinical encounter transcripts and extract structured data
 
 ## Patient Record Fields (extract if mentioned):
 - name: Patient's full name
-- age: Preserve original format (e.g., "34 years", "6 months")
+- age: Normalize to a numeric string only (e.g., "42", "6") — strip words like "year-old", "years", "months old"
 - weight: As a string with unit (e.g., "82 kg", "180 lbs")
 - weightUnit: "kg" or "lbs"
 - sex: One of "male", "female", "other"
