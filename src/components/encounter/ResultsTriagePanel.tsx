@@ -428,7 +428,16 @@ export function ResultsTriagePanel({
     if (isRerunning) return;
     setIsRerunning(true);
     try {
-      await rerunExtraction({ encounterId });
+      const result = await rerunExtraction({ encounterId });
+      if (!result.success) {
+        toast({ title: 'Extraction failed', description: result.error, variant: 'destructive' });
+      } else if ((result.count ?? 0) === 0) {
+        toast({ title: 'No lab results found in this consultation' });
+      } else {
+        toast({ title: `Found ${result.count} lab result${result.count !== 1 ? 's' : ''}` });
+      }
+    } catch {
+      toast({ title: 'Extraction failed', variant: 'destructive' });
     } finally {
       setIsRerunning(false);
     }

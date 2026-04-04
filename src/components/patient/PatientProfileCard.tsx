@@ -24,6 +24,7 @@ const PROBLEM_CHIP: Record<string, string> = {
 
 export function PatientProfileCard({ patientId }: PatientProfileCardProps) {
   const profile = useQuery(api.patientProfiles.getByPatient, { patientId });
+  const latestEncounter = useQuery(api.encounters.getLatestPublishedByPatient, { patientId });
   const [narrativeExpanded, setNarrativeExpanded] = useState(true);
   const [isRerunning, setIsRerunning] = useState(false);
 
@@ -31,19 +32,14 @@ export function PatientProfileCard({ patientId }: PatientProfileCardProps) {
   const buildProfile = useAction(api.patientProfiles.buildPatientProfile);
 
   async function handleRerun() {
-    if (!profile || isRerunning) return;
+    const enc = profile ?? null;
+    const encounterId = enc ? enc.triggerEncounterId : latestEncounter?._id;
+    const orgId = enc ? enc.orgId : latestEncounter?.orgId;
+    if (!encounterId || !orgId || isRerunning) return;
     setIsRerunning(true);
     try {
-      await markProcessing({
-        patientId: profile.patientId,
-        orgId: profile.orgId,
-        encounterId: profile.triggerEncounterId,
-      });
-      await buildProfile({
-        patientId: profile.patientId,
-        orgId: profile.orgId,
-        encounterId: profile.triggerEncounterId,
-      });
+      await markProcessing({ patientId, orgId, encounterId });
+      await buildProfile({ patientId, orgId, encounterId });
     } finally {
       setIsRerunning(false);
     }
@@ -54,12 +50,23 @@ export function PatientProfileCard({ patientId }: PatientProfileCardProps) {
 
   // No profile yet
   if (profile === null) {
+    const canGenerate = !!latestEncounter;
     return (
-      <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center">
-        <Brain className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+      <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center space-y-3">
+        <Brain className="h-8 w-8 text-gray-300 mx-auto" />
         <p className="text-sm text-muted-foreground">
           No clinical profile yet — will be generated after the first published encounter.
         </p>
+        {canGenerate && (
+          <button
+            onClick={handleRerun}
+            disabled={isRerunning}
+            className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline disabled:opacity-50"
+          >
+            <RotateCw className={`h-3.5 w-3.5 ${isRerunning ? 'animate-spin' : ''}`} />
+            {isRerunning ? 'Generating…' : 'Generate now'}
+          </button>
+        )}
       </div>
     );
   }

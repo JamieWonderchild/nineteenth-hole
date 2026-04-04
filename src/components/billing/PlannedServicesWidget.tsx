@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useEffect, useState } from 'react'
-import { useQuery, useMutation } from 'convex/react'
+import { useQuery, useMutation, useAction } from 'convex/react'
 import { api } from 'convex/_generated/api'
 import type { Id } from 'convex/_generated/dataModel'
 import { DollarSign, Trash2, AlertCircle, CheckCircle2, RotateCcw, Loader2, Plus } from 'lucide-react'
@@ -11,6 +11,7 @@ import { useUser } from '@clerk/nextjs'
 import { AppLink } from '@/components/navigation/AppLink'
 import { scoreEM, type EncounterType } from '@/lib/emScoring'
 import { AddServiceModal } from '@/components/billing/AddServiceModal'
+import { toast } from '@/hooks/use-toast'
 
 interface SimpleFact {
   id: string
@@ -60,6 +61,26 @@ export function PlannedServicesWidget({
   const [processedFacts, setProcessedFacts] = useState<Set<string>>(new Set())
   const [voidConfirming, setVoidConfirming] = useState(false)
   const [showAddService, setShowAddService] = useState(false)
+  const [isRerunning, setIsRerunning] = useState(false)
+
+  const rerunBilling = useAction(api.billingExtraction.extractFromReconciliation)
+
+  async function handleRerunBilling() {
+    if (isRerunning || !orgId) return
+    setIsRerunning(true)
+    try {
+      const result = await rerunBilling({ encounterId })
+      if (!result.success) {
+        toast({ title: 'Billing extraction failed', variant: 'destructive' })
+      } else {
+        toast({ title: result.itemsCreated ? `Found ${result.itemsCreated} billing item${result.itemsCreated !== 1 ? 's' : ''}` : 'No billing items found' })
+      }
+    } catch {
+      toast({ title: 'Billing extraction failed', variant: 'destructive' })
+    } finally {
+      setIsRerunning(false)
+    }
+  }
 
   // Queries
   const catalog = useQuery(
@@ -340,7 +361,17 @@ export function PlannedServicesWidget({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {isExtracting && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+          {(isExtracting || isRerunning) && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+          {!isFinalized && orgId && (
+            <button
+              onClick={handleRerunBilling}
+              disabled={isRerunning || isExtracting}
+              className="text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+              title="Re-run billing extraction"
+            >
+              <RotateCcw className={`h-3.5 w-3.5 ${isRerunning ? 'animate-spin' : ''}`} />
+            </button>
+          )}
           <span className="text-xs font-semibold text-green-600 dark:text-green-400">
             Est. ${total.toFixed(2)}
           </span>

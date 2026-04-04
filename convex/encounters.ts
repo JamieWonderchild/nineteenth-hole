@@ -1783,3 +1783,16 @@ export const migrateFinalized = mutation({
     return { migrated: count };
   },
 });
+// Get the most recent published encounter for a patient (used for manual profile generation)
+export const getLatestPublishedByPatient = query({
+  args: { patientId: v.id("patients") },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("encounters")
+      .withIndex("by_patient_status", q =>
+        q.eq("patientId", args.patientId).eq("status", "published")
+      )
+      .order("desc")
+      .first();
+  },
+});
