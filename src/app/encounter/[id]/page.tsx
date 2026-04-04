@@ -1044,6 +1044,7 @@ export default function ConsultationDetailPage() {
                       providerId={encounter.providerId}
                       patientPhone={patient?.emergencyContact?.phone}
                       isEditable={isEditable}
+                      extractionAttempted={!!detail?.factReconciliation?.reconciledAt}
                     />
                   )}
 

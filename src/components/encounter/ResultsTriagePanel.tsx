@@ -52,6 +52,7 @@ interface ResultsTriagePanelProps {
   providerId: string;
   patientPhone?: string;
   isEditable?: boolean;
+  extractionAttempted?: boolean;
 }
 
 const URGENCY_CONFIG: Record<string, {
@@ -417,6 +418,7 @@ export function ResultsTriagePanel({
   providerId,
   patientPhone,
   isEditable = true,
+  extractionAttempted = false,
 }: ResultsTriagePanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -523,12 +525,16 @@ export function ResultsTriagePanel({
 
           {/* Results list */}
           {results.length === 0 && !showAddForm && (
-            <div className="px-4 py-6 text-center text-xs text-gray-400 dark:text-muted-foreground">
-              Results are extracted automatically from the consultation.
+            <div className="px-4 py-6 text-center text-xs text-muted-foreground space-y-1">
+              {extractionAttempted || isRerunning ? (
+                <p>No lab results found in this consultation.</p>
+              ) : (
+                <p>Lab results are extracted automatically after the consultation is processed.</p>
+              )}
               {isEditable && (
                 <button
                   onClick={() => setShowAddForm(true)}
-                  className="ml-1 text-indigo-600 dark:text-indigo-400 hover:underline"
+                  className="text-indigo-600 dark:text-indigo-400 hover:underline"
                 >
                   Add manually
                 </button>

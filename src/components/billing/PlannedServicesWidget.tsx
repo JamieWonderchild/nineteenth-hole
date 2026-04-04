@@ -105,6 +105,10 @@ export function PlannedServicesWidget({
     r => r.billingExtractionStatus === 'processing'
   ) || false
 
+  const hasExtracted = recordings?.some(
+    r => r.billingExtractionStatus === 'completed' || r.billingExtractionStatus === 'failed'
+  ) || false
+
   const isFinalized = invoiceMeta?.status === 'finalized'
 
   // Prospective items for pre-invoice display + auto-creation logic
@@ -330,7 +334,9 @@ export function PlannedServicesWidget({
           </p>
         ) : (
           <p className="text-xs text-muted-foreground py-1">
-            No billable items found yet.
+            {hasExtracted || isRerunning
+              ? 'No billable items found in this consultation.'
+              : 'Billing is extracted automatically after the consultation is processed.'}
           </p>
         )}
         <AddServiceTrigger onOpen={() => setShowAddService(true)} />
