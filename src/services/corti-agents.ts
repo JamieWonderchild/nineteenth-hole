@@ -2259,7 +2259,6 @@ Classify urgency, draft a patient notification, and suggest a follow-up action. 
     }
 
     const factLines = facts
-      .filter(f => ['assessment', 'plan', 'medications', 'past-medical-history'].includes(f.group))
       .map(f => `[${f.group}] ${f.text}`)
       .join('\n');
 
@@ -2269,7 +2268,7 @@ SOAP NOTE:
 ${soapContent.substring(0, 3000)}
 
 CLINICAL FACTS:
-${factLines.substring(0, 1000)}
+${factLines.substring(0, 2000)}
 
 Return JSON only.`;
 
