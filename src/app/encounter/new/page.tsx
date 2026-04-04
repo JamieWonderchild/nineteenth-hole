@@ -5,8 +5,10 @@ import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Stethoscope, Save, Check, Loader2, Sparkles, Search } from 'lucide-react';
+import { Stethoscope, Save, Check, Loader2, Sparkles, Search, Radio, FileText } from 'lucide-react';
+
 import { CortiConsultation } from '@/components/encounter/CortiConsultation';
+import { DictationEncounterPanel } from '@/components/encounter/DictationEncounterPanel';
 import { useUser } from '@clerk/nextjs';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from 'convex/_generated/api';
@@ -45,6 +47,7 @@ export default function NewEncounterPage() {
   const isMobile = useIsMobile();
 
   const [encounterType, setEncounterType] = useState<'outpatient' | 'inpatient' | 'ed'>('outpatient');
+  const [recordingMode, setRecordingMode] = useState<'ambient' | 'dictate'>('ambient');
   const [sessionData, setSessionData] = useState<EncounterSession | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -401,38 +404,75 @@ export default function NewEncounterPage() {
           </div>
         </div>
 
-        {/* Encounter type selector — shown before first recording */}
+        {/* Mode + encounter type selectors — shown before first recording */}
         {!sessionData && !encounterId && (
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground font-medium">Encounter type</span>
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Recording mode */}
             <div className="flex rounded-lg border overflow-hidden">
-              {(['outpatient', 'inpatient', 'ed'] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setEncounterType(t)}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                    encounterType === t
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-background text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  {t === 'outpatient' ? 'Outpatient' : t === 'inpatient' ? 'Inpatient' : 'ED'}
-                </button>
-              ))}
+              <button
+                onClick={() => setRecordingMode('ambient')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+                  recordingMode === 'ambient'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                <Radio className="h-3.5 w-3.5" />
+                Ambient Consultation
+              </button>
+              <button
+                onClick={() => setRecordingMode('dictate')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors border-l ${
+                  recordingMode === 'dictate'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Dictate Note
+              </button>
+            </div>
+
+            {/* Encounter type */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground font-medium">Type</span>
+              <div className="flex rounded-lg border overflow-hidden">
+                {(['outpatient', 'inpatient', 'ed'] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setEncounterType(t)}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                      encounterType === t
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t === 'outpatient' ? 'Outpatient' : t === 'inpatient' ? 'Inpatient' : 'ED'}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
 
-        <CortiConsultation
-          consultationType="sick-visit"
-          onSessionComplete={handleSessionComplete}
-          onRecordAgain={handleRecordAgain}
-          encounterId={encounterId ?? undefined}
-          initialFacts={draftFacts}
-          initialTranscript={draftTranscript}
-          isMobile={isMobile}
-          mobileQuickStart={isMobileQuickStart}
-        />
+        {recordingMode === 'dictate' && !sessionData ? (
+          <DictationEncounterPanel
+            key={encounterId ?? 'new'}
+            onSessionComplete={handleSessionComplete}
+            encounterId={encounterId ?? undefined}
+          />
+        ) : (
+          <CortiConsultation
+            consultationType="sick-visit"
+            onSessionComplete={handleSessionComplete}
+            onRecordAgain={handleRecordAgain}
+            encounterId={encounterId ?? undefined}
+            initialFacts={draftFacts}
+            initialTranscript={draftTranscript}
+            isMobile={isMobile}
+            mobileQuickStart={isMobileQuickStart}
+          />
+        )}
 
         {sessionData && (
           <div className="flex justify-center">
