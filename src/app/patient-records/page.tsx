@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlusCircle, Users, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { PlusCircle, Users, ChevronRight, ArrowUpDown, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useQuery, useMutation, useAction } from "convex/react";
@@ -45,7 +45,7 @@ export default function PatientRecordsPage() {
   }, [orgContext?.orgId]);
 
   const orgPatients = useQuery(
-    api.patients.getPatientsByOrg,
+    api.patients.getPatientsByOrgEnriched,
     orgContext ? { orgId: orgContext.orgId as Id<"organizations"> } : 'skip'
   );
   const vetPatients = useQuery(
@@ -62,10 +62,12 @@ export default function PatientRecordsPage() {
     .map(transformPatientData)
     .sort((a, b) => {
       if (sortBy === 'alpha') return a.name.localeCompare(b.name);
-      if (!a.lastVisit && !b.lastVisit) return a.name.localeCompare(b.name);
-      if (!a.lastVisit) return 1;
-      if (!b.lastVisit) return -1;
-      return new Date(b.lastVisit).getTime() - new Date(a.lastVisit).getTime();
+      const aDate = a.profile?.lastEncounterDate ?? a.lastVisit;
+      const bDate = b.profile?.lastEncounterDate ?? b.lastVisit;
+      if (!aDate && !bDate) return a.name.localeCompare(b.name);
+      if (!aDate) return 1;
+      if (!bDate) return -1;
+      return new Date(bDate).getTime() - new Date(aDate).getTime();
     });
 
   const handleCreatePatient = async () => {
@@ -93,11 +95,11 @@ export default function PatientRecordsPage() {
     }
   };
 
-  const formatLastVisit = (lastVisit?: string) => {
-    if (!lastVisit) return null;
-    const date = new Date(lastVisit);
+  const formatLastVisit = (date?: string) => {
+    if (!date) return null;
+    const d = new Date(date);
     const now = new Date();
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 30) return `${diffDays}d ago`;
@@ -167,39 +169,78 @@ export default function PatientRecordsPage() {
               <Card>
                 <CardContent className="p-0">
                   {sortedPatients.map((patient, idx) => {
-                    const subline = [patient.age, patient.sex].filter(Boolean).join(' · ');
-                    const lastVisit = formatLastVisit(patient.lastVisit);
+                    const profile = patient.profile;
+                    const lastVisitDate = profile?.lastEncounterDate ?? patient.lastVisit;
+                    const lastVisit = formatLastVisit(lastVisitDate);
+                    const encounterCount = profile?.encounterCount ?? 0;
+                    const activeProblems = profile?.activeProblems ?? [];
+                    const allergies = profile?.allergies ?? [];
+                    const hasAllergies = allergies.length > 0;
+
+                    const demographicParts = [patient.age, patient.sex].filter(Boolean);
+                    if (patient.mrn) demographicParts.push(`MRN ${patient.mrn}`);
+                    const subline = demographicParts.join(' · ');
 
                     return (
                       <div
                         key={patient._id}
                         className={cn(
-                          'flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-muted/50 transition-colors',
+                          'flex items-start gap-3 px-4 py-3.5 cursor-pointer hover:bg-muted/50 transition-colors',
                           idx > 0 && 'border-t'
                         )}
                         onClick={() => router.push(`/patient-records/${patient._id}`)}
                       >
                         {/* Avatar initials */}
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                           <span className="text-sm font-semibold text-primary">
                             {patient.name.charAt(0).toUpperCase()}
                           </span>
                         </div>
 
-                        {/* Name + demographics */}
+                        {/* Main content */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold truncate">{patient.name}</p>
-                          {subline && (
-                            <p className="text-xs text-muted-foreground truncate">{subline}</p>
-                          )}
-                        </div>
+                          {/* Name row */}
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm font-semibold truncate leading-snug">{patient.name}</p>
+                            {/* Visit count + last visit */}
+                            <div className="flex items-center gap-1.5 flex-shrink-0 text-xs text-muted-foreground leading-snug">
+                              {encounterCount > 0 && (
+                                <span className="tabular-nums">
+                                  {encounterCount} {encounterCount === 1 ? 'visit' : 'visits'}
+                                </span>
+                              )}
+                              {encounterCount > 0 && lastVisit && <span>·</span>}
+                              {lastVisit && (
+                                <span className="tabular-nums">{lastVisit}</span>
+                              )}
+                              <ChevronRight className="h-4 w-4 ml-0.5" />
+                            </div>
+                          </div>
 
-                        {/* Last visit + chevron */}
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {lastVisit && (
-                            <span className="text-xs text-muted-foreground tabular-nums">{lastVisit}</span>
+                          {/* Demographics */}
+                          {subline && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">{subline}</p>
                           )}
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+
+                          {/* Clinical chips */}
+                          {(activeProblems.length > 0 || hasAllergies) && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {activeProblems.map((problem) => (
+                                <span
+                                  key={problem.condition}
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-muted text-muted-foreground font-medium leading-none"
+                                >
+                                  {problem.condition}
+                                </span>
+                              ))}
+                              {hasAllergies && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-red-50 text-red-600 font-medium leading-none dark:bg-red-950/40 dark:text-red-400">
+                                  <AlertTriangle className="h-2.5 w-2.5" />
+                                  {allergies.length === 1 ? '1 allergy' : `${allergies.length} allergies`}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );

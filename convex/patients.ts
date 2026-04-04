@@ -111,6 +111,40 @@ export const getPatientsByOrg = query({
   },
 });
 
+export const getPatientsByOrgEnriched = query({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    const patients = await ctx.db
+      .query("patients")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    const profiles = await ctx.db
+      .query("patientProfiles")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+
+    const profileMap = new Map(profiles.map(p => [p.patientId as string, p]));
+
+    return patients.map(patient => {
+      const profile = profileMap.get(patient._id as string);
+      return {
+        ...patient,
+        profile: profile ? {
+          lastEncounterDate: profile.lastEncounterDate,
+          encounterCount: profile.encounterCount,
+          activeProblems: profile.activeProblems
+            .filter(p => p.status !== 'resolved')
+            .slice(0, 4),
+          allergies: profile.allergies,
+          buildStatus: profile.buildStatus,
+        } : null,
+      };
+    });
+  },
+});
+
 export const getPatientById = query({
   args: { id: v.id("patients") },
   handler: async (ctx, args) => {

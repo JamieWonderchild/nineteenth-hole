@@ -1,6 +1,22 @@
 // types/patient.ts
 import { Id } from 'convex/_generated/dataModel';
 
+export interface PatientProfileSummary {
+  lastEncounterDate: string;
+  encounterCount: number;
+  activeProblems: Array<{
+    condition: string;
+    status: string;
+    icd10Code?: string;
+  }>;
+  allergies: Array<{
+    allergen: string;
+    reaction?: string;
+    severity?: string;
+  }>;
+  buildStatus?: string;
+}
+
 export interface Patient {
   _id: Id<"patients">;
   name: string;
@@ -11,6 +27,7 @@ export interface Patient {
   weightUnit?: string;
   mrn?: string;
   lastVisit?: string;
+  profile?: PatientProfileSummary | null;
   medicalHistory?: Array<{
     date: string;
     type: string;
@@ -29,6 +46,7 @@ export interface ConvexPatient {
   sex?: string;
   mrn?: string;
   lastVisit?: string;
+  profile?: PatientProfileSummary | null;
   medicalHistory: Array<{
     date: string;
     type: string;
@@ -59,6 +77,7 @@ export const transformPatientData = (convexPatient: ConvexPatient): Patient => {
     sex: convexPatient.sex,
     mrn: convexPatient.mrn,
     lastVisit: convexPatient.lastVisit,
+    profile: convexPatient.profile,
     medicalHistory: convexPatient.medicalHistory,
   };
 };
