@@ -174,7 +174,10 @@ export default function PatientRecordsPage() {
                     const lastVisit = formatLastVisit(lastVisitDate);
                     const encounterCount = profile?.encounterCount ?? 0;
                     const activeProblems = profile?.activeProblems ?? [];
-                    const allergies = profile?.allergies ?? [];
+                    const NKA_PATTERN = /^(no\s+known|nkda?|none|nil)$/i;
+                    const allergies = (profile?.allergies ?? []).filter(
+                      a => !NKA_PATTERN.test(a.allergen.trim())
+                    );
                     const hasAllergies = allergies.length > 0;
 
                     const demographicParts = [patient.age, patient.sex].filter(Boolean);
