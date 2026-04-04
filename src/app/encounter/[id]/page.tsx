@@ -866,11 +866,19 @@ export default function ConsultationDetailPage() {
                 </div>
                 <div className="text-center space-y-1">
                   <p className="text-lg font-medium">Ready to begin</p>
-                  <p className="text-sm text-muted-foreground">Start a recording to capture encounter findings</p>
+                  <p className="text-sm text-muted-foreground">Choose how to capture this encounter</p>
                 </div>
-                <AppLink href={`/encounter/new?encounterId=${encounterId}`}>
-                  <Button className="gap-2"><Mic className="h-4 w-4" />Begin Encounter</Button>
-                </AppLink>
+                <div className="flex items-center gap-3">
+                  <AppLink href={`/encounter/new?encounterId=${encounterId}`}>
+                    <Button className="gap-2"><Mic className="h-4 w-4" />Ambient Consultation</Button>
+                  </AppLink>
+                  <AppLink href={`/encounter/new?encounterId=${encounterId}&mode=dictate`}>
+                    <Button variant="outline" className="gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Dictate Note
+                    </Button>
+                  </AppLink>
+                </div>
               </div>
             </div>
           )}

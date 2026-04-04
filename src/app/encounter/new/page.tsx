@@ -44,10 +44,11 @@ export default function NewEncounterPage() {
   const searchParams = useSearchParams();
   const queryConsultationId = searchParams.get('encounterId') as Id<"encounters"> | null;
   const isMobileQuickStart = searchParams.get('mobile') === 'true';
+  const queryMode = searchParams.get('mode') === 'dictate' ? 'dictate' : 'ambient';
   const isMobile = useIsMobile();
 
   const [encounterType, setEncounterType] = useState<'outpatient' | 'inpatient' | 'ed'>('outpatient');
-  const [recordingMode, setRecordingMode] = useState<'ambient' | 'dictate'>('ambient');
+  const [recordingMode, setRecordingMode] = useState<'ambient' | 'dictate'>(queryMode);
   const [sessionData, setSessionData] = useState<EncounterSession | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
