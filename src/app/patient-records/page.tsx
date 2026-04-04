@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PlusCircle, Users, ChevronRight, ArrowUpDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from 'convex/_generated/api';
 import { useAuth } from "@clerk/nextjs";
 import { useAppRouter } from '@/hooks/useAppRouter';
@@ -31,6 +31,18 @@ export default function PatientRecordsPage() {
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
   const createPatient = useMutation(api.patients.createPatient);
+  const catchUp = useAction(api.patientProfiles.catchUpPatientProfiles);
+
+  // Once per session (6h cooldown): catch up any patients missing or with stale profiles
+  useEffect(() => {
+    if (!orgContext?.orgId) return;
+    const key = `profile_catchup_${orgContext.orgId}`;
+    const last = localStorage.getItem(key);
+    if (last && Date.now() - Number(last) < 6 * 60 * 60 * 1000) return;
+    localStorage.setItem(key, Date.now().toString());
+    catchUp({ orgId: orgContext.orgId as Id<"organizations"> }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgContext?.orgId]);
 
   const orgPatients = useQuery(
     api.patients.getPatientsByOrg,

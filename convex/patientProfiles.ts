@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { action, internalMutation, mutation, query } from "./_generated/server";
+import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
@@ -363,5 +363,95 @@ export const getByPatient = query({
       .query("patientProfiles")
       .withIndex("by_patient", q => q.eq("patientId", args.patientId))
       .first();
+  },
+});
+
+/**
+ * Internal: Find all patients in the org whose profile is missing or stale.
+ * A profile is stale when the latest published encounter was after the profile was generated.
+ * Returns up to 20, prioritised by most recent encounter.
+ */
+export const getPatientsNeedingProfiles = internalQuery({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    const patients = await ctx.db
+      .query("patients")
+      .withIndex("by_org", q => q.eq("orgId", args.orgId))
+      .collect();
+
+    const needing: Array<{
+      patientId: Id<"patients">;
+      encounterId: Id<"encounters">;
+      publishedAt: string;
+    }> = [];
+
+    for (const patient of patients) {
+      const latestEncounter = await ctx.db
+        .query("encounters")
+        .withIndex("by_patient_status", q =>
+          q.eq("patientId", patient._id).eq("status", "published")
+        )
+        .order("desc")
+        .first();
+
+      if (!latestEncounter) continue;
+
+      const profile = await ctx.db
+        .query("patientProfiles")
+        .withIndex("by_patient", q => q.eq("patientId", patient._id))
+        .first();
+
+      const needsBuild =
+        !profile ||
+        profile.buildStatus === 'failed' ||
+        (profile.buildStatus === 'completed' &&
+          latestEncounter.publishedAt != null &&
+          profile.generatedAt < latestEncounter.publishedAt);
+
+      if (needsBuild) {
+        needing.push({
+          patientId: patient._id,
+          encounterId: latestEncounter._id,
+          publishedAt: latestEncounter.publishedAt ?? latestEncounter._creationTime.toString(),
+        });
+      }
+    }
+
+    // Sort by most recent encounter first, cap at 20
+    return needing
+      .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+      .slice(0, 20);
+  },
+});
+
+/**
+ * Public: Catch up profile builds for all patients in the org.
+ * Schedules builds staggered 3s apart so we don't hammer the Corti API.
+ * Designed to be called once per session from the UI with a client-side cooldown.
+ */
+export const catchUpPatientProfiles = action({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, args): Promise<{ triggered: number }> => {
+    const patients = await ctx.runQuery(
+      internal.patientProfiles.getPatientsNeedingProfiles,
+      { orgId: args.orgId }
+    );
+
+    if (patients.length === 0) return { triggered: 0 };
+
+    for (let i = 0; i < patients.length; i++) {
+      await ctx.scheduler.runAfter(
+        i * 3000, // stagger 3s apart
+        api.patientProfiles.buildPatientProfile,
+        {
+          patientId: patients[i].patientId,
+          orgId: args.orgId,
+          encounterId: patients[i].encounterId,
+        }
+      );
+    }
+
+    console.log(`[ProfileCatchUp] Scheduled ${patients.length} profile build(s) for org ${args.orgId}`);
+    return { triggered: patients.length };
   },
 });
