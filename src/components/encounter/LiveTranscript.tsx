@@ -57,7 +57,7 @@ export function LiveTranscript({ segments, isRecording, accumulatedTranscript }:
           animation: fadeIn 0.4s ease-out;
         }
       `}</style>
-      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 text-center">
         Transcript
       </h3>
       <div
@@ -67,7 +67,7 @@ export function LiveTranscript({ segments, isRecording, accumulatedTranscript }:
         {segments.length === 0 && !transcriptText ? (
           <p className="text-center text-muted-foreground text-[13px]">
             {isRecording
-              ? "Listening... Speak now."
+              ? "Listening… Speak now."
               : "Start recording to see the transcript."}
           </p>
         ) : (

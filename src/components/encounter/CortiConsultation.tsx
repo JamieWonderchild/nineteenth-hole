@@ -854,7 +854,7 @@ export function CortiConsultation({
                 isConnecting={false}
                 audioLevel={audioLevel}
               />
-              <div className="w-full">
+              <div className="w-full max-w-2xl">
                 <LiveTranscript segments={segments} isRecording={isRecording} accumulatedTranscript={displayTranscript} />
               </div>
             </div>
