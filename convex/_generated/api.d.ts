@@ -38,6 +38,7 @@ import type * as onboarding from "../onboarding.js";
 import type * as orderOrchestration from "../orderOrchestration.js";
 import type * as organizationSetup from "../organizationSetup.js";
 import type * as organizations from "../organizations.js";
+import type * as patientProfiles from "../patientProfiles.js";
 import type * as patients from "../patients.js";
 import type * as permissions from "../permissions.js";
 import type * as providers from "../providers.js";
@@ -89,6 +90,7 @@ declare const fullApi: ApiFromModules<{
   orderOrchestration: typeof orderOrchestration;
   organizationSetup: typeof organizationSetup;
   organizations: typeof organizations;
+  patientProfiles: typeof patientProfiles;
   patients: typeof patients;
   permissions: typeof permissions;
   providers: typeof providers;

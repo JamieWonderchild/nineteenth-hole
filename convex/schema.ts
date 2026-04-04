@@ -901,6 +901,49 @@ export default defineSchema({
     .index("by_org_status", ["orgId", "status"]),
 
   // ============================================================================
+  // Living Patient Profile (AI-maintained longitudinal clinical summary)
+  // ============================================================================
+  patientProfiles: defineTable({
+    patientId: v.id("patients"),
+    orgId: v.id("organizations"),
+    activeProblems: v.array(v.object({
+      condition: v.string(),
+      icd10Code: v.optional(v.string()),
+      status: v.string(),              // 'active' | 'chronic' | 'resolved'
+      onsetDate: v.optional(v.string()),
+      lastMentionedDate: v.string(),
+      notes: v.optional(v.string()),
+    })),
+    currentMedications: v.array(v.object({
+      drug: v.string(),
+      dose: v.optional(v.string()),
+      frequency: v.optional(v.string()),
+      route: v.optional(v.string()),
+      startDate: v.optional(v.string()),
+    })),
+    allergies: v.array(v.object({
+      allergen: v.string(),
+      reaction: v.optional(v.string()),
+      severity: v.optional(v.string()),
+    })),
+    riskFactors: v.array(v.string()),
+    clinicalNarrative: v.string(),     // AI-written 2-3 paragraph briefing
+    careGaps: v.array(v.object({
+      description: v.string(),
+      priority: v.string(),            // 'high' | 'medium' | 'low'
+      lastScreeningDate: v.optional(v.string()),
+    })),
+    keyHistory: v.string(),
+    generatedAt: v.string(),
+    triggerEncounterId: v.id("encounters"),
+    encounterCount: v.number(),
+    lastEncounterDate: v.string(),
+    buildStatus: v.optional(v.string()), // 'processing' | 'completed' | 'failed'
+  })
+    .index("by_patient", ["patientId"])
+    .index("by_org", ["orgId"]),
+
+  // ============================================================================
   // Lab Results & Results Triage
   // ============================================================================
   labResults: defineTable({

@@ -1203,6 +1203,22 @@ export const publishConsultation = mutation({
       updatedAt: timestamp,
     });
 
+    // Immediately mark profile as processing so UI shows loading state
+    if (encounter.patientId && encounter.orgId) {
+      await ctx.runMutation(api.patientProfiles.markProcessing, {
+        patientId: encounter.patientId,
+        orgId: encounter.orgId,
+        encounterId: args.encounterId,
+      });
+
+      // Schedule async profile rebuild
+      await ctx.scheduler.runAfter(0, api.patientProfiles.buildPatientProfile, {
+        patientId: encounter.patientId,
+        orgId: encounter.orgId,
+        encounterId: args.encounterId,
+      });
+    }
+
     return args.encounterId;
   },
 });

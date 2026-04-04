@@ -13,6 +13,7 @@ import { AppLink } from '@/components/navigation/AppLink';
 import { PatientHeader } from './components/PatientHeader';
 import { ConsultationTimeline } from './components/ConsultationTimeline';
 import { PatientHistorySearch } from './components/PatientHistorySearch';
+import { PatientProfileCard } from '@/components/patient/PatientProfileCard';
 import { CreateDraftDialog } from '@/components/encounter/CreateDraftDialog';
 
 export default function PatientDetailPage() {
@@ -94,6 +95,8 @@ export default function PatientDetailPage() {
               )}
 
               <PatientHistorySearch patientId={patientId} />
+
+              <PatientProfileCard patientId={patientId} />
 
               <ConsultationTimeline
                 encounters={encounters ?? []}

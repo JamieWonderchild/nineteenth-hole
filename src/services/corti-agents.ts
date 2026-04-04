@@ -757,6 +757,91 @@ Respond ONLY with this exact JSON structure:
 - Include reasoning for each match to help providers understand extraction logic
 - If no matches found, return empty extractedItems array`,
 
+  PATIENT_PROFILE: `You are an expert clinician building a living longitudinal patient profile from a series of clinical encounters. Your task is to synthesize all encounters into a single, always-current clinical intelligence document.
+
+## Your Outputs
+
+### activeProblems
+List every diagnosis, condition, or clinical problem mentioned across all encounters.
+- **active**: recently active, not documented as resolved
+- **chronic**: ongoing long-term condition (diabetes, hypertension, asthma, etc.)
+- **resolved**: explicitly documented as resolved, or a one-time acute issue from a past visit that has not recurred
+For each: extract the condition name, ICD-10 code if mentioned, when it was first noted, and when it was last mentioned.
+
+### currentMedications
+Build the most current medication list based on all encounters. If a drug was started and never stopped, it is current. If a drug was discontinued, omit it. Include dose, frequency, and route when documented.
+
+### allergies
+Aggregate all allergies documented across encounters. Include reaction type and severity when available.
+
+### riskFactors
+Identify clinical risk factors from all encounters: smoking, obesity, family history of specific conditions, sedentary lifestyle, alcohol use, diabetes, hypertension, etc.
+
+### clinicalNarrative
+Write a 2-3 paragraph summary that a new provider could read in 30 seconds to understand this patient. Include:
+- Paragraph 1: Who the patient is, major chronic conditions, key history
+- Paragraph 2: Recent clinical activity (last 1-2 encounters), what changed, what was treated
+- Paragraph 3 (if needed): Outstanding issues, care gaps, what to watch for
+
+### careGaps
+Identify preventive care or monitoring that appears overdue based on patient demographics and diagnoses. Examples:
+- Colonoscopy overdue (age >45, no prior documented)
+- HbA1c not rechecked in >3 months (diabetic patient)
+- Annual diabetic eye exam not documented
+- Hypertension follow-up overdue
+- Cervical cancer screening overdue (female patient, age-appropriate)
+Assign priority: high = clinically urgent, medium = standard preventive, low = advisory
+
+### keyHistory
+One paragraph summarizing major past events: significant procedures, hospitalizations, surgeries, major diagnoses first encountered.
+
+## Output Format
+Respond ONLY with this exact JSON structure:
+{
+  "activeProblems": [
+    {
+      "condition": "string",
+      "icd10Code": "string or null",
+      "status": "active" | "chronic" | "resolved",
+      "onsetDate": "YYYY-MM-DD or null",
+      "lastMentionedDate": "YYYY-MM-DD",
+      "notes": "string or null"
+    }
+  ],
+  "currentMedications": [
+    {
+      "drug": "string",
+      "dose": "string or null",
+      "frequency": "string or null",
+      "route": "string or null",
+      "startDate": "YYYY-MM-DD or null"
+    }
+  ],
+  "allergies": [
+    {
+      "allergen": "string",
+      "reaction": "string or null",
+      "severity": "string or null"
+    }
+  ],
+  "riskFactors": ["string"],
+  "clinicalNarrative": "string",
+  "careGaps": [
+    {
+      "description": "string",
+      "priority": "high" | "medium" | "low",
+      "lastScreeningDate": "YYYY-MM-DD or null"
+    }
+  ],
+  "keyHistory": "string"
+}
+
+## Important
+- Base everything only on what is documented — do not invent or assume
+- If information is absent, omit the optional fields (use null)
+- Reconcile conflicts across encounters: newer information takes precedence
+- Be concise in the narrative — busy clinicians need density, not verbosity`,
+
   ORDER_EXTRACTOR: `You are a clinical order extraction specialist. Your task is to read the Plan section of a SOAP note and extract every implied clinical action as a structured order.
 
 ## Order Types
@@ -994,6 +1079,11 @@ export class ClinicalDiagnosisOrchestrator {
         name: 'provider-shift-handoff',
         description: 'Clinical handoff specialist for generating SBAR shift handoff notes',
         systemPrompt: AGENT_PROMPTS.SHIFT_HANDOFF,
+      },
+      {
+        name: 'provider-patient-profile',
+        description: 'Clinical longitudinal patient profile specialist for synthesizing encounter history into a living clinical summary',
+        systemPrompt: AGENT_PROMPTS.PATIENT_PROFILE,
       },
       {
         name: 'provider-order-extractor',
@@ -2147,6 +2237,93 @@ Classify urgency, draft a patient notification, and suggest a follow-up action. 
       return null;
     }
   }
+
+  /**
+   * Build a living patient profile by synthesizing all encounters for a patient
+   */
+  async buildPatientProfileFromEncounters(
+    patientInfo: { name?: string; age?: string; sex?: string; weight?: string; allergies?: string[] },
+    encounters: Array<{
+      date: string;
+      chiefComplaint?: string;
+      icd10Codes?: string[];
+      keyFacts: Record<string, string[]>;
+      planText?: string;
+    }>
+  ): Promise<PatientProfileResult | null> {
+    const agentId = this.agents.get('provider-patient-profile');
+    if (!agentId) {
+      console.error('[PatientProfile] Agent not found');
+      return null;
+    }
+
+    const encounterSummaries = encounters
+      .slice(0, 20) // Cap at 20 most recent
+      .map((e, i) => {
+        const factLines = Object.entries(e.keyFacts)
+          .filter(([, facts]) => facts.length > 0)
+          .map(([group, facts]) => `  [${group}]: ${facts.slice(0, 5).join('; ')}`)
+          .join('\n');
+        return `Encounter ${i + 1} (${e.date}):\n  Chief complaint: ${e.chiefComplaint ?? 'not recorded'}\n  ICD-10: ${(e.icd10Codes ?? []).join(', ') || 'none'}\n${factLines}\n  Plan: ${(e.planText ?? '').substring(0, 400)}`;
+      })
+      .join('\n\n---\n\n');
+
+    const prompt = `Build a living patient profile from the following encounter history.
+
+PATIENT:
+- Name: ${patientInfo.name ?? 'Unknown'}
+- Age: ${patientInfo.age ?? 'Unknown'}
+- Sex: ${patientInfo.sex ?? 'Unknown'}
+- Weight: ${patientInfo.weight ?? 'Unknown'}
+- Known allergies: ${(patientInfo.allergies ?? []).join(', ') || 'none documented'}
+
+ENCOUNTER HISTORY (${encounters.length} total, showing up to 20 most recent, newest first):
+
+${encounterSummaries}
+
+Synthesize all encounters into a comprehensive living patient profile. Return JSON only.`;
+
+    try {
+      let task = await this.client.sendTextMessage(agentId, prompt);
+
+      const maxAttempts = 175; // 35s — profile synthesis takes longer
+      const pollInterval = 200;
+      let attempts = 0;
+
+      while (attempts < maxAttempts) {
+        const state = task.status?.state;
+        if (state === 'completed') break;
+        if (state === 'failed') {
+          console.error('[PatientProfile] Task failed:', task.status?.message);
+          return null;
+        }
+        if (state === 'pending' || state === 'running') {
+          attempts++;
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          task = await this.client.getTask(agentId, task.id);
+        } else {
+          break;
+        }
+      }
+
+      if (attempts >= maxAttempts) {
+        console.error('[PatientProfile] Task polling timeout');
+        return null;
+      }
+
+      const result = this.client.parseJsonFromTask<PatientProfileResult>(task);
+
+      if (!result) {
+        console.error('[PatientProfile] Failed to parse JSON. Raw:', this.client.extractTextFromTask(task)?.substring(0, 300));
+        return null;
+      }
+
+      return result;
+    } catch (error) {
+      console.error('[PatientProfile] Agent error:', error instanceof Error ? error.message : error);
+      return null;
+    }
+  }
 }
 
 export interface BillingExtractionResult {
@@ -2217,6 +2394,37 @@ export interface ExtractedPatientRecord {
     overall: 'high' | 'medium' | 'low';
     patientIdentification: 'high' | 'medium' | 'low' | 'not_found';
   };
+}
+
+export interface PatientProfileResult {
+  activeProblems: Array<{
+    condition: string;
+    icd10Code?: string | null;
+    status: 'active' | 'chronic' | 'resolved';
+    onsetDate?: string | null;
+    lastMentionedDate: string;
+    notes?: string | null;
+  }>;
+  currentMedications: Array<{
+    drug: string;
+    dose?: string | null;
+    frequency?: string | null;
+    route?: string | null;
+    startDate?: string | null;
+  }>;
+  allergies: Array<{
+    allergen: string;
+    reaction?: string | null;
+    severity?: string | null;
+  }>;
+  riskFactors: string[];
+  clinicalNarrative: string;
+  careGaps: Array<{
+    description: string;
+    priority: 'high' | 'medium' | 'low';
+    lastScreeningDate?: string | null;
+  }>;
+  keyHistory: string;
 }
 
 export interface OrderExtractionResult {
