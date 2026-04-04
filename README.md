@@ -1,8 +1,6 @@
 # [PRODUCT_NAME] Assistant
 
-AI-powered veterinary encounter assistant. Streamlines the encounter workflow with voice recording, AI-extracted clinical facts, and automated document generation.
-
-**Live:** [vetrinair.com](https://vetrinair.com)
+AI-powered clinical encounter assistant. Streamlines the encounter workflow with voice recording, AI-extracted clinical facts, and automated document generation.
 
 ---
 
@@ -10,7 +8,7 @@ AI-powered veterinary encounter assistant. Streamlines the encounter workflow wi
 
 - **Record encounters** — stream audio to Corti AI, get structured clinical facts in real-time
 - **Generate documents** — SOAP notes, discharge instructions, prescriptions, referrals, and more
-- **Owner Companion** — shareable AI chat for pet owners after each visit
+- **Patient Companion** — shareable AI chat for patients and caregivers after each visit
 - **Case Reasoning** — AI-assisted differential diagnosis and drug interaction checking
 - **Billing** — auto-extract billable items from recordings, catch missed charges, generate invoices
 

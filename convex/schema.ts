@@ -571,6 +571,7 @@ export default defineSchema({
     }))),
     // Post-visit order orchestration
     orderExtractionStatus: v.optional(v.string()), // 'processing' | 'completed' | 'failed'
+    labExtractionStatus: v.optional(v.string()), // 'processing' | 'completed' | 'failed'
     suggestedOrders: v.optional(v.object({
       orders: v.array(v.object({
         id: v.string(),

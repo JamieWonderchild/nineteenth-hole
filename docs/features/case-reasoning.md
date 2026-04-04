@@ -2,7 +2,7 @@
 
 ## Overview
 
-An AI-powered vet chat that lets vets reason through cases conversationally. Can be used standalone or linked to a encounter for context-aware reasoning.
+An AI-powered clinical chat that lets providers reason through cases conversationally. Can be used standalone or linked to a encounter for context-aware reasoning.
 
 Powered by Corti ephemeral agents with `contextId` for conversation memory.
 
@@ -13,9 +13,9 @@ Powered by Corti ephemeral agents with `contextId` for conversation memory.
 The case reasoning chat provides:
 - **Differential diagnoses** — with probability, reasoning, supporting/contradicting evidence
 - **Diagnostic tests** — prioritized recommendations with rationale
-- **Drug interactions** — per-species safety checks, dosing, side effects
+- **Drug interactions** — safety checks, dosing, side effects
 - **Literature references** — PubMed citations (via `pubmed-expert` or `drugbank-expert`)
-- **Multi-turn conversation** — vets can dig deeper, ask follow-up questions
+- **Multi-turn conversation** — providers can dig deeper, ask follow-up questions
 
 ---
 
@@ -49,7 +49,7 @@ Structured results stored on the encounter:
 ## Architecture
 
 ```
-VetChat UI
+Case Reasoning UI
   ↓
 POST /api/case-reasoning/chat
   → Clerk auth

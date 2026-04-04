@@ -62,25 +62,25 @@ const URGENCY_CONFIG: Record<string, {
   critical: {
     label: 'Critical',
     icon: AlertTriangle,
-    badgeClass: 'bg-red-100 text-red-700 border-red-300',
+    badgeClass: 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-300 dark:border-red-700',
     borderClass: 'border-l-red-500',
   },
   high: {
     label: 'Abnormal',
     icon: AlertCircle,
-    badgeClass: 'bg-amber-100 text-amber-700 border-amber-300',
+    badgeClass: 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700',
     borderClass: 'border-l-amber-400',
   },
   normal: {
     label: 'Normal',
     icon: CheckCircle2,
-    badgeClass: 'bg-green-100 text-green-700 border-green-300',
+    badgeClass: 'bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-400 border-green-300 dark:border-green-800',
     borderClass: 'border-l-green-400',
   },
   low: {
     label: 'Monitor',
     icon: Info,
-    badgeClass: 'bg-gray-100 text-gray-600 border-gray-300',
+    badgeClass: 'bg-gray-100 dark:bg-muted/40 text-gray-600 dark:text-muted-foreground border-gray-300 dark:border-border',
     borderClass: 'border-l-gray-300',
   },
 };
@@ -89,7 +89,7 @@ function getUrgencyConfig(urgency?: string) {
   return URGENCY_CONFIG[urgency ?? ''] ?? {
     label: 'Pending',
     icon: Loader2,
-    badgeClass: 'bg-gray-100 text-gray-500 border-gray-200',
+    badgeClass: 'bg-gray-100 dark:bg-muted/40 text-gray-500 dark:text-muted-foreground border-gray-200 dark:border-border',
     borderClass: 'border-l-gray-200',
   };
 }
@@ -145,7 +145,7 @@ function AddResultForm({
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
-          <label className="text-xs text-gray-500 mb-1 block">Test name *</label>
+          <label className="text-xs text-gray-500 dark:text-muted-foreground mb-1 block">Test name *</label>
           <Input
             value={testName}
             onChange={e => setTestName(e.target.value)}
@@ -155,7 +155,7 @@ function AddResultForm({
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500 mb-1 block">Result *</label>
+          <label className="text-xs text-gray-500 dark:text-muted-foreground mb-1 block">Result *</label>
           <Input
             value={resultValue}
             onChange={e => setResultValue(e.target.value)}
@@ -164,7 +164,7 @@ function AddResultForm({
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500 mb-1 block">Units</label>
+          <label className="text-xs text-gray-500 dark:text-muted-foreground mb-1 block">Units</label>
           <Input
             value={units}
             onChange={e => setUnits(e.target.value)}
@@ -172,7 +172,7 @@ function AddResultForm({
           />
         </div>
         <div className="col-span-2">
-          <label className="text-xs text-gray-500 mb-1 block">Reference range</label>
+          <label className="text-xs text-gray-500 dark:text-muted-foreground mb-1 block">Reference range</label>
           <Input
             value={referenceRange}
             onChange={e => setReferenceRange(e.target.value)}
@@ -245,18 +245,18 @@ function NotificationModal({
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-xs text-gray-500 mb-1.5 block font-medium">Notification draft</label>
+        <label className="text-xs text-gray-500 dark:text-muted-foreground mb-1.5 block font-medium">Notification draft</label>
         <textarea
           value={draft}
           onChange={e => setDraft(e.target.value)}
-          className="w-full rounded-md border border-gray-200 p-2.5 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-indigo-400"
+          className="w-full rounded-md border border-gray-200 dark:border-border bg-transparent dark:text-foreground p-2.5 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-indigo-400"
           rows={4}
         />
       </div>
       {result.suggestedFollowUp && (
-        <div className="rounded-md bg-indigo-50 border border-indigo-100 p-3">
-          <p className="text-xs font-medium text-indigo-700 mb-1">Suggested follow-up</p>
-          <p className="text-sm text-indigo-800">{result.suggestedFollowUp}</p>
+        <div className="rounded-md bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800 p-3">
+          <p className="text-xs font-medium text-indigo-700 dark:text-indigo-400 mb-1">Suggested follow-up</p>
+          <p className="text-sm text-indigo-800 dark:text-indigo-300">{result.suggestedFollowUp}</p>
         </div>
       )}
       <div className="flex gap-2 justify-between">
@@ -321,13 +321,13 @@ function ResultCard({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold text-gray-800">{result.testName}</span>
-              <span className="text-sm text-gray-700">{result.resultValue}{result.units ? ` ${result.units}` : ''}</span>
+              <span className="text-sm font-semibold text-gray-800 dark:text-foreground">{result.testName}</span>
+              <span className="text-sm text-gray-700 dark:text-foreground">{result.resultValue}{result.units ? ` ${result.units}` : ''}</span>
               {result.referenceRange && (
-                <span className="text-xs text-gray-400">ref: {result.referenceRange}</span>
+                <span className="text-xs text-gray-400 dark:text-muted-foreground">ref: {result.referenceRange}</span>
               )}
               {isPending ? (
-                <Badge variant="outline" className="text-xs gap-1 text-gray-400">
+                <Badge variant="outline" className="text-xs gap-1 text-gray-400 dark:text-muted-foreground">
                   <Loader2 className="h-2.5 w-2.5 animate-spin" />
                   Analyzing…
                 </Badge>
@@ -338,7 +338,7 @@ function ResultCard({
                 </Badge>
               )}
               {result.notificationSent && (
-                <Badge variant="outline" className="text-xs text-green-600 border-green-200 bg-green-50">
+                <Badge variant="outline" className="text-xs text-green-600 dark:text-green-400 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40">
                   <Check className="h-2.5 w-2.5 mr-0.5" />
                   Notified
                 </Badge>
@@ -346,14 +346,14 @@ function ResultCard({
             </div>
 
             {result.urgencyReason && (
-              <p className="text-xs text-gray-500 mt-1">{result.urgencyReason}</p>
+              <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">{result.urgencyReason}</p>
             )}
 
             {isTriaged && !result.notificationSent && result.patientNotificationDraft && isEditable && (
               <div className="mt-2 flex items-center gap-2">
                 <button
                   onClick={() => setShowNotifyModal(true)}
-                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
+                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium flex items-center gap-1"
                 >
                   <Send className="h-3 w-3" />
                   Review & send notification
@@ -361,7 +361,7 @@ function ResultCard({
                 {isTriaged && isEditable && (
                   <button
                     onClick={handleMarkReviewed}
-                    className="text-xs text-gray-400 hover:text-gray-600"
+                    className="text-xs text-gray-400 dark:text-muted-foreground hover:text-gray-600"
                   >
                     Mark reviewed
                   </button>
@@ -370,13 +370,13 @@ function ResultCard({
             )}
 
             {isTriaged && result.suggestedFollowUp && !result.followUpAccepted && isEditable && (
-              <div className="mt-1.5 flex items-start gap-2 rounded bg-indigo-50 border border-indigo-100 px-2 py-1.5">
-                <p className="text-xs text-indigo-800 flex-1">
+              <div className="mt-1.5 flex items-start gap-2 rounded bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800 px-2 py-1.5">
+                <p className="text-xs text-indigo-800 dark:text-indigo-300 flex-1">
                   <span className="font-medium">Suggested: </span>{result.suggestedFollowUp}
                 </p>
                 <button
                   onClick={handleAcceptFollowUp}
-                  className="shrink-0 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                  className="shrink-0 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium"
                 >
                   <Check className="h-3.5 w-3.5" />
                 </button>
@@ -384,7 +384,7 @@ function ResultCard({
             )}
 
             {result.followUpAccepted && result.suggestedFollowUp && (
-              <p className="text-xs text-green-600 mt-1">
+              <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                 <Check className="inline h-3 w-3 mr-0.5" />
                 Follow-up noted: {result.suggestedFollowUp}
               </p>
@@ -427,7 +427,7 @@ export function ResultsTriagePanel({
   const unreviewedCount = results.filter(r => r.triageStatus === 'triaged').length;
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+    <div className="rounded-lg border border-gray-200 dark:border-border bg-white dark:bg-card overflow-hidden">
       {/* Header */}
       <div
         className="flex items-center justify-between px-4 py-3 cursor-pointer select-none"
@@ -435,16 +435,16 @@ export function ResultsTriagePanel({
       >
         <div className="flex items-center gap-2">
           <FlaskConical className="h-4 w-4 text-blue-500" />
-          <span className="text-sm font-semibold text-gray-800">Lab Results</span>
+          <span className="text-sm font-semibold text-gray-800 dark:text-foreground">Lab Results</span>
           {results.length > 0 && (
             <div className="flex items-center gap-1">
               {criticalCount > 0 && (
-                <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-300">
+                <Badge variant="outline" className="text-xs bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-300 dark:border-red-700">
                   {criticalCount} critical
                 </Badge>
               )}
               {unreviewedCount > 0 && (
-                <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">
+                <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700">
                   {unreviewedCount} to review
                 </Badge>
               )}
@@ -460,26 +460,26 @@ export function ResultsTriagePanel({
           {isEditable && (
             <button
               onClick={e => { e.stopPropagation(); setShowAddForm(f => !f); setIsCollapsed(false); }}
-              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
+              className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium flex items-center gap-1"
             >
               <Plus className="h-3.5 w-3.5" />
               Add result
             </button>
           )}
           {isCollapsed ? (
-            <ChevronDown className="h-4 w-4 text-gray-400" />
+            <ChevronDown className="h-4 w-4 text-gray-400 dark:text-muted-foreground" />
           ) : (
-            <ChevronUp className="h-4 w-4 text-gray-400" />
+            <ChevronUp className="h-4 w-4 text-gray-400 dark:text-muted-foreground" />
           )}
         </div>
       </div>
 
       {/* Body */}
       {!isCollapsed && (
-        <div className="border-t border-gray-100">
+        <div className="border-t border-gray-100 dark:border-border">
           {/* Add result form */}
           {showAddForm && (
-            <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-border bg-gray-50 dark:bg-muted/40">
               <AddResultForm
                 encounterId={encounterId}
                 patientId={patientId}
@@ -492,8 +492,16 @@ export function ResultsTriagePanel({
 
           {/* Results list */}
           {results.length === 0 && !showAddForm && (
-            <div className="px-4 py-6 text-center text-xs text-gray-400">
-              No results yet.{isEditable && ' Click "Add result" to enter a lab or imaging result.'}
+            <div className="px-4 py-6 text-center text-xs text-gray-400 dark:text-muted-foreground">
+              Results are extracted automatically from the consultation.
+              {isEditable && (
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  className="ml-1 text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  Add manually
+                </button>
+              )}
             </div>
           )}
 

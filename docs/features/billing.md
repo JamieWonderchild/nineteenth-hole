@@ -2,16 +2,16 @@
 
 ## Overview
 
-Two-phase billing that automatically extracts billable items from encounter recordings and helps vets catch missed charges.
+Two-phase billing that automatically extracts billable items from encounter recordings and helps providers catch missed charges.
 
-**Core value prop:** Vet records encounter → system extracts what was planned and what was done → flags anything that was done but not billed → vet reviews and generates invoice.
+**Core value prop:** Provider records encounter → system extracts what was planned and what was done → flags anything that was done but not billed → provider reviews and generates invoice.
 
 ---
 
 ## Two-Phase Model
 
 ### Phase 1: Prospective (During Encounter)
-Items the vet plans to do:
+Items the provider plans to do:
 - Extracted from recording keywords: *"I'm going to...", "We need to...", "Let's run..."*
 - Stored as `billingItems` with `phase: 'prospective'`
 - Shown in UI as "Planned Services"

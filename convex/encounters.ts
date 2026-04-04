@@ -596,8 +596,14 @@ export const saveGeneratedDocuments = mutation({
       const existingPlanContent = encounter.suggestedOrders?.planSectionContent ?? '';
 
       if (newPlanContent.trim() !== existingPlanContent.trim() && newPlanContent.trim().length > 0) {
-        await ctx.db.patch(args.encounterId, { orderExtractionStatus: 'processing' });
+        await ctx.db.patch(args.encounterId, {
+          orderExtractionStatus: 'processing',
+          labExtractionStatus: 'processing',
+        });
         await ctx.scheduler.runAfter(0, api.orderOrchestration.extractOrdersFromDocument, {
+          encounterId: args.encounterId,
+        });
+        await ctx.scheduler.runAfter(0, api.resultsTriage.extractLabResultsFromConsultation, {
           encounterId: args.encounterId,
         });
       }

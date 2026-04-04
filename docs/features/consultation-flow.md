@@ -10,7 +10,7 @@ draft → in-progress → review → published
 |--------|---------|
 | `draft` | Pre-encounter — patient selected, not yet started |
 | `in-progress` | Recording active or paused |
-| `review` | Recording complete, vet reviewing facts |
+| `review` | Recording complete, provider reviewing facts |
 | `published` | Encounter finalized, companion session created |
 
 ---
@@ -30,7 +30,7 @@ draft → in-progress → review → published
 
 ### 3. Review Facts
 - Vet reviews extracted facts before saving
-- Can add vet notes: diagnosis + treatment plan (`vetNotes` field)
+- Can add provider notes: diagnosis + treatment plan (`providerNotes` field)
 - Facts shown grouped by recording if multiple exist
 
 ### 4. Save & Redirect
@@ -56,7 +56,7 @@ A encounter can have multiple recordings (follow-up, pre-encounter, etc.).
 When 2+ recordings exist:
 - Fact reconciliation auto-triggers on the detail page
 - Facts grouped by recording with colored dot indicators
-- Contradictions surfaced for vet resolution
+- Contradictions surfaced for provider resolution
 - `aggregatedFacts` respects resolutions (keep-old swaps text)
 
 See [fact-reconciliation.md](fact-reconciliation.md) for details.
@@ -76,7 +76,7 @@ Uploaded via EvidenceUpload component → stored in Convex `_storage` → `evide
 
 ## Prior Context
 
-`PriorConsultationSelector` + `PatientHistorySearch` let the vet reference previous encounters.
+`PriorConsultationSelector` + `PatientHistorySearch` let the provider reference previous encounters.
 
 Selected prior context is passed into the document generation workflow as additional facts, giving Corti historical context for better document quality.
 
@@ -95,4 +95,4 @@ See [owner-companion.md](owner-companion.md) for the companion session lifecycle
 
 ## Addenda
 
-Post-publish, vets can add addenda (`encounters.addenda` array). Each addendum records the vet ID and timestamp. Used for corrections without modifying the original encounter.
+Post-publish, providers can add addenda (`encounters.addenda` array). Each addendum records the provider ID and timestamp. Used for corrections without modifying the original encounter.

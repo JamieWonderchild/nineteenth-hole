@@ -7,7 +7,7 @@ All tables live in Convex. Source of truth: `convex/schema.ts`.
 ## Organizations & Access
 
 ### `organizations`
-Core org record. Created when a Clerk org is created (via webhook) or when a solo vet signs up.
+Core org record. Created when a Clerk org is created (via webhook) or when a solo provider signs up.
 
 | Field | Type | Notes |
 |-------|------|-------|
@@ -19,7 +19,7 @@ Core org record. Created when a Clerk org is created (via webhook) or when a sol
 | stripeCustomerId | string? | Stripe customer ID |
 | stripeSubscriptionId | string? | Active subscription ID |
 | trialEndsAt | string? | ISO date |
-| maxVetSeats | number | Seat limit for plan |
+| maxProviderSeats | number | Seat limit for plan |
 | clinicName, clinicPhone, clinicEmail, clinicAddress, emergencyPhone | string? | Clinic contact info |
 | billingCurrency | string? | `"USD"`, `"EUR"`, `"GBP"`, etc. |
 | taxSettings | object? | See tax config below |
@@ -48,7 +48,7 @@ Links Clerk users to orgs with roles.
 |-------|------|-------|
 | orgId | Id<"organizations"> | |
 | userId | string | Clerk user ID |
-| role | string | `'owner'` \| `'admin'` \| `'practice-admin'` \| `'vet'` |
+| role | string | `'owner'` \| `'admin'` \| `'practice-admin'` \| `'provider'` |
 | status | string | `'active'` \| `'pending'` \| `'deactivated'` |
 | locationIds | Id<"locations">[]? | Empty = org-wide access; populated = location-scoped |
 | archivedAt / archivedReason | string? | Set on plan downgrade |
@@ -125,7 +125,7 @@ Per-user, per-org UI preferences (dismissed banners, tours, wizard state).
 ## Clinical Data
 
 ### `vets`
-Vet profile. One per Clerk user (legacy — most queries now go through memberships).
+Provider profile. One per Clerk user (legacy — most queries now go through memberships).
 
 | Field | Type |
 |-------|------|
@@ -140,27 +140,32 @@ Vet profile. One per Clerk user (legacy — most queries now go through membersh
 ---
 
 ### `patients`
-Patient (animal) records.
+Patient records.
 
 | Field | Type | Notes |
 |-------|------|-------|
-| name, species | string | |
-| breed, dateOfBirth, age, weight, weightUnit, sex | string? | |
-| ownerName, ownerEmail, ownerPhone | string? | |
+| name | string | |
+| mrn | string? | Medical Record Number |
+| dateOfBirth, age, sex | string? | |
+| weight, weightUnit | string? | |
+| allergies | string[]? | |
+| insurance | object? | `{ provider, memberId?, groupId? }` |
+| emergencyContact | object? | `{ name, phone?, email?, relationship? }` |
+| primaryCareProvider | string? | |
 | providerId | string | Attribution |
 | orgId | Id<"organizations">? | |
 | locationId | Id<"locations">? | |
 | isActive | boolean | |
 | medicalHistory | array | `{ date, type, notes, diagnosis?, treatment?, medications? }` |
 | labResults | array? | `{ date, testName, results, notes? }` |
-| vaccinations | array? | `{ name, date, nextDueDate }` |
+| immunizations | array? | `{ name, date, nextDueDate }` |
 
 **Indexes:** `by_org`, `by_org_location`
 
 ---
 
 ### `encounters`
-The central record. Links patient, vet, recording facts, generated documents, billing.
+The central record. Links patient, provider, recording facts, generated documents, billing.
 
 | Field | Type | Notes |
 |-------|------|-------|
@@ -174,7 +179,7 @@ The central record. Links patient, vet, recording facts, generated documents, bi
 | facts | array? | `{ id, text, group }` — aggregated from recordings |
 | transcription | string? | Raw transcript |
 | physicalExam | object? | `{ temperature, weight, heartRate, respiratoryRate, notes }` |
-| diagnosis, treatment, followUp | string? | Vet-entered fields |
+| diagnosis, treatment, followUp | string? | Provider-entered fields |
 | vetNotes | object? | `{ diagnosis, treatmentPlan }` |
 | generatedDocuments | object? | 8 doc types (see Document Generation) |
 | invoiceMetadata | object? | Snapshot at invoice time |
@@ -220,7 +225,7 @@ Uploaded files (lab PDFs, imaging, referral letters) attached to a encounter.
 | fileName, mimeType | string | |
 | fileSize | number | bytes |
 | category | string | `'lab-result'` \| `'imaging'` \| `'referral'` \| `'other'` |
-| notes | string? | Manual vet notes |
+| notes | string? | Manual provider notes |
 | extractedFindings | array? | `{ id, text, group, confidence? }` |
 | extractionStatus | string | `'pending'` \| `'processing'` \| `'completed'` \| `'failed'` |
 
@@ -248,7 +253,7 @@ Scheduled follow-up appointments.
 ## AI Features
 
 ### `companionSessions`
-Owner Companion AI sessions. One per published encounter. Accessed via `accessToken` (no auth).
+Patient Companion AI sessions. One per published encounter. Accessed via `accessToken` (no auth).
 
 | Field | Type | Notes |
 |-------|------|-------|
@@ -267,7 +272,7 @@ Owner Companion AI sessions. One per published encounter. Accessed via `accessTo
 ---
 
 ### `caseReasoningSessions`
-Persisted vet AI chat sessions. Can be standalone or linked to a encounter.
+Persisted provider AI chat sessions. Can be standalone or linked to a encounter.
 
 | Field | Type |
 |-------|------|

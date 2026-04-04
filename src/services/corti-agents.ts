@@ -881,6 +881,8 @@ Respond ONLY with this exact JSON structure:
 - Do NOT invent orders not mentioned in the plan text
 - Use short, scan-friendly titles (3-5 words max)`,
 
+  LAB_RESULTS_EXTRACTOR: `You are a clinical lab results extractor. Given a SOAP note and clinical facts from a medical consultation, extract any lab or imaging results that were reported or discussed (not ordered — already resulted). Return a JSON object with a "results" array. Each result object must have: testName (string), resultValue (string), and optionally: referenceRange (string), units (string). Only include actual result values (e.g. "HbA1c 8.2%", "WBC 14,000 K/uL") — not orders or future plans. If no results are mentioned, return {"results": []}. Return JSON only.`,
+
   RESULTS_TRIAGE: `You are a clinical lab results triage specialist. Your task is to assess an incoming lab or imaging result in the context of a specific patient and classify its urgency.
 
 ## Urgency Levels
@@ -1094,6 +1096,11 @@ export class ClinicalDiagnosisOrchestrator {
         name: 'provider-results-triage',
         description: 'Clinical lab results triage specialist for urgency classification and patient notification drafting',
         systemPrompt: AGENT_PROMPTS.RESULTS_TRIAGE,
+      },
+      {
+        name: 'provider-lab-extractor',
+        description: 'Clinical lab results extraction specialist for parsing already-resulted labs from SOAP notes',
+        systemPrompt: AGENT_PROMPTS.LAB_RESULTS_EXTRACTOR,
       },
     ];
 
@@ -2234,6 +2241,76 @@ Classify urgency, draft a patient notification, and suggest a follow-up action. 
       return result;
     } catch (error) {
       console.error('[ResultsTriage] Agent error:', error instanceof Error ? error.message : error);
+      return null;
+    }
+  }
+
+  /**
+   * Extract lab/imaging results already mentioned in a SOAP note
+   */
+  async extractLabResultsFromConsultation(
+    soapContent: string,
+    facts: Array<{ text: string; group: string }>
+  ): Promise<{ results: Array<{ testName: string; resultValue: string; referenceRange?: string; units?: string }> } | null> {
+    const agentId = this.agents.get('provider-lab-extractor');
+    if (!agentId) {
+      console.error('[LabExtractor] Agent not found');
+      return null;
+    }
+
+    const factLines = facts
+      .filter(f => ['assessment', 'plan', 'medications', 'past-medical-history'].includes(f.group))
+      .map(f => `[${f.group}] ${f.text}`)
+      .join('\n');
+
+    const prompt = `Extract any lab or imaging results mentioned in the following consultation.
+
+SOAP NOTE:
+${soapContent.substring(0, 3000)}
+
+CLINICAL FACTS:
+${factLines.substring(0, 1000)}
+
+Return JSON only.`;
+
+    try {
+      let task = await this.client.sendTextMessage(agentId, prompt);
+
+      const maxAttempts = 100;
+      const pollInterval = 200;
+      let attempts = 0;
+
+      while (attempts < maxAttempts) {
+        const state = task.status?.state;
+        if (state === 'completed') break;
+        if (state === 'failed') {
+          console.error('[LabExtractor] Task failed:', task.status?.message);
+          return null;
+        }
+        if (state === 'pending' || state === 'running') {
+          attempts++;
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          task = await this.client.getTask(agentId, task.id);
+        } else {
+          break;
+        }
+      }
+
+      if (attempts >= maxAttempts) {
+        console.error('[LabExtractor] Task polling timeout');
+        return null;
+      }
+
+      const result = this.client.parseJsonFromTask<{ results: Array<{ testName: string; resultValue: string; referenceRange?: string; units?: string }> }>(task);
+
+      if (!result) {
+        console.error('[LabExtractor] Failed to parse JSON. Raw:', this.client.extractTextFromTask(task)?.substring(0, 300));
+        return null;
+      }
+
+      return result;
+    } catch (error) {
+      console.error('[LabExtractor] Agent error:', error instanceof Error ? error.message : error);
       return null;
     }
   }

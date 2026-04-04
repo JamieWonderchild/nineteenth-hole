@@ -270,7 +270,7 @@ export function PhysicalExam({
               <Label htmlFor="generalAppearance" className="text-sm">General Appearance</Label>
               <Textarea
                 id="generalAppearance"
-                placeholder="Describe the animal's general appearance, behavior, and demeanor..."
+                placeholder="Describe the patient's general appearance, behavior, and demeanor..."
                 rows={2}
                 value={examData.clinicalSigns.generalAppearance}
                 onChange={(e) => handleClinicalSignChange('generalAppearance', e.target.value)}

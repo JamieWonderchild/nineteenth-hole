@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Owner Companion is a public-facing AI chat for pet owners, accessible via a shareable link after a encounter is published. No login required — access is controlled by a token in the URL.
+The Patient Companion is a public-facing AI chat for patients and caregivers, accessible via a shareable link after a encounter is published. No login required — access is controlled by a token in the URL.
 
 Inspired by PostVisit.ai.
 
@@ -11,13 +11,13 @@ Inspired by PostVisit.ai.
 ## Access Model
 
 ```
-Vet publishes encounter
+Provider publishes encounter
   ↓
 companionSessions record created with accessToken
   ↓
 Shareable URL: [PRODUCT_NAME_DOMAIN]/companion/[accessToken]
   ↓
-Pet owner opens link (no auth required)
+Patient or caregiver opens link (no auth required)
   ↓
 Companion AI answers questions about the visit
 ```
@@ -28,12 +28,12 @@ The companion is public — anyone with the URL can access it. Links expire via 
 
 ## Session Lifecycle
 
-1. **Creation**: Vet publishes encounter → `POST /api/companion/create`
+1. **Creation**: Provider publishes encounter → `POST /api/companion/create`
    - Creates `companionSessions` record
    - Populates `context` from encounter facts, vet notes, medications, follow-up plan, etc.
    - Sets `expiresAt`, `isActive: true`, `messageCount: 0`
 
-2. **Access**: Owner opens URL → `GET /api/companion/[id]`
+2. **Access**: Patient/caregiver opens URL → `GET /api/companion/[id]`
    - Returns session context (no auth check, just token validation)
    - `lastAccessedAt` updated
 
@@ -56,8 +56,6 @@ What the owner companion knows:
 ```typescript
 context: {
   patientName: string,
-  species: string,
-  breed?: string,
   age?: string,
   weight?: string,
   visitSummary: string,

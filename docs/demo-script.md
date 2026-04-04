@@ -1,25 +1,25 @@
 # [PRODUCT_NAME] Demo Walkthrough
 
-**Patient:** Nala — Weimaraner, 6yr F/S
-**Case:** Limping right front leg
+**Patient:** Sarah Chen — 42F, office manager
+**Case:** Low back pain, 2 weeks
 
 ---
 
 ## Before You Start
 
 - [ ] Logged in, org active
-- [ ] Nala (Weimaraner, 6yr F/S) exists as a patient with at least one prior encounter
-- [ ] Billing catalog has items (Physical Exam, Gabapentin, Rimadyl, X-ray, CBC Panel)
+- [ ] Sarah Chen (42F) exists as a patient with at least one prior encounter
+- [ ] Billing catalog has items (Physical Exam, MRI Lumbar Spine, Naproxen, Physical Therapy Referral, CBC Panel)
 - [ ] Mic permissions granted
 - [ ] Incognito window ready (for companion)
 
 ---
 
-## 1. Create a Encounter
+## 1. Create an Encounter
 
-- Go to Nala's patient page
+- Go to Sarah's patient page
 - Click **New Encounter**
-- Reason for visit: *"Limping right front leg — 3 days"*
+- Reason for visit: *"Low back pain — 2 weeks"*
 - Click **Create**
 
 ---
@@ -30,10 +30,10 @@
 
 **Dictate:**
 
-> This is Nala, a six year old female spayed Weimaraner. Owner reports she's been limping on her right front leg for the past three days. She was seen two weeks ago and had mild arthritis noted in both hips. Currently on Rimadyl, seventy-five milligrams twice daily. Weight was thirty kilograms at last visit. Owner says appetite and energy are normal, just the limp.
+> This is Sarah Chen, a 42-year-old female office manager presenting with low back pain for the past two weeks. Pain started gradually with no acute injury. She rates it 6 out of 10, worse with prolonged sitting and better with movement. No radiation down the legs, no numbness or tingling. She denies bowel or bladder changes. She's been taking over-the-counter ibuprofen 400 milligrams as needed with partial relief. Past medical history includes mild hypertension, managed with lisinopril 10 milligrams daily. No known drug allergies.
 
 - Point out facts extracting in real time in the right panel
-- Click **Stop** → review the extracted facts (species, breed, age, medications, complaint)
+- Click **Stop** → review extracted facts (demographics, complaint, medications, allergies)
 - Click **Save**
 
 ---
@@ -44,7 +44,7 @@
 
 **Dictate:**
 
-> Physical examination of Nala. Temperature 38.5 degrees Celsius. Heart rate 90 beats per minute. Respiratory rate 20. On palpation there's tenderness over the distal radius of the right foreleg. No swelling or crepitus. Range of motion slightly reduced on flexion. Left foreleg is normal. Hip flexion bilateral — mild discomfort on full extension, consistent with known arthritis. Neurological exam unremarkable. Assessment: soft tissue injury of the right forelimb, likely a strain. Plan: add Gabapentin 100 milligrams twice daily for pain, continue Rimadyl, restrict exercise for two weeks, recheck in fourteen days.
+> Physical examination of Sarah. Blood pressure 132 over 84. Heart rate 72 beats per minute. Temperature 36.6 degrees Celsius. Respiratory rate 14. Weight 68 kilograms. On musculoskeletal exam, lumbar range of motion is reduced — flexion to 60 degrees with pain, extension to 15 degrees. Paraspinal muscle tenderness at L4-L5 bilaterally. Straight leg raise is negative bilaterally. Neurological exam of the lower extremities is intact — sensation, strength, and reflexes normal. No midline spinal tenderness. Assessment: mechanical low back pain, likely lumbar muscle strain. Plan: prescribe naproxen 500 milligrams twice daily with food, refer for 6 sessions of physical therapy, and order MRI lumbar spine to rule out disc herniation given duration of symptoms. Return in 4 weeks or sooner if symptoms worsen.
 
 - Click **Stop** → **Save**
 
@@ -54,29 +54,29 @@
 
 - Open the **Facts** tab — show facts grouped by recording
 - Point out the coloured dots: green = confirmed across recordings, yellow = updated, red = conflict
-- Show that weight and medications were confirmed across both recordings
+- Show that blood pressure, weight, and medications were confirmed across both recordings
 
 ---
 
 ## 5. Document Generation
 
 - In the workflow panel, select document types:
-  **SOAP Note, Client Summary, Discharge Instructions, Prescription, Follow-Up Plan**
-- Add vet notes:
-  - Diagnosis: *Right forelimb soft tissue strain; concurrent bilateral hip osteoarthritis*
-  - Treatment: *Gabapentin 100mg BID x14 days, continue Rimadyl 75mg BID, exercise restriction 2 weeks, recheck 14 days*
+  **SOAP Note, After-Visit Summary, Referral Letter, Prescription, Follow-Up Plan**
+- Add provider notes:
+  - Diagnosis: *Mechanical low back pain, lumbar muscle strain at L4-L5*
+  - Treatment: *Naproxen 500mg BID x14 days, physical therapy 6 sessions, MRI lumbar spine ordered, return in 4 weeks*
 - Click **Generate Documents**
-- Click through each document as they appear — show SOAP note, client summary, prescription
+- Click through each document as they appear — show SOAP note, after-visit summary, referral letter
 - Make a small inline edit to show it's editable
 
 ---
 
 ## 6. Case Reasoning
 
-- Open **Case Reasoning** / VetChat
-- Ask: *"What are the top differentials for a limping Weimaraner with no fracture on radiograph and tenderness over the distal radius?"*
+- Open **Case Reasoning**
+- Ask: *"What are the top differentials for low back pain in a 42-year-old with no leg radiation and negative straight leg raise?"*
 - Show the response
-- Ask: *"Any drug interactions between Rimadyl and Gabapentin in dogs?"*
+- Ask: *"Any interactions between naproxen and lisinopril I should be aware of?"*
 - Show the response
 
 ---
@@ -84,20 +84,20 @@
 ## 7. Billing
 
 - Open the **Billing** tab
-- Show items extracted automatically from the recordings (Physical Exam, Gabapentin, Rimadyl)
+- Show items extracted automatically from the recordings (Physical Exam, Naproxen, MRI Lumbar Spine, Physical Therapy Referral)
 - Add a missing item manually if needed
 - Click **Generate Invoice** → show the itemised invoice
 
 ---
 
-## 8. Publish & Owner Companion
+## 8. Publish & Patient Companion
 
 - Click **Publish** → confirm
-- Click **Share with Owner** → copy the link
+- Click **Share with Patient** → copy the link
 - Open in incognito — show the companion page
 - Ask: *"What medication was prescribed and what's the dose?"*
-- Ask: *"Can Nala go for walks this week?"*
-- Ask: *"What should I watch for at home?"*
+- Ask: *"Can I go for walks this week?"*
+- Ask: *"What symptoms should make me come back sooner?"*
 
 ---
 

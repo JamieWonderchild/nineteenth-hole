@@ -79,8 +79,8 @@ This feature extracts billable items from encounter recordings, compares what wa
 | PROC-001 | Dental Cleaning - Full | procedure | $180.00 | Yes | High value |
 | PROC-002 | Tooth Extraction | procedure | $60.00 | Yes | Per tooth |
 | MED-001 | Amoxicillin 10-day supply | medication | $25.00 | Yes | Common Rx |
-| MED-002 | Carprofen 500mg | medication | $40.00 | Yes | Pain mgmt |
-| SUPPLY-001 | E-collar | supply | $15.00 | Yes | Retail item |
+| MED-002 | Ibuprofen 400mg | medication | $40.00 | Yes | Pain mgmt |
+| SUPPLY-001 | Wound dressing kit | supply | $15.00 | Yes | Retail item |
 | SUPPLY-002 | Bandage materials | supply | $10.00 | Yes | Consumable |
 | PROC-003 | Emergency After-Hours | procedure | $100.00 | No | Non-taxable |
 
@@ -98,7 +98,7 @@ This feature extracts billable items from encounter recordings, compares what wa
 - [ ] All tab shows all items
 
 ### Test 1.4: Edit & Archive
-1. [ ] Click "Edit" on "E-collar"
+1. [ ] Click "Edit" on "Wound dressing kit"
 2. [ ] Change price to `$18.00`
 3. [ ] Save
 4. [ ] Verify price updated
@@ -121,12 +121,11 @@ This feature extracts billable items from encounter recordings, compares what wa
 4. [ ] **Speak this script clearly:**
 
 ```
-"Okay, let's start with Buddy's examination today. I'm going to perform
-a comprehensive physical exam. His owner mentioned he's been limping,
-so we'll need to run a CBC panel to check for infection. I'm also
-planning to do a urinalysis to rule out any kidney issues. Based on
-what I'm seeing with his teeth, we should schedule a full dental
-cleaning under sedation."
+"Okay, let's get started with the exam today. I'm going to perform
+a comprehensive physical exam. The patient mentioned some fatigue,
+so we'll need to run a CBC panel to check for infection or anaemia. I'm
+also planning to do a urinalysis to rule out any kidney issues. Based on
+the dental findings, we should schedule a full dental cleaning."
 ```
 
 5. [ ] Stop recording after ~30 seconds
@@ -191,13 +190,12 @@ cleaning under sedation."
 3. [ ] **Speak this retrospective script:**
 
 ```
-"Encounter completed for Buddy. I performed the comprehensive
-physical exam and ran the CBC panel as planned. The urinalysis came
-back normal. During the dental cleaning, I discovered two severely
-infected teeth that required extraction. I extracted both teeth
-successfully. I've prescribed Amoxicillin 10-day supply for infection
-prevention and gave the owner an e-collar to prevent licking.
-I also administered Carprofen for pain management."
+"Encounter completed. I performed the comprehensive physical exam
+and ran the CBC panel as planned. The urinalysis came back normal.
+During the dental cleaning, I identified two severely infected teeth
+that required extraction. I extracted both teeth successfully.
+I've prescribed Amoxicillin 10-day supply for infection prevention
+and prescribed an analgesic for pain management."
 ```
 
 4. [ ] Stop recording
@@ -227,8 +225,8 @@ I also administered Carprofen for pain management."
 - [ ] Shows missed items (~4 items):
   - [ ] Tooth Extraction × 2 ($60 × 2 = $120)
   - [ ] Amoxicillin 10-day supply ($25)
-  - [ ] E-collar ($18)
-  - [ ] Carprofen 500mg ($40)
+  - [ ] Wound dressing kit ($18)
+  - [ ] Ibuprofen 400mg ($40)
 - [ ] **Total missed: ~$203** 💰
 - [ ] Each item has "Add to Bill" button
 
@@ -319,7 +317,7 @@ I also administered Carprofen for pain management."
 **If you have pending reconciliations:**
 1. [ ] Table appears below chart
 2. [ ] Shows columns:
-   - [ ] Patient (name + species)
+   - [ ] Patient (name)
    - [ ] Date
    - [ ] Missed Items (count badge)
    - [ ] Amount (in green)

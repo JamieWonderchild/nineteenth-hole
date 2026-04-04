@@ -240,6 +240,123 @@ export const getResultsByEncounter = query({
 });
 
 /**
+ * Internal: Get SOAP content + facts for lab extraction
+ */
+export const getEncounterForLabExtraction = internalMutation({
+  args: { encounterId: v.id("encounters") },
+  handler: async (ctx, args) => {
+    const encounter = await ctx.db.get(args.encounterId);
+    if (!encounter) return null;
+    if (!encounter.orgId) return null;
+
+    const patient = await ctx.db.get(encounter.patientId);
+
+    // Concatenate all SOAP sections for the extractor
+    const soapSections = encounter.generatedDocuments?.soapNote?.sections ?? [];
+    const soapContent = soapSections
+      .map((s: { key: string; content?: string; text?: string }) =>
+        `${s.key}:\n${s.content ?? s.text ?? ''}`
+      )
+      .join('\n\n');
+
+    // Get facts
+    let facts: Array<{ text: string; group: string }> = [];
+    if (encounter.factReconciliation) {
+      facts = encounter.factReconciliation.reconciledFacts.map(
+        (f: { text: string; group: string }) => ({ text: f.text, group: f.group })
+      );
+    } else if (encounter.facts) {
+      facts = encounter.facts.map((f: { text: string; group: string }) => ({
+        text: f.text,
+        group: f.group,
+      }));
+    }
+
+    return {
+      encounterId: args.encounterId,
+      patientId: encounter.patientId,
+      orgId: encounter.orgId,
+      providerId: encounter.providerId,
+      soapContent,
+      facts,
+      patientName: patient?.name,
+    };
+  },
+});
+
+/**
+ * Action: Extract lab results from the SOAP note and auto-create lab result records
+ */
+export const extractLabResultsFromConsultation = action({
+  args: { encounterId: v.id("encounters") },
+  handler: async (ctx, args): Promise<{ success: boolean; count?: number; error?: string }> => {
+    console.log(`[LabExtractor] Extracting results for encounter ${args.encounterId}`);
+
+    try {
+      const data = await ctx.runMutation(
+        internal.resultsTriage.getEncounterForLabExtraction,
+        { encounterId: args.encounterId }
+      );
+
+      if (!data) {
+        return { success: false, error: 'Encounter not found' };
+      }
+
+      if (!data.soapContent.trim()) {
+        return { success: true, count: 0 };
+      }
+
+      const apiUrl = process.env.SITE_URL || 'https://healthplatform.com';
+      const response = await fetch(`${apiUrl}/api/corti/extract-lab-results`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          soapContent: data.soapContent,
+          facts: data.facts,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[LabExtractor] API error:', errorText.substring(0, 300));
+        return { success: false, error: `API error: ${response.status}` };
+      }
+
+      const { extraction } = await response.json();
+      const results = extraction?.results ?? [];
+
+      if (results.length === 0) {
+        console.log('[LabExtractor] No lab results found in consultation');
+        return { success: true, count: 0 };
+      }
+
+      // Create a lab result record for each extracted result
+      for (const result of results) {
+        if (!result.testName?.trim() || !result.resultValue?.trim()) continue;
+        await ctx.runMutation(api.resultsTriage.createLabResult, {
+          encounterId: args.encounterId,
+          patientId: data.patientId,
+          orgId: data.orgId,
+          providerId: data.providerId,
+          testName: result.testName.trim(),
+          resultValue: result.resultValue.trim(),
+          referenceRange: result.referenceRange?.trim() || undefined,
+          units: result.units?.trim() || undefined,
+          entryMethod: 'auto',
+        });
+      }
+
+      console.log(`[LabExtractor] Created ${results.length} lab result record(s)`);
+      return { success: true, count: results.length };
+
+    } catch (error) {
+      console.error('[LabExtractor] Fatal error:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  },
+});
+
+/**
  * Get all pending/triaged results for the org (provider inbox view)
  */
 export const getPendingResultsByOrg = query({

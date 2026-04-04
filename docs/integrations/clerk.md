@@ -76,4 +76,4 @@ Roles are stored in Convex `memberships` (not in Clerk). Clerk is source of trut
 | `owner` | Full access, billing, team management |
 | `admin` | Full access except billing |
 | `practice-admin` | Location-scoped access |
-| `vet` | Standard clinical access |
+| `provider` | Standard clinical access |
