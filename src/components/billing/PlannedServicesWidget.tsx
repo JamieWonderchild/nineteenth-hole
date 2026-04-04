@@ -62,6 +62,7 @@ export function PlannedServicesWidget({
   const [voidConfirming, setVoidConfirming] = useState(false)
   const [showAddService, setShowAddService] = useState(false)
   const [isRerunning, setIsRerunning] = useState(false)
+  const [hasRun, setHasRun] = useState(false)
 
   const rerunBilling = useAction(api.billingExtraction.extractFromReconciliation)
 
@@ -70,6 +71,7 @@ export function PlannedServicesWidget({
     setIsRerunning(true)
     try {
       const result = await rerunBilling({ encounterId })
+      setHasRun(true)
       if (!result.success) {
         toast({ title: 'Billing extraction failed', variant: 'destructive' })
       } else {
@@ -334,7 +336,7 @@ export function PlannedServicesWidget({
           </p>
         ) : (
           <p className="text-xs text-muted-foreground py-1">
-            {hasExtracted || isRerunning
+            {hasExtracted || hasRun
               ? 'No billable items found in this consultation.'
               : 'Billing is extracted automatically after the consultation is processed.'}
           </p>

@@ -423,6 +423,7 @@ export function ResultsTriagePanel({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [isRerunning, setIsRerunning] = useState(false);
+  const [hasRun, setHasRun] = useState(false);
 
   const rerunExtraction = useAction(api.resultsTriage.extractLabResultsFromConsultation);
 
@@ -431,6 +432,7 @@ export function ResultsTriagePanel({
     setIsRerunning(true);
     try {
       const result = await rerunExtraction({ encounterId });
+      setHasRun(true);
       if (!result.success) {
         toast({ title: 'Extraction failed', description: result.error, variant: 'destructive' });
       } else if ((result.count ?? 0) === 0) {
@@ -526,7 +528,7 @@ export function ResultsTriagePanel({
           {/* Results list */}
           {results.length === 0 && !showAddForm && (
             <div className="px-4 py-6 text-center text-xs text-muted-foreground space-y-1">
-              {extractionAttempted || isRerunning ? (
+              {extractionAttempted || hasRun ? (
                 <p>No lab results found in this consultation.</p>
               ) : (
                 <p>Lab results are extracted automatically after the consultation is processed.</p>
