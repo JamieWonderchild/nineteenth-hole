@@ -569,6 +569,22 @@ export default defineSchema({
       createdAt: v.string(),
       factCount: v.optional(v.number()),
     }))),
+    // Post-visit order orchestration
+    orderExtractionStatus: v.optional(v.string()), // 'processing' | 'completed' | 'failed'
+    suggestedOrders: v.optional(v.object({
+      orders: v.array(v.object({
+        id: v.string(),
+        type: v.string(),              // 'lab' | 'medication' | 'referral' | 'follow-up' | 'imaging'
+        title: v.string(),
+        detail: v.string(),
+        sourceText: v.string(),
+        accepted: v.optional(v.boolean()),
+        acceptedAt: v.optional(v.string()),
+      })),
+      extractedAt: v.string(),
+      extractedFromDocumentType: v.string(),
+      planSectionContent: v.string(),
+    })),
   }).index("by_org", ["orgId"])
     .index("by_org_location", ["orgId", "locationId"])
     .index("by_patient", ["patientId"])
@@ -883,4 +899,46 @@ export default defineSchema({
     .index("by_org", ["orgId"])
     .index("by_encounter", ["encounterId"])
     .index("by_org_status", ["orgId", "status"]),
+
+  // ============================================================================
+  // Lab Results & Results Triage
+  // ============================================================================
+  labResults: defineTable({
+    encounterId: v.id("encounters"),
+    patientId: v.id("patients"),
+    orgId: v.id("organizations"),
+    providerId: v.string(),
+
+    // Result data
+    testName: v.string(),
+    resultValue: v.string(),
+    referenceRange: v.optional(v.string()),
+    units: v.optional(v.string()),
+    collectedAt: v.optional(v.string()),
+    resultedAt: v.string(),
+
+    // Triage
+    urgency: v.optional(v.string()),       // 'critical' | 'high' | 'normal' | 'low'
+    urgencyReason: v.optional(v.string()),
+    triageStatus: v.string(),              // 'pending' | 'triaged' | 'reviewed' | 'actioned'
+
+    // AI-generated notification draft
+    patientNotificationDraft: v.optional(v.string()),
+    notificationSent: v.optional(v.boolean()),
+    notificationSentAt: v.optional(v.string()),
+
+    // Follow-up suggestion
+    suggestedFollowUp: v.optional(v.string()),
+    followUpAccepted: v.optional(v.boolean()),
+
+    // Manual entry vs imported
+    entryMethod: v.string(),               // 'manual' | 'upload' | 'hl7'
+
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_encounter", ["encounterId"])
+    .index("by_patient", ["patientId"])
+    .index("by_org_urgency", ["orgId", "urgency"])
+    .index("by_org_triage_status", ["orgId", "triageStatus"]),
 });

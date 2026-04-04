@@ -586,6 +586,23 @@ export const saveGeneratedDocuments = mutation({
       updatedAt: timestamp,
     });
 
+    // If a SOAP note was just saved, trigger async order extraction — but only if
+    // the plan content has changed since the last extraction (idempotency guard).
+    if (args.soapNote) {
+      const newPlanSection = args.soapNote.sections?.find(
+        (s: { key: string }) => s.key === 'corti-plan'
+      );
+      const newPlanContent = newPlanSection?.content ?? '';
+      const existingPlanContent = encounter.suggestedOrders?.planSectionContent ?? '';
+
+      if (newPlanContent.trim() !== existingPlanContent.trim() && newPlanContent.trim().length > 0) {
+        await ctx.db.patch(args.encounterId, { orderExtractionStatus: 'processing' });
+        await ctx.scheduler.runAfter(0, api.orderOrchestration.extractOrdersFromDocument, {
+          encounterId: args.encounterId,
+        });
+      }
+    }
+
     // Audit log: document generation is a PHI access event
     await ctx.runMutation(internal.auditLogs.log, {
       orgId: encounter.orgId,

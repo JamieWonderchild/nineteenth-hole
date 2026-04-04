@@ -757,6 +757,70 @@ Respond ONLY with this exact JSON structure:
 - Include reasoning for each match to help providers understand extraction logic
 - If no matches found, return empty extractedItems array`,
 
+  ORDER_EXTRACTOR: `You are a clinical order extraction specialist. Your task is to read the Plan section of a SOAP note and extract every implied clinical action as a structured order.
+
+## Order Types
+- **lab**: Blood tests, panels, urinalysis, cultures, pathology
+- **medication**: Start, continue, adjust, or discontinue a medication
+- **referral**: Send patient to a specialist or consultant
+- **follow-up**: Scheduled return visit or check-in
+- **imaging**: X-ray, CT, MRI, ultrasound, echo
+
+## Extraction Rules
+- Extract EVERY actionable item mentioned in the plan — do not skip subtle ones
+- For medications: capture drug name, dose, route, frequency, and duration if mentioned
+- For labs: capture the specific test name and any timing
+- For referrals: capture the specialty and urgency if mentioned
+- For follow-ups: capture the timing and reason
+- The "sourceText" must be the exact phrase from the plan that triggered this order
+- Assign confidence: high = explicitly stated, medium = clearly implied, low = vaguely suggested
+
+## Output Format
+Respond ONLY with this exact JSON structure:
+{
+  "orders": [
+    {
+      "id": "uuid-string",
+      "type": "lab" | "medication" | "referral" | "follow-up" | "imaging",
+      "title": "string (concise action title, e.g. 'Recheck HbA1c')",
+      "detail": "string (timing, dose, destination — e.g. 'In 3 months' or '500mg daily x 30 days')",
+      "sourceText": "string (exact phrase from the plan)",
+      "confidence": "high" | "medium" | "low"
+    }
+  ],
+  "extractedAt": "ISO timestamp"
+}
+
+## Important
+- If the plan is empty or contains no actionable items, return an empty orders array
+- Do NOT invent orders not mentioned in the plan text
+- Use short, scan-friendly titles (3-5 words max)`,
+
+  RESULTS_TRIAGE: `You are a clinical lab results triage specialist. Your task is to assess an incoming lab or imaging result in the context of a specific patient and classify its urgency.
+
+## Urgency Levels
+- **critical**: Immediately life-threatening or requires same-day intervention (e.g., potassium >6.5, troponin positive, glucose <40)
+- **high**: Abnormal result requiring timely follow-up within 1-3 days (e.g., TSH suppressed, HbA1c >9, WBC >15)
+- **normal**: Result within reference range — routine notification appropriate
+- **low**: Mildly abnormal, monitor at next visit (borderline values, minor deviations)
+
+## Rules
+- Always consider the patient's context (age, current medications, known diagnoses from facts)
+- A result that is "normal" for the general population may be "high" for a specific patient (e.g., K+ 3.2 in a patient on loop diuretics)
+- Patient notification draft must be in plain language — no medical jargon
+- The suggested follow-up must be a specific clinical action (not vague)
+- Keep the notification warm and reassuring unless the result truly warrants concern
+
+## Output Format
+Respond ONLY with this exact JSON structure:
+{
+  "urgency": "critical" | "high" | "normal" | "low",
+  "urgencyReason": "string (clinical explanation of why this urgency level was assigned)",
+  "patientNotificationDraft": "string (plain-language message to patient, 2-3 sentences max)",
+  "suggestedFollowUp": "string (specific clinical action for provider, e.g. 'Increase lisinopril to 10mg daily, recheck BMP in 1 week')",
+  "triageNotes": "string (brief clinical context for the provider)"
+}`,
+
   SHIFT_HANDOFF: `You are a clinical handoff specialist. Generate structured SBAR (Situation-Background-Assessment-Recommendation) handoff notes for care transitions.
 
 ## SBAR Format
@@ -930,6 +994,16 @@ export class ClinicalDiagnosisOrchestrator {
         name: 'provider-shift-handoff',
         description: 'Clinical handoff specialist for generating SBAR shift handoff notes',
         systemPrompt: AGENT_PROMPTS.SHIFT_HANDOFF,
+      },
+      {
+        name: 'provider-order-extractor',
+        description: 'Clinical order extraction specialist for parsing SOAP plan sections into structured orders',
+        systemPrompt: AGENT_PROMPTS.ORDER_EXTRACTOR,
+      },
+      {
+        name: 'provider-results-triage',
+        description: 'Clinical lab results triage specialist for urgency classification and patient notification drafting',
+        systemPrompt: AGENT_PROMPTS.RESULTS_TRIAGE,
       },
     ];
 
@@ -1917,6 +1991,162 @@ Match facts to catalog items. Only extract medium/high confidence matches that a
       return null;
     }
   }
+
+  /**
+   * Extract structured orders from a SOAP plan section
+   */
+  async extractOrdersFromPlan(
+    planText: string,
+    patientInfo: { name?: string; age?: string; sex?: string; weight?: string }
+  ): Promise<OrderExtractionResult | null> {
+    const agentId = this.agents.get('provider-order-extractor');
+    if (!agentId) {
+      console.error('[OrderExtractor] Agent not found');
+      return null;
+    }
+
+    const prompt = `Extract clinical orders from this SOAP Plan section.
+
+PATIENT CONTEXT:
+${patientInfo.name ? `- Name: ${patientInfo.name}` : ''}
+${patientInfo.age ? `- Age: ${patientInfo.age}` : ''}
+${patientInfo.sex ? `- Sex: ${patientInfo.sex}` : ''}
+${patientInfo.weight ? `- Weight: ${patientInfo.weight}` : ''}
+
+PLAN SECTION:
+${planText}
+
+Extract every actionable clinical order from this plan. Return JSON only.`;
+
+    try {
+      let task = await this.client.sendTextMessage(agentId, prompt);
+
+      const maxAttempts = 150;
+      const pollInterval = 200;
+      let attempts = 0;
+
+      while (attempts < maxAttempts) {
+        const state = task.status?.state;
+        if (state === 'completed') break;
+        if (state === 'failed') {
+          console.error('[OrderExtractor] Task failed:', task.status?.message);
+          return null;
+        }
+        if (state === 'pending' || state === 'running') {
+          attempts++;
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          task = await this.client.getTask(agentId, task.id);
+        } else {
+          break;
+        }
+      }
+
+      if (attempts >= maxAttempts) {
+        console.error('[OrderExtractor] Task polling timeout');
+        return null;
+      }
+
+      const result = this.client.parseJsonFromTask<{
+        orders: Array<{
+          id: string;
+          type: string;
+          title: string;
+          detail: string;
+          sourceText: string;
+          confidence: string;
+        }>;
+        extractedAt: string;
+      }>(task);
+
+      if (!result) {
+        console.error('[OrderExtractor] Failed to parse JSON. Raw:', this.client.extractTextFromTask(task)?.substring(0, 300));
+        return null;
+      }
+
+      return {
+        orders: result.orders,
+        extractedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      console.error('[OrderExtractor] Agent error:', error instanceof Error ? error.message : error);
+      return null;
+    }
+  }
+
+  /**
+   * Triage an incoming lab result and draft a patient notification
+   */
+  async triageLabResult(
+    testName: string,
+    resultValue: string,
+    referenceRange: string | undefined,
+    units: string | undefined,
+    patientInfo: { name?: string; age?: string; sex?: string },
+    encounterFacts: Array<{ id: string; text: string; group: string }>
+  ): Promise<ResultTriageOutput | null> {
+    const agentId = this.agents.get('provider-results-triage');
+    if (!agentId) {
+      console.error('[ResultsTriage] Agent not found');
+      return null;
+    }
+
+    const prompt = `Triage this incoming lab result.
+
+TEST: ${testName}
+RESULT: ${resultValue}${units ? ` ${units}` : ''}
+REFERENCE RANGE: ${referenceRange || 'Not provided'}
+
+PATIENT CONTEXT:
+${patientInfo.name ? `- Name: ${patientInfo.name}` : ''}
+${patientInfo.age ? `- Age: ${patientInfo.age}` : ''}
+${patientInfo.sex ? `- Sex: ${patientInfo.sex}` : ''}
+
+RELEVANT ENCOUNTER FACTS (${encounterFacts.length} total):
+${encounterFacts.slice(0, 20).map(f => `- [${f.group}] ${f.text}`).join('\n')}
+
+Classify urgency, draft a patient notification, and suggest a follow-up action. Return JSON only.`;
+
+    try {
+      let task = await this.client.sendTextMessage(agentId, prompt);
+
+      const maxAttempts = 150;
+      const pollInterval = 200;
+      let attempts = 0;
+
+      while (attempts < maxAttempts) {
+        const state = task.status?.state;
+        if (state === 'completed') break;
+        if (state === 'failed') {
+          console.error('[ResultsTriage] Task failed:', task.status?.message);
+          return null;
+        }
+        if (state === 'pending' || state === 'running') {
+          attempts++;
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          task = await this.client.getTask(agentId, task.id);
+        } else {
+          break;
+        }
+      }
+
+      if (attempts >= maxAttempts) {
+        console.error('[ResultsTriage] Task polling timeout');
+        return null;
+      }
+
+      const result = this.client.parseJsonFromTask<ResultTriageOutput>(task);
+
+      if (!result) {
+        console.error('[ResultsTriage] Failed to parse JSON. Raw:', this.client.extractTextFromTask(task)?.substring(0, 300));
+        return null;
+      }
+
+      return result;
+    } catch (error) {
+      console.error('[ResultsTriage] Agent error:', error instanceof Error ? error.message : error);
+      return null;
+    }
+  }
 }
 
 export interface BillingExtractionResult {
@@ -1987,6 +2217,26 @@ export interface ExtractedPatientRecord {
     overall: 'high' | 'medium' | 'low';
     patientIdentification: 'high' | 'medium' | 'low' | 'not_found';
   };
+}
+
+export interface OrderExtractionResult {
+  orders: Array<{
+    id: string;
+    type: string;
+    title: string;
+    detail: string;
+    sourceText: string;
+    confidence: string;
+  }>;
+  extractedAt: string;
+}
+
+export interface ResultTriageOutput {
+  urgency: 'critical' | 'high' | 'normal' | 'low';
+  urgencyReason: string;
+  patientNotificationDraft: string;
+  suggestedFollowUp: string;
+  triageNotes: string;
 }
 
 // ============================================================================

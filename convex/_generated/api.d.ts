@@ -8,11 +8,6 @@
  * @module
  */
 
-import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
-} from "convex/server";
 import type * as admin from "../admin.js";
 import type * as adminDiagnostics from "../adminDiagnostics.js";
 import type * as analytics from "../analytics.js";
@@ -40,6 +35,7 @@ import type * as locations from "../locations.js";
 import type * as memberships from "../memberships.js";
 import type * as migrations_addLocationSupport from "../migrations/addLocationSupport.js";
 import type * as onboarding from "../onboarding.js";
+import type * as orderOrchestration from "../orderOrchestration.js";
 import type * as organizationSetup from "../organizationSetup.js";
 import type * as organizations from "../organizations.js";
 import type * as patients from "../patients.js";
@@ -47,6 +43,7 @@ import type * as permissions from "../permissions.js";
 import type * as providers from "../providers.js";
 import type * as recordings from "../recordings.js";
 import type * as repair from "../repair.js";
+import type * as resultsTriage from "../resultsTriage.js";
 import type * as seedBillingCatalog from "../seedBillingCatalog.js";
 import type * as testHelpers from "../testHelpers.js";
 import type * as upgrade from "../upgrade.js";
@@ -55,14 +52,12 @@ import type * as userPreferences from "../userPreferences.js";
 import type * as webhookEvents from "../webhookEvents.js";
 import type * as wipe from "../wipe.js";
 
-/**
- * A utility for referencing Convex functions in your app's API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
+
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   adminDiagnostics: typeof adminDiagnostics;
@@ -91,6 +86,7 @@ declare const fullApi: ApiFromModules<{
   memberships: typeof memberships;
   "migrations/addLocationSupport": typeof migrations_addLocationSupport;
   onboarding: typeof onboarding;
+  orderOrchestration: typeof orderOrchestration;
   organizationSetup: typeof organizationSetup;
   organizations: typeof organizations;
   patients: typeof patients;
@@ -98,6 +94,7 @@ declare const fullApi: ApiFromModules<{
   providers: typeof providers;
   recordings: typeof recordings;
   repair: typeof repair;
+  resultsTriage: typeof resultsTriage;
   seedBillingCatalog: typeof seedBillingCatalog;
   testHelpers: typeof testHelpers;
   upgrade: typeof upgrade;
@@ -106,11 +103,31 @@ declare const fullApi: ApiFromModules<{
   webhookEvents: typeof webhookEvents;
   wipe: typeof wipe;
 }>;
+
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 export declare const api: FilterApi<
   typeof fullApi,
   FunctionReference<any, "public">
 >;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
 export declare const internal: FilterApi<
   typeof fullApi,
   FunctionReference<any, "internal">
 >;
+
+export declare const components: {};

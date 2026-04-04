@@ -15,6 +15,8 @@ import { DictationModal } from '@/components/encounter/DictationModal';
 import { RecordingTimeline } from '@/components/encounter/RecordingTimeline';
 import { PlannedServicesWidget } from '@/components/billing/PlannedServicesWidget';
 import { MedicalCodingPanel } from '@/components/encounter/MedicalCodingPanel';
+import { OrderSuggestionsPanel } from '@/components/encounter/OrderSuggestionsPanel';
+import { ResultsTriagePanel } from '@/components/encounter/ResultsTriagePanel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -1022,6 +1024,28 @@ export default function ConsultationDetailPage() {
                     reconciledAt={detail?.factReconciliation?.reconciledAt}
                     unresolvedContradictions={unresolvedContradictions}
                   />
+
+                  {/* Post-Visit Order Suggestions */}
+                  {(encounter.suggestedOrders || encounter.orderExtractionStatus === 'processing') && (
+                    <OrderSuggestionsPanel
+                      encounterId={encounterId as Id<'encounters'>}
+                      suggestedOrders={encounter.suggestedOrders as any}
+                      orderExtractionStatus={encounter.orderExtractionStatus}
+                      isEditable={isEditable}
+                    />
+                  )}
+
+                  {/* Lab Results & Triage */}
+                  {encounter.patientId && (encounter.orgId || orgContext?.orgId) && (
+                    <ResultsTriagePanel
+                      encounterId={encounterId as Id<'encounters'>}
+                      patientId={encounter.patientId as Id<'patients'>}
+                      orgId={(encounter.orgId ?? orgContext?.orgId) as Id<'organizations'>}
+                      providerId={encounter.providerId}
+                      patientPhone={patient?.emergencyContact?.phone}
+                      isEditable={isEditable}
+                    />
+                  )}
 
                   {/* Attachments (compact) */}
                   <div
