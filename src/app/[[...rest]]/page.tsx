@@ -389,8 +389,8 @@ export default function Home() {
                 </CardContent>
               </Card>
 
-              {/* Overdue Follow-ups */}
-              <Card>
+              {/* Overdue Follow-ups — only shown when there are items */}
+              {overdueFollowUps !== undefined && enrichedOverdue.length > 0 && <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-3">
                   <div className="flex items-center gap-2">
                     <CardTitle className="text-base">Overdue Follow-ups</CardTitle>
@@ -402,18 +402,8 @@ export default function Home() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {overdueFollowUps === undefined ? (
-                    <div className="flex justify-center py-6">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-                    </div>
-                  ) : enrichedOverdue.length === 0 ? (
-                    <div className="py-6 text-center">
-                      <CheckCircle2 className="h-8 w-8 mx-auto text-green-500/60 mb-2" />
-                      <p className="text-sm text-muted-foreground">No overdue follow-ups</p>
-                    </div>
-                  ) : (
-                    <div className="divide-y">
-                      {enrichedOverdue.map((f) => (
+                  <div className="divide-y">
+                    {enrichedOverdue.map((f) => (
                         <AppLink
                           key={f.id}
                           href={`/patient-records/${f.patientId}`}
@@ -433,11 +423,10 @@ export default function Home() {
                             </span>
                           </div>
                         </AppLink>
-                      ))}
-                    </div>
-                  )}
+                    ))}
+                  </div>
                 </CardContent>
-              </Card>
+              </Card>}
 
             </div>
 

@@ -173,7 +173,21 @@ export default function PatientRecordsPage() {
                     const lastVisitDate = profile?.lastEncounterDate ?? patient.lastVisit;
                     const lastVisit = formatLastVisit(lastVisitDate);
                     const encounterCount = profile?.encounterCount ?? 0;
-                    const activeProblems = profile?.activeProblems ?? [];
+                    const activeProblems = (profile?.activeProblems ?? [])
+                      // Drop Z-codes — administrative/contextual, not clinical problems
+                      .filter(p => !p.icd10Code?.match(/^Z/i))
+                      // Cap at 3
+                      .slice(0, 3)
+                      // Clean display label: strip embedded ICD codes like "(R53.83)"
+                      .map(p => ({
+                        ...p,
+                        label: p.condition.replace(/\s*\([A-Z]\d{2}[^)]*\)/g, '').trim(),
+                      }))
+                      // Truncate to 22 chars
+                      .map(p => ({
+                        ...p,
+                        label: p.label.length > 22 ? p.label.slice(0, 22).trimEnd() + '…' : p.label,
+                      }));
                     const NKA_PATTERN = /^(no\s+known|nkda?|none|nil)$/i;
                     const allergies = (profile?.allergies ?? []).filter(
                       a => !NKA_PATTERN.test(a.allergen.trim())
@@ -233,7 +247,7 @@ export default function PatientRecordsPage() {
                                   key={problem.condition}
                                   className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-muted text-muted-foreground font-medium leading-none"
                                 >
-                                  {problem.condition}
+                                  {problem.label}
                                 </span>
                               ))}
                               {hasAllergies && (
