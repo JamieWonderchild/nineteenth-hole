@@ -1,8 +1,8 @@
-# Owner Companion
+# Patient Companion
 
 ## Overview
 
-The Patient Companion is a public-facing AI chat for patients and caregivers, accessible via a shareable link after a encounter is published. No login required — access is controlled by a token in the URL.
+The Patient Companion is a public-facing AI chat for patients and caregivers, accessible via a shareable link after an encounter is published. No login required — access is controlled by a token in the URL.
 
 Inspired by PostVisit.ai.
 
@@ -30,14 +30,14 @@ The companion is public — anyone with the URL can access it. Links expire via 
 
 1. **Creation**: Provider publishes encounter → `POST /api/companion/create`
    - Creates `companionSessions` record
-   - Populates `context` from encounter facts, vet notes, medications, follow-up plan, etc.
+   - Populates `context` from encounter facts, clinical notes, medications, follow-up plan, etc.
    - Sets `expiresAt`, `isActive: true`, `messageCount: 0`
 
 2. **Access**: Patient/caregiver opens URL → `GET /api/companion/[id]`
    - Returns session context (no auth check, just token validation)
    - `lastAccessedAt` updated
 
-3. **Chat**: Owner sends message → ephemeral Corti agent created/reused
+3. **Chat**: Patient/caregiver sends message → ephemeral Corti agent created/reused
    - Agent uses `cortiAgentId` for reuse across turns (within session)
    - `cortiContextId` maintains conversation memory
    - `messageCount` incremented on each turn

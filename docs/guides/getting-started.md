@@ -11,8 +11,8 @@
 ## Setup
 
 ```bash
-git clone https://github.com/JamieWonderchild/vetai-assistant.git
-cd vetai-assistant
+git clone https://github.com/JamieWonderchild/health-platform.git
+cd health-platform
 npm install
 cp .env.example .env.local
 ```
@@ -37,7 +37,7 @@ src/
   components/           React components
     ui/                 shadcn/ui primitives
     navigation/         AppLink, LoadingLink
-    case-reasoning/     VetChat component
+    case-reasoning/     CaseReasoning component
     encounter/       Recording, WorkflowPanel, EvidenceUpload, etc.
   contexts/             OrgContext, NavigationContext
   hooks/                useOrgCtx, useAppRouter, useBillingMatcher, etc.

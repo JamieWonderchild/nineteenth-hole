@@ -129,13 +129,8 @@ Tax-inclusive (EU/UK/AU):
 
 ---
 
-## Current Status (March 2026)
+## Medical Coding Integration
 
-- ✅ Phase 0: Catalog CRUD, schema, UI shell
-- ✅ Phase 1 foundation: `billingItems` table, extraction API route
-- 🚧 Background extraction: In progress — Corti agent matching facts to catalog
-- ⬜ Reconciliation UI: Not started
-- ⬜ Invoice generation: Not started
-- ⬜ Revenue analytics dashboard: Not started
+After publish, ICD-10 and CPT codes are extracted automatically from the encounter by the Corti coding pipeline. CPT codes determine the E&M billing level (e.g. `99214` — established patient, moderate complexity) and map directly to a dollar value shown in the billing panel.
 
-**Known issue (Phase 0 blocker):** Matcher filters for `fact.group.startsWith('billing-')` but Corti doesn't automatically assign this prefix — the extraction agent must explicitly set it.
+See [medical-coding.md](medical-coding.md) for the full coding pipeline.
