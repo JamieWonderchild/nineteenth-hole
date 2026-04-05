@@ -1,116 +1,350 @@
-# [PRODUCT_NAME] Demo Walkthrough
+# Platform Demo Script
 
-**Patient:** Sarah Chen — 42F, office manager
-**Case:** Low back pain, 2 weeks
+**Audience:** Prospective customers, investors
+**Format:** Live walkthrough (dark mode recommended)
 
----
-
-## Before You Start
-
-- [ ] Logged in, org active
-- [ ] Sarah Chen (42F) exists as a patient with at least one prior encounter
-- [ ] Billing catalog has items (Physical Exam, MRI Lumbar Spine, Naproxen, Physical Therapy Referral, CBC Panel)
-- [ ] Mic permissions granted
-- [ ] Incognito window ready (for companion)
+Two versions below: [Full (~18 min)](#full-demo--18-min) and [Short (~4 min)](#short-demo--4-min).
 
 ---
 
-## 1. Create an Encounter
+## Setup Checklist
 
-- Go to Sarah's patient page
-- Click **New Encounter**
-- Reason for visit: *"Low back pain — 2 weeks"*
-- Click **Create**
+Before the demo, ensure the following are in place:
 
----
-
-## 2. First Recording — History
-
-- Click **Begin Encounter** → click the mic
-
-**Dictate:**
-
-> This is Sarah Chen, a 42-year-old female office manager presenting with low back pain for the past two weeks. Pain started gradually with no acute injury. She rates it 6 out of 10, worse with prolonged sitting and better with movement. No radiation down the legs, no numbness or tingling. She denies bowel or bladder changes. She's been taking over-the-counter ibuprofen 400 milligrams as needed with partial relief. Past medical history includes mild hypertension, managed with lisinopril 10 milligrams daily. No known drug allergies.
-
-- Point out facts extracting in real time in the right panel
-- Click **Stop** → review extracted facts (demographics, complaint, medications, allergies)
-- Click **Save**
+- [ ] **James Harrison** exists as a patient with at least one prior published encounter so his clinical profile is already built
+- [ ] The profile build has completed (check the "Built from N encounters" badge on his profile)
+- [ ] Browser is logged in and on the home page
+- [ ] Dark mode enabled
+- [ ] Tabs pre-positioned: Home → Patient Records → (encounter will open live)
+- [ ] Microphone tested and working
+- [ ] No other tabs or notifications visible
 
 ---
 
-## 3. Second Recording — Physical Exam
+## Demo Patient
 
-- Click **Add Recording** → mic
+**James Harrison** · 58M · Established patient
+History of Type 2 diabetes (on metformin) and hypertension.
+Presenting today with fatigue and shortness of breath on exertion. Labs from last visit are back.
 
-**Dictate:**
+This case covers:
 
-> Physical examination of Sarah. Blood pressure 132 over 84. Heart rate 72 beats per minute. Temperature 36.6 degrees Celsius. Respiratory rate 14. Weight 68 kilograms. On musculoskeletal exam, lumbar range of motion is reduced — flexion to 60 degrees with pain, extension to 15 degrees. Paraspinal muscle tenderness at L4-L5 bilaterally. Straight leg raise is negative bilaterally. Neurological exam of the lower extremities is intact — sensation, strength, and reflexes normal. No midline spinal tenderness. Assessment: mechanical low back pain, likely lumbar muscle strain. Plan: prescribe naproxen 500 milligrams twice daily with food, refer for 6 sessions of physical therapy, and order MRI lumbar spine to rule out disc herniation given duration of symptoms. Return in 4 weeks or sooner if symptoms worsen.
-
-- Click **Stop** → **Save**
-
----
-
-## 4. Facts & Reconciliation
-
-- Open the **Facts** tab — show facts grouped by recording
-- Point out the coloured dots: green = confirmed across recordings, yellow = updated, red = conflict
-- Show that blood pressure, weight, and medications were confirmed across both recordings
-
----
-
-## 5. Document Generation
-
-- In the workflow panel, select document types:
-  **SOAP Note, After-Visit Summary, Referral Letter, Prescription, Follow-Up Plan**
-- Add provider notes:
-  - Diagnosis: *Mechanical low back pain, lumbar muscle strain at L4-L5*
-  - Treatment: *Naproxen 500mg BID x14 days, physical therapy 6 sessions, MRI lumbar spine ordered, return in 4 weeks*
-- Click **Generate Documents**
-- Click through each document as they appear — show SOAP note, after-visit summary, referral letter
-- Make a small inline edit to show it's editable
+| Feature | How it appears |
+|---|---|
+| Ambient consultation | Full doctor–patient dialogue, both voices |
+| Lab result extraction | Values read aloud → auto-extracted |
+| ICD-10 coding | T2DM with hyperglycaemia, hypertension, dyspnoea, anaemia, hyperlipidaemia |
+| CPT billing | 99214 office visit, moderate complexity |
+| Facts panel | Symptoms, exam findings, lab values structured |
+| Case reasoning | AI flags anaemia pattern, statin appropriateness |
+| Document generation | SOAP note from the consultation |
+| Patient companion | Patient asks about new medication |
+| Profile update | Second encounter shows longitudinal evolution |
 
 ---
 
-## 6. Case Reasoning
-
-- Open **Case Reasoning**
-- Ask: *"What are the top differentials for low back pain in a 42-year-old with no leg radiation and negative straight leg raise?"*
-- Show the response
-- Ask: *"Any interactions between naproxen and lisinopril I should be aware of?"*
-- Show the response
+## Full Demo (~18 min)
 
 ---
 
-## 7. Billing
+### 1. Home Page & Patient List (2 min)
 
-- Open the **Billing** tab
-- Show items extracted automatically from the recordings (Physical Exam, Naproxen, MRI Lumbar Spine, Physical Therapy Referral)
-- Add a missing item manually if needed
-- Click **Generate Invoice** → show the itemised invoice
+**Show:** Home page dashboard
+
+> *"The day starts here. Pending encounters, overdue follow-ups, recently seen patients — all in one place. Nothing buried."*
+
+**Navigate to:** Patient Records
+
+> *"The patient list isn't just names. Each row pulls from the living clinical profile — active problems, allergy flags, last visit date. You get the clinical picture before you open a chart."*
+
+- Point out condition chips and allergy indicators on a couple of patients
+- Point out visit count and last seen date on the right
+
+**Click:** James Harrison
+
+> *"James is coming in this morning. Here's his profile."*
+
+- Point to the clinical narrative summary
+- Point to active problems with ICD-10 codes
+- Point to current medications
+
+> *"This has been built automatically from every encounter on record. The system has read every note and distilled it into a living briefing. Nothing maintained manually."*
 
 ---
 
-## 8. Publish & Patient Companion
+### 2. Start the Encounter (1 min)
 
-- Click **Publish** → confirm
-- Click **Share with Patient** → copy the link
-- Open in incognito — show the companion page
-- Ask: *"What medication was prescribed and what's the dose?"*
-- Ask: *"Can I go for walks this week?"*
-- Ask: *"What symptoms should make me come back sooner?"*
+**Click:** New Encounter → select James Harrison → Ambient Consultation
+
+> *"He's in the room. Ambient mode picks up the whole room — both voices, no microphone handoff, no typing. We just talk."*
+
+**Hit record.**
 
 ---
 
-## Troubleshooting
+### 3. Ambient Consultation (3 min)
 
-**Facts not extracting** — Check mic permissions. Look for `[Corti Facts]` in Console.
+*Read naturally, as if in the consultation room. Approximately 90 seconds of speech.*
 
-**Document generation fails** — Check `CORTI_CLIENT_ID`, `CORTI_CLIENT_SECRET`, `CORTI_TENANT` in `.env`.
+---
 
-**Reconciliation doesn't trigger** — Requires 2+ recordings.
+**Provider:** "James, good to see you. How have you been feeling since your last visit?"
 
-**Billing items missing** — Background extraction runs after save, give it 5–10 seconds.
+**Patient:** "Not great, honestly. I've been really tired, and I'm getting short of breath walking up the stairs. It wasn't like this a few months ago."
 
-**Companion page error** — Ensure encounter is Published and companion link is visible.
+**Provider:** "Any chest pain? Palpitations?"
 
-**Case reasoning times out** — Normal response is 10–12s. Do not re-enable `web-search-expert`.
+**Patient:** "No chest pain. Maybe a bit of a racing feeling once or twice."
+
+**Provider:** "Okay. Your labs came back. HbA1c is 8.4% — up from 7.9 at your last visit, so your sugar control has slipped a bit. Fasting glucose was 11.2. LDL cholesterol is 3.8, which is higher than we'd like given your diabetes. Kidney function is stable, creatinine 98. Haemoglobin is 11.8 — mildly low."
+
+**Patient:** "Is that why I'm so tired?"
+
+**Provider:** "Quite possibly, yes. The anaemia combined with not-great sugar control will make you feel that way. Let me examine you."
+
+**Provider:** "Blood pressure today is 152 over 94 — a bit high. Heart sounds normal, chest is clear, no peripheral oedema."
+
+**Provider:** "Here's the plan, James. We're going to increase your metformin to 1 gram twice daily. I'm also going to start you on atorvastatin 40 milligrams at night given that LDL. For the anaemia, I want to check iron studies — we'll draw blood today. I'd like you to have a 24-hour ECG given the palpitations, and I'm referring you to cardiology just to be safe. Come back in six weeks."
+
+**Patient:** "Okay, that all makes sense. Thank you."
+
+---
+
+**Stop recording.**
+
+> *"That's the consultation. Now watch what happens."*
+
+---
+
+### 4. Facts Panel (2 min)
+
+**Navigate to:** Facts
+
+> *"Every clinical fact from that conversation has been pulled out and structured. Symptoms, examination findings, the lab values we discussed — HbA1c 8.4, fasting glucose 11.2, LDL 3.8, haemoglobin 11.8, creatinine 98, BP 152/94. None of this required any typing."*
+
+- Scroll through the facts list slowly
+- Pause on lab values
+
+> *"Look at the lab results section. The values I read aloud have been extracted as discrete structured results. The system isn't just transcribing — it's understanding a clinical conversation."*
+
+---
+
+### 5. Case Reasoning (1.5 min)
+
+**Navigate to:** Case Reasoning
+
+> *"For complex cases, this is where it gets genuinely useful."*
+
+- Run case reasoning if not already complete
+
+> *"It's flagging the combination of anaemia and mildly elevated creatinine as worth monitoring — that pattern can indicate CKD-related anaemia, which changes the management approach. It's also confirming the statin is appropriate given his diabetes and LDL. Not replacing clinical judgement — a second pair of eyes across the whole case."*
+
+---
+
+### 6. Document Generation (1 min)
+
+**Navigate to:** Generate documents → SOAP note
+
+> *"Ten seconds. A complete, structured clinical note — not a transcript, a proper SOAP note. We can generate a referral letter to cardiology or a patient-facing summary from the same consultation."*
+
+- Show the generated SOAP note, scrolling through it without reading aloud
+
+---
+
+### 7. Publish (30 sec)
+
+**Click:** Publish
+
+> *"Publishing triggers the full downstream pipeline simultaneously — coding, billing, profile update, patient companion. All in the background."*
+
+*Wait for processing.*
+
+---
+
+### 8. ICD-10 Coding (1 min)
+
+**Show:** Medical coding panel
+
+> *"ICD-10 codes suggested from what was said in the room. E11.65 — Type 2 diabetes with hyperglycaemia. I10 — hypertension. R06.09 — dyspnoea. D64.9 — anaemia. E78.5 — hyperlipidaemia. The coder reviews and confirms — for straightforward cases like this, it's essentially done."*
+
+- Point to each code
+
+---
+
+### 9. Billing & CPT Codes (1 min)
+
+**Show:** Billing panel
+
+> *"CPT codes — 99214, established patient, moderate complexity. Determined automatically from the number of diagnoses, data reviewed, and management complexity."*
+
+- Show the estimated dollar value
+
+> *"Every encounter has a value attached from the moment it's published. Nothing falls off the billing cycle."*
+
+---
+
+### 10. Patient Companion (1.5 min)
+
+**Navigate to:** Patient companion
+
+> *"James gets a link — works on any phone, no app download. He can ask questions about what was discussed today."*
+
+**Show:** *"What is atorvastatin and why am I taking it?"* → companion response
+
+> *"Grounded only in his encounter and history — not a general chatbot. He gets answers at 11pm without calling the practice."*
+
+---
+
+### 11. Updated Profile & Second Encounter (5 min)
+
+**Navigate to:** James Harrison — Patient Records
+
+> *"His profile has already updated. New diagnoses in active problems, atorvastatin in medications, anaemia flagged. No manual update."*
+
+- Point to updated active problems, medications, clinical narrative
+
+> *"Six weeks later, James comes back. Iron studies confirmed deficiency. Cardiology cleared him on the Holter. Quick follow-up."*
+
+**New Encounter → James Harrison → Ambient → Record**
+
+---
+
+**Provider:** "James, good news — cardiology reviewed your 24-hour ECG and it's normal. Your iron studies show iron deficiency, ferritin was 8, so we're starting you on ferrous sulphate 200 milligrams daily with food. Blood pressure today is 138 over 86 — much better. Keep doing what you're doing."
+
+**Patient:** "That's a relief. Will the iron help with the tiredness?"
+
+**Provider:** "Yes, you should notice improvement over the next four to six weeks. We'll recheck your bloods at your next visit."
+
+---
+
+**Stop → Publish → Navigate to James Harrison profile**
+
+> *"The profile has updated. Ferritin 8 in lab results. Iron deficiency anaemia confirmed and coded. Ferrous sulphate in current medications. Cardiology clearance in the narrative. Every encounter adds to the picture. The clinician always walks in with context."*
+
+- Point to the "Built from N encounters" counter incrementing
+
+---
+
+### Closing
+
+> *"From the room to the record to the bill — automated, accurate, and in the background. The clinician just had to show up and do their job."*
+
+---
+
+## Short Demo (~4 min)
+
+*Best for investor pitches, trade show conversations, or when time is tight. Covers the core loop only: ambient → facts + labs → coding + billing → profile. Skip document generation, case reasoning, and companion.*
+
+---
+
+### Setup
+
+Same patient — James Harrison, profile already built.
+Navigate to his patient detail page before starting.
+
+---
+
+### Script
+
+**Show:** James Harrison's patient profile (5 sec)
+
+> *"This is James. Established patient, Type 2 diabetes, hypertension. His clinical profile is built automatically from every encounter on record — problems, medications, history. We didn't type any of this."*
+
+**Click:** New Encounter → Ambient Consultation → Record
+
+> *"He's in the room. Ambient mode — both voices, no typing."*
+
+---
+
+*Read the following — approximately 60 seconds:*
+
+**Provider:** "James, your labs came back. HbA1c is 8.4, up from 7.9 — sugar control has slipped. LDL is 3.8, which is high. Haemoglobin is 11.8, mildly low, which may explain the fatigue you've been having. Blood pressure today is 152 over 94. Here's the plan — we're increasing metformin to 1 gram twice daily, starting atorvastatin 40 milligrams at night for the cholesterol, and I want to check iron studies today. I'm also referring you to cardiology for a 24-hour ECG given the occasional palpitations. Come back in six weeks."
+
+**Patient:** "Okay, understood. Thank you."
+
+---
+
+**Stop recording.**
+
+> *"Done. Watch what the platform does with that."*
+
+**Navigate to:** Facts
+
+> *"Symptoms, exam, the lab values I read aloud — HbA1c 8.4, LDL 3.8, haemoglobin 11.8, BP 152/94 — all structured. No typing."*
+
+- Pause on lab results section
+
+> *"These values are extracted as discrete lab results. From speech."*
+
+**Click:** Publish
+
+*Wait briefly.*
+
+**Show:** ICD coding panel
+
+> *"ICD-10 codes — T2DM with hyperglycaemia, hypertension, anaemia, hyperlipidaemia, dyspnoea. From the conversation."*
+
+**Show:** Billing panel
+
+> *"99214 — moderate complexity office visit. Billed automatically."*
+
+- Show dollar value
+
+**Navigate to:** James Harrison profile
+
+> *"Profile updated. New diagnoses, new medication, anaemia flagged. Every encounter builds the picture forward."*
+
+> *"From the room to the record to the bill — the clinician just had to show up."*
+
+---
+
+### Short Demo Timing
+
+| Section | Duration |
+|---|---|
+| Patient profile intro | 20 sec |
+| Start encounter | 10 sec |
+| Ambient consultation | 60 sec |
+| Facts + lab results | 45 sec |
+| Publish + ICD coding | 40 sec |
+| Billing | 20 sec |
+| Profile update | 25 sec |
+| **Total** | **~4 min** |
+
+---
+
+## Full Demo Timing Reference
+
+| Section | Duration |
+|---|---|
+| Home page & patient list | 2 min |
+| Start encounter | 1 min |
+| Ambient consultation | 3 min |
+| Facts panel | 2 min |
+| Case reasoning | 1.5 min |
+| Document generation | 1 min |
+| Publish | 0.5 min |
+| ICD-10 coding | 1 min |
+| Billing & CPT | 1 min |
+| Patient companion | 1.5 min |
+| Updated profile & second encounter | 5 min |
+| **Total** | **~19 min** |
+
+---
+
+## Handling Questions
+
+**"How accurate is the coding?"**
+The ICD suggestions are reviewed and confirmed by the coder — the system proposes, the coder disposes. It's a starting point, not a black box.
+
+**"Is the data secure / HIPAA compliant?"**
+Audio is processed in real-time and not stored beyond what's needed. All data is encrypted at rest and in transit.
+
+**"What if the AI gets something wrong in the facts?"**
+Every fact is reviewable and editable before the note is finalised. The system surfaces everything — the clinician has final sign-off.
+
+**"Can it handle specialist consultations, not just primary care?"**
+Yes — fact extraction and coding are specialty-aware. Templates are configurable per specialty and encounter type.
+
+**"What does setup look like?"**
+Onboarding is self-serve for small practices. Existing patient data can be imported. First encounter can be run on day one.
