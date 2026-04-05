@@ -5,6 +5,7 @@ import { api } from 'convex/_generated/api';
 import type { Id } from 'convex/_generated/dataModel';
 import { Brain, RotateCw, Clock } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from '@/hooks/use-toast';
 
 interface PatientProfileCardProps {
   patientId: Id<'patients'>;
@@ -28,11 +29,18 @@ export function PatientProfileCard({ patientId, embedded = false }: PatientProfi
   async function handleRerun() {
     const encounterId = profile?.triggerEncounterId ?? latestEncounter?._id;
     const orgId = profile?.orgId ?? latestEncounter?.orgId;
-    if (!encounterId || !orgId || isRerunning) return;
+    console.log('[ProfileCard] handleRerun', { encounterId, orgId, isRerunning, profile: profile?.buildStatus });
+    if (!encounterId || !orgId || isRerunning) {
+      console.warn('[ProfileCard] Early return — missing:', { encounterId, orgId, isRerunning });
+      return;
+    }
     setIsRerunning(true);
     try {
       await markProcessing({ patientId, orgId, encounterId });
       await buildProfile({ patientId, orgId, encounterId });
+    } catch (err) {
+      console.error('[ProfileCard] buildProfile error:', err);
+      toast({ title: 'Profile generation failed', description: String(err), variant: 'destructive' });
     } finally {
       setIsRerunning(false);
     }

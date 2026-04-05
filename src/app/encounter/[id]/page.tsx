@@ -691,20 +691,12 @@ export default function ConsultationDetailPage() {
             {/* Primary actions */}
             <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
               {status === 'draft' && (
-                <>
-                  <AppLink href={`/encounter/new?encounterId=${encounterId}`}>
-                    <Button className="gap-2">
-                      <Mic className="h-4 w-4" />
-                      Ambient
-                    </Button>
-                  </AppLink>
-                  <AppLink href={`/encounter/new?encounterId=${encounterId}&mode=dictate`}>
-                    <Button variant="outline" className="gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      Dictate
-                    </Button>
-                  </AppLink>
-                </>
+                <AppLink href={`/encounter/new?encounterId=${encounterId}`}>
+                  <Button className="gap-2">
+                    <Mic className="h-4 w-4" />
+                    Start Recording
+                  </Button>
+                </AppLink>
               )}
 
               {(status === 'in-progress' || status === 'review') && (
@@ -812,19 +804,11 @@ export default function ConsultationDetailPage() {
                 </div>
                 <div className="text-center space-y-1">
                   <p className="text-lg font-medium">Ready to begin</p>
-                  <p className="text-sm text-muted-foreground">Choose how to capture this encounter</p>
+                  <p className="text-sm text-muted-foreground">Start the ambient recording to capture this encounter</p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <AppLink href={`/encounter/new?encounterId=${encounterId}`}>
-                    <Button className="gap-2"><Mic className="h-4 w-4" />Ambient Consultation</Button>
-                  </AppLink>
-                  <AppLink href={`/encounter/new?encounterId=${encounterId}&mode=dictate`}>
-                    <Button variant="outline" className="gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      Dictate Note
-                    </Button>
-                  </AppLink>
-                </div>
+                <AppLink href={`/encounter/new?encounterId=${encounterId}`}>
+                  <Button className="gap-2"><Mic className="h-4 w-4" />Start Ambient Recording</Button>
+                </AppLink>
               </div>
             </div>
           )}

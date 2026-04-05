@@ -41,7 +41,7 @@ Do not repeat information from Overview or Recent.`,
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { patientInfo, encounters } = body;
+    const { patientInfo, encounters, interactionId } = body;
 
     if (!encounters || !Array.isArray(encounters) || encounters.length === 0) {
       return NextResponse.json(
@@ -50,11 +50,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = createCortiClientFromEnv();
+    if (!interactionId || typeof interactionId !== 'string') {
+      return NextResponse.json(
+        { error: 'Missing required field: interactionId' },
+        { status: 400 }
+      );
+    }
 
-    // Create a fresh interaction for this profile build
-    const interaction = await client.createInteractionV2();
-    const interactionId = interaction.id;
+    const client = createCortiClientFromEnv();
 
     // Aggregate facts from all encounters into Corti context format.
     // Patient demographics first, then encounter facts newest-first.

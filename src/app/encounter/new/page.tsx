@@ -5,10 +5,9 @@ import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Stethoscope, Save, Check, Loader2, Sparkles, Search, Radio, FileText } from 'lucide-react';
+import { Stethoscope, Save, Check, Loader2, Sparkles, Search } from 'lucide-react';
 
 import { CortiConsultation } from '@/components/encounter/CortiConsultation';
-import { DictationEncounterPanel } from '@/components/encounter/DictationEncounterPanel';
 import { useUser } from '@clerk/nextjs';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from 'convex/_generated/api';
@@ -44,11 +43,9 @@ export default function NewEncounterPage() {
   const searchParams = useSearchParams();
   const queryConsultationId = searchParams.get('encounterId') as Id<"encounters"> | null;
   const isMobileQuickStart = searchParams.get('mobile') === 'true';
-  const queryMode = searchParams.get('mode') === 'dictate' ? 'dictate' : 'ambient';
   const isMobile = useIsMobile();
 
   const [encounterType, setEncounterType] = useState<'outpatient' | 'inpatient' | 'ed'>('outpatient');
-  const [recordingMode, setRecordingMode] = useState<'ambient' | 'dictate'>(queryMode);
   const [sessionData, setSessionData] = useState<EncounterSession | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -405,32 +402,9 @@ export default function NewEncounterPage() {
           </div>
         </div>
 
-        {/* Mode + encounter type selectors — shown before first recording */}
+        {/* Encounter type — shown before first recording */}
         {!sessionData && !encounterId && (
-          <div className="flex flex-col items-center gap-6 py-4">
-            {/* Mode cards */}
-            <div className="grid grid-cols-2 gap-4 w-full max-w-lg">
-              {([
-                { mode: 'ambient' as const, icon: Radio, title: 'Ambient Consultation', desc: 'Listens to the full room conversation' },
-                { mode: 'dictate' as const, icon: FileText, title: 'Dictate Note', desc: 'You speak directly to dictate' },
-              ]).map(({ mode, icon: Icon, title, desc }) => (
-                <button
-                  key={mode}
-                  onClick={() => setRecordingMode(mode)}
-                  className={`flex flex-col items-center gap-2 rounded-xl border-2 p-5 text-center transition-colors ${
-                    recordingMode === mode
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border bg-card hover:border-primary/40 hover:bg-muted/40'
-                  }`}
-                >
-                  <Icon className={`h-6 w-6 ${recordingMode === mode ? 'text-primary' : 'text-muted-foreground'}`} />
-                  <span className={`text-sm font-semibold ${recordingMode === mode ? 'text-primary' : 'text-foreground'}`}>{title}</span>
-                  <span className="text-xs text-muted-foreground">{desc}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Encounter type — subtle secondary control */}
+          <div className="flex justify-center py-2">
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Encounter type</span>
               <div className="flex rounded-lg border overflow-hidden text-xs">
@@ -452,24 +426,16 @@ export default function NewEncounterPage() {
           </div>
         )}
 
-        {recordingMode === 'dictate' && !sessionData ? (
-          <DictationEncounterPanel
-            key={encounterId ?? 'new'}
-            onSessionComplete={handleSessionComplete}
-            encounterId={encounterId ?? undefined}
-          />
-        ) : (
-          <CortiConsultation
-            consultationType="sick-visit"
-            onSessionComplete={handleSessionComplete}
-            onRecordAgain={handleRecordAgain}
-            encounterId={encounterId ?? undefined}
-            initialFacts={draftFacts}
-            initialTranscript={draftTranscript}
-            isMobile={isMobile}
-            mobileQuickStart={isMobileQuickStart}
-          />
-        )}
+        <CortiConsultation
+          consultationType="sick-visit"
+          onSessionComplete={handleSessionComplete}
+          onRecordAgain={handleRecordAgain}
+          encounterId={encounterId ?? undefined}
+          initialFacts={draftFacts}
+          initialTranscript={draftTranscript}
+          isMobile={isMobile}
+          mobileQuickStart={isMobileQuickStart}
+        />
 
         {sessionData && (
           <div className="flex justify-center">

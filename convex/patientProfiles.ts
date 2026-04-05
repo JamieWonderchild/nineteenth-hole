@@ -3,9 +3,52 @@ import { action, internalMutation, internalQuery, mutation, query } from "./_gen
 import { internal, api } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
+const PATIENT_PROFILE_SECTIONS = [
+  {
+    key: 'corti-subjective',
+    nameOverride: 'Overview',
+    contentOverride: 'Include: patient demographics, major chronic conditions, allergy status, key background history. Exclude: recent visit details, pending items, treatment plans.',
+    writingStyleOverride: 'Dense clinical shorthand, as if handing off to a colleague. No padding.',
+    additionalInstructionsOverride: `Write 2-3 sentences maximum. Cover: who the patient is (age, sex), their major ongoing conditions, and allergy status.\nExample: "58M with T2DM (poorly controlled), primary hypertension, and new hyperlipidaemia. NKDA. No prior hospitalisations documented."\nDo not mention recent visits or pending actions here.`,
+  },
+  {
+    key: 'corti-assessment',
+    nameOverride: 'Recent',
+    contentOverride: 'Include: last 1-2 encounter dates, chief complaint, key findings, diagnoses made, what was started or changed. Exclude: chronic background, medications unchanged, pending follow-up items.',
+    writingStyleOverride: 'Tight clinical narrative, past tense, dense.',
+    additionalInstructionsOverride: `Summarise the most recent encounter(s) in 2-4 sentences.\nCover: why the patient came in, what was found, what was diagnosed or changed, what was ordered or started.\nExample: "Seen 2026-04-05 for fatigue and exertional SOB. HbA1c 8.4%, LDL 3.8, mild normocytic anaemia (Hb 11.8). Metformin uptitrated to 1g BD, atorvastatin 40mg nocte started. Iron studies, 24h Holter, and cardiology referral placed."\nIf multiple encounters, summarise the most recent first.`,
+  },
+  {
+    key: 'corti-plan',
+    nameOverride: 'Watch',
+    contentOverride: 'Include: pending results, outstanding referrals, unresolved issues, items to monitor at next visit. Exclude: completed treatments, resolved problems, background history.',
+    writingStyleOverride: 'Bullet-point style, action-oriented, brief.',
+    additionalInstructionsOverride: `List what is unresolved, pending, or needs monitoring. 1-4 items maximum.\nExample: "Iron studies pending — exclude iron deficiency vs CKD-related anaemia. Cardiology referral placed — Holter requested for palpitations. Glycaemic control suboptimal — recheck HbA1c in 3 months."\nIf nothing is pending, write: "No outstanding items documented."\nDo not repeat information from Overview or Recent.`,
+  },
+];
+
+async function cortiAuthenticate(clientId: string, clientSecret: string, tenant: string, region: string): Promise<string> {
+  const body = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: 'client_credentials',
+    scope: 'openid',
+  });
+  const response = await fetch(`https://auth.${region}.corti.app/realms/${tenant}/protocol/openid-connect/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!response.ok) {
+    throw new Error(`Corti auth failed: ${response.status}`);
+  }
+  const data = await response.json();
+  return data.access_token as string;
+}
+
 /**
  * Public action: Build (or rebuild) the living patient profile.
- * Called after every encounter publish, and can be triggered manually.
+ * Calls Corti directly — no dependency on SITE_URL or Next.js routes.
  */
 export const buildPatientProfile = action({
   args: {
@@ -20,7 +63,7 @@ export const buildPatientProfile = action({
       // Step 1: Assemble patient + encounter context
       const contextData = await ctx.runMutation(
         internal.patientProfiles.getPatientContextData,
-        { patientId: args.patientId }
+        { patientId: args.patientId, encounterId: args.encounterId }
       );
 
       if (!contextData) {
@@ -38,39 +81,121 @@ export const buildPatientProfile = action({
         return { success: true };
       }
 
-      // Step 2: Call Corti agent via API route
-      // If a profile already exists, only send the new encounter as a delta update.
-      // Otherwise, send all encounters for the initial synthesis.
-      const apiUrl = process.env.SITE_URL || 'https://healthplatform.com';
-      const response = await fetch(`${apiUrl}/api/corti/build-patient-profile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patientInfo: contextData.patientInfo,
-          encounters: contextData.encounters,
-          existingProfile: contextData.existingProfile ?? null,
-        }),
+      // Step 2: Authenticate with Corti directly
+      const clientId = process.env.CORTI_CLIENT_ID;
+      const clientSecret = process.env.CORTI_CLIENT_SECRET;
+      const tenant = process.env.CORTI_TENANT?.trim();
+      const region = process.env.CORTI_ENV || 'eu';
+
+      if (!clientId || !clientSecret || !tenant) {
+        return { success: false, error: 'Missing Corti credentials in Convex environment' };
+      }
+
+      const accessToken = await cortiAuthenticate(clientId, clientSecret, tenant, region);
+
+      // Step 3: Aggregate facts from all encounters
+      const facts: Array<{ text: string; source: 'core'; group: string }> = [];
+      const { patientInfo, encounters } = contextData;
+
+      if (patientInfo.name) facts.push({ text: `Patient: ${patientInfo.name}`, source: 'core', group: 'demographics' });
+      if (patientInfo.age) facts.push({ text: `Age: ${patientInfo.age}`, source: 'core', group: 'demographics' });
+      if (patientInfo.sex) facts.push({ text: `Sex: ${patientInfo.sex}`, source: 'core', group: 'demographics' });
+      if (patientInfo.weight) facts.push({ text: `Weight: ${patientInfo.weight}`, source: 'core', group: 'demographics' });
+      facts.push({
+        text: `Allergies: ${(patientInfo.allergies ?? []).length > 0 ? patientInfo.allergies.join(', ') : 'none documented'}`,
+        source: 'core',
+        group: 'allergies',
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[PatientProfile] API error:', errorText.substring(0, 300));
+      for (const enc of encounters) {
+        if (enc.date) facts.push({ text: `Encounter date: ${enc.date}`, source: 'core', group: 'history-of-present-illness' });
+        if (enc.chiefComplaint) facts.push({ text: `Chief complaint: ${enc.chiefComplaint}`, source: 'core', group: 'chief-complaint' });
+        if (enc.icd10Codes?.length > 0) facts.push({ text: `Diagnoses: ${enc.icd10Codes.join(', ')}`, source: 'core', group: 'assessment' });
+        for (const [group, groupFacts] of Object.entries(enc.keyFacts ?? {})) {
+          for (const fact of (groupFacts as string[]).slice(0, 8)) {
+            facts.push({ text: fact, source: 'core', group });
+          }
+        }
+        if (enc.planText) facts.push({ text: `Plan: ${enc.planText}`, source: 'core', group: 'plan' });
+      }
+
+      // Step 4: Create a fresh v1 interaction for document generation
+      const interactionResponse = await fetch(
+        `https://api.${region}.corti.app/interactions/`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      if (!interactionResponse.ok) {
+        const errText = await interactionResponse.text();
+        console.error('[PatientProfile] Interaction creation error:', errText.substring(0, 200));
         await ctx.runMutation(internal.patientProfiles.updateBuildStatus, {
           patientId: args.patientId,
           orgId: args.orgId,
           encounterId: args.encounterId,
           status: 'failed',
         });
-        return { success: false, error: `API error: ${response.status}` };
+        return { success: false, error: `Corti interaction error: ${interactionResponse.status}` };
+      }
+      const { id: interactionId } = await interactionResponse.json();
+
+      // Step 5: Call Corti document generation directly
+      const docResponse = await fetch(
+        `https://api.${region}.corti.app/v2/interactions/${interactionId}/documents`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Tenant-Name': tenant,
+          },
+          body: JSON.stringify({
+            context: [{ type: 'facts', data: facts }],
+            template: { sections: PATIENT_PROFILE_SECTIONS },
+            outputLanguage: 'en',
+            name: patientInfo.name ? `Clinical Profile — ${patientInfo.name}` : 'Clinical Profile',
+            documentationMode: 'routed_parallel',
+          }),
+        }
+      );
+
+      if (!docResponse.ok) {
+        const errorText = await docResponse.text();
+        console.error('[PatientProfile] Corti doc gen error:', errorText.substring(0, 300));
+        await ctx.runMutation(internal.patientProfiles.updateBuildStatus, {
+          patientId: args.patientId,
+          orgId: args.orgId,
+          encounterId: args.encounterId,
+          status: 'failed',
+        });
+        return { success: false, error: `Corti error: ${docResponse.status}` };
       }
 
-      const { profile } = await response.json();
+      const document = await docResponse.json();
 
-      if (!profile) {
-        return { success: false, error: 'Invalid profile response' };
-      }
+      // Step 5: Map sections and save
+      const summarySections = (document.sections ?? [])
+        .map((s: { key: string; name?: string; title?: string; text?: string; content?: string }) => ({
+          title: s.name || s.title || s.key,
+          content: s.text || s.content || '',
+        }))
+        .filter((s: { title: string; content: string }) => s.content.trim().length > 0);
 
-      // Step 3: Upsert the profile
+      const profile = {
+        summarySections,
+        activeProblems: [] as Array<{ condition: string; status: string; lastMentionedDate: string }>,
+        currentMedications: [] as Array<{ drug: string }>,
+        allergies: [] as Array<{ allergen: string }>,
+        riskFactors: [] as string[],
+        clinicalNarrative: '',
+        careGaps: [] as Array<{ description: string; priority: string }>,
+        keyHistory: '',
+      };
+
       await ctx.runMutation(internal.patientProfiles.saveProfile, {
         patientId: args.patientId,
         orgId: args.orgId,
@@ -100,7 +225,7 @@ export const buildPatientProfile = action({
  * Internal: Assemble patient demographics + published encounter summaries
  */
 export const getPatientContextData = internalMutation({
-  args: { patientId: v.id("patients") },
+  args: { patientId: v.id("patients"), encounterId: v.id("encounters") },
   handler: async (ctx, args) => {
     const patient = await ctx.db.get(args.patientId);
     if (!patient) return null;
@@ -167,7 +292,12 @@ export const getPatientContextData = internalMutation({
       keyHistory: existingProfile.keyHistory,
     } : null;
 
-    return { patientInfo, encounters, existingProfile: profileForAgent };
+    // Find the most recent real Corti interactionId from published encounters.
+    // Dictation encounters use synthetic IDs like "dictation-xxx" which aren't valid Corti interactions.
+    const cortiFacts = rawEncounters.find(enc => enc.interactionId && !enc.interactionId.startsWith('dictation-'));
+    const triggerInteractionId = cortiFacts?.interactionId ?? null;
+
+    return { patientInfo, encounters, existingProfile: profileForAgent, triggerInteractionId };
   },
 });
 
