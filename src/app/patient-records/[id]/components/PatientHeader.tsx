@@ -168,7 +168,7 @@ export function PatientHeader({
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <Button variant="outline" size="sm" onClick={onNewConsultation} className="gap-1.5 whitespace-nowrap">
               <PlusCircle className="h-3.5 w-3.5" />
               New Encounter
@@ -178,7 +178,7 @@ export function PatientHeader({
               Follow-up
             </Button>
             <AppLink href={`/patient-records/${patient._id}/print`}>
-              <Button variant="ghost" size="sm" className="gap-1.5 w-full">
+              <Button variant="ghost" size="sm" className="gap-1.5">
                 <Printer className="h-3.5 w-3.5" />
                 Export
               </Button>
