@@ -35,8 +35,9 @@ interface MedicalCodingPanelProps {
   isEditable?: boolean;
   addenda?: Array<{ text: string; createdAt: string }>;
   encounterType?: 'outpatient' | 'inpatient' | 'ed';
-  reconciledAt?: string; // ISO timestamp — changes when fact reconciliation completes
-  unresolvedContradictions?: number; // blocks coding until all conflicts are resolved
+  reconciledAt?: string;
+  unresolvedContradictions?: number;
+  embedded?: boolean; // strips outer card wrapper and header when true
 }
 
 export function MedicalCodingPanel({
@@ -50,6 +51,7 @@ export function MedicalCodingPanel({
   encounterType = 'outpatient',
   reconciledAt,
   unresolvedContradictions = 0,
+  embedded = false,
 }: MedicalCodingPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [icd10Suggestions, setIcd10Suggestions] = useState<MedicalCode[]>([]);
@@ -268,21 +270,24 @@ export function MedicalCodingPanel({
   const hasAccepted = acceptedIcd10.size > 0 || acceptedCpt.size > 0;
   const totalAccepted = acceptedIcd10.size + acceptedCpt.size;
 
-  return (
-    <div className="rounded-lg border bg-card p-4">
+  const inner = (
+    <>
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-            <Tag className="h-3.5 w-3.5" />
-            Medical Coding
-          </p>
-          {hasAccepted && (
-            <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
-              {totalAccepted} code{totalAccepted !== 1 ? 's' : ''}
-            </span>
-          )}
-        </div>
+      <div className={`flex items-center justify-between ${embedded ? 'mb-3' : 'mb-3'}`}>
+        {!embedded && (
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <Tag className="h-3.5 w-3.5" />
+              Medical Coding
+            </p>
+            {hasAccepted && (
+              <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+                {totalAccepted} code{totalAccepted !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        )}
+        {embedded && <div />}
         {isEditable && (
           <button
             onClick={runCoding}
@@ -443,6 +448,9 @@ export function MedicalCodingPanel({
           ))}
         </div>
       )}
-    </div>
+    </>
   );
+
+  if (embedded) return <div>{inner}</div>;
+  return <div className="rounded-lg border bg-card p-4">{inner}</div>;
 }

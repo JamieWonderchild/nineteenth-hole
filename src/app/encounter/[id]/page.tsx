@@ -58,6 +58,8 @@ import {
   FileText,
   ClipboardList,
   ChevronRight,
+  ChevronDown,
+  Tag,
   AlertTriangle,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -115,6 +117,7 @@ export default function ConsultationDetailPage() {
   const [smsPhone, setSmsPhone] = useState('');
   const [isSendingSms, setIsSendingSms] = useState(false);
   const [smsSent, setSmsSent] = useState(false);
+  const [codingExpanded, setCodingExpanded] = useState(false);
 
 
   const encounter = useQuery(
@@ -655,7 +658,7 @@ export default function ConsultationDetailPage() {
   return (
     <Layout>
       <BillingGuard feature="Encounters">
-        <div className="mx-auto max-w-7xl p-4 sm:p-6 space-y-5">
+        <div className="mx-auto max-w-3xl p-4 sm:p-6 space-y-5">
           {/* Header: back + name + status + actions */}
           <div className="flex flex-col sm:flex-row sm:items-start gap-3">
             <div className="flex-1 min-w-0 space-y-1">
@@ -925,104 +928,149 @@ export default function ConsultationDetailPage() {
                 </div>
               )}
 
-              {/* ── Two-column body ───────────────────────────────────── */}
-              <div className="flex gap-6 items-start">
+              {/* ── Single-column body ───────────────────────────────── */}
+              <div className="space-y-5">
 
-                {/* Left: timeline + notes + planned services */}
-                <div className="flex-1 min-w-0 space-y-5">
-
-                  {/* Recording Timeline */}
-                  <div ref={timelineRef}>
-                    <RecordingTimeline
-                      recordings={detail?.recordings || []}
-                      factReconciliation={detail?.factReconciliation}
-                      onResolveConflict={isEditable ? handleResolveConflict : undefined}
-                      addenda={encounter.addenda ?? []}
-                      onEditNote={(index, text, createdAt) => { setViewingNote({ index, text, createdAt }); setEditNoteText(text); }}
-                      isEditable={isEditable}
-                    />
-                  </div>
-
-                  {/* Planned Services */}
-                  {orgContext?.orgId && (
-                    <PlannedServicesWidget
-                      encounterId={encounterId as Id<"encounters">}
-                      orgId={orgContext.orgId as Id<"organizations">}
-                      facts={computeFactsFromDetail()}
-                      encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
-                    />
-                  )}
-
-                </div>{/* end left column */}
-
-                {/* Right: patient + coding + attachments */}
-                <div className="w-[360px] flex-shrink-0 sticky top-6 self-start space-y-4">
-
-                  {/* Medical Coding */}
-                  <MedicalCodingPanel
-                    encounterId={encounterId as Id<'encounters'>}
-                    facts={computeFactsFromDetail()}
-                    transcript={encounter.transcription}
-                    existingIcd10={encounter.icd10Codes ?? []}
-                    existingCpt={encounter.cptCodes ?? []}
-                    isEditable={isEditable}
+                {/* Recording Timeline */}
+                <div ref={timelineRef}>
+                  <RecordingTimeline
+                    recordings={detail?.recordings || []}
+                    factReconciliation={detail?.factReconciliation}
+                    onResolveConflict={isEditable ? handleResolveConflict : undefined}
                     addenda={encounter.addenda ?? []}
-                    encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
-                    reconciledAt={detail?.factReconciliation?.reconciledAt}
-                    unresolvedContradictions={unresolvedContradictions}
+                    onEditNote={(index, text, createdAt) => { setViewingNote({ index, text, createdAt }); setEditNoteText(text); }}
+                    isEditable={isEditable}
                   />
+                </div>
 
-                  {/* Attachments (compact) */}
-                  <div
-                    className="rounded-lg border bg-card p-3"
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => { e.preventDefault(); handleFileUpload(e.dataTransfer.files); }}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Attachments</p>
-                        {evidenceFiles && evidenceFiles.length > 0 && (
-                          <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">{evidenceFiles.length}</span>
-                        )}
-                      </div>
-                      <button onClick={() => fileInputRef.current?.click()} disabled={isUploading}
-                        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
-                        {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                        Attach
-                      </button>
-                      <input ref={fileInputRef} type="file" className="hidden"
-                        accept="application/pdf,image/jpeg,image/png,image/webp" multiple
-                        onChange={(e) => handleFileUpload(e.target.files)} />
-                    </div>
-                    {evidenceFiles === undefined ? (
-                      <div className="flex justify-center py-3"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
-                    ) : evidenceFiles.length === 0 ? (
-                      <p className="text-xs text-muted-foreground py-1">No attachments — drag and drop or click Attach</p>
-                    ) : (
-                      <div className="divide-y">
-                        {evidenceFiles.map((file) => (
-                          <div key={file._id} className="flex items-center gap-2 py-1.5 first:pt-0 last:pb-0">
-                            <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                            <span className="text-xs flex-1 truncate">{file.fileName}</span>
-                            {file.url && (
-                              <button onClick={() => window.open(file.url!, '_blank')}
-                                className="text-muted-foreground hover:text-foreground transition-colors">
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                            <button onClick={() => handleDeleteFile(file._id)}
-                              className="text-muted-foreground hover:text-destructive transition-colors">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                {/* Planned Services */}
+                {orgContext?.orgId && (
+                  <PlannedServicesWidget
+                    encounterId={encounterId as Id<"encounters">}
+                    orgId={orgContext.orgId as Id<"organizations">}
+                    facts={computeFactsFromDetail()}
+                    encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
+                  />
+                )}
+
+                {/* Medical Coding — collapsible summary */}
+                {(() => {
+                  const icd10 = encounter.icd10Codes ?? [];
+                  const cpt = encounter.cptCodes ?? [];
+                  const hasCodes = icd10.length > 0 || cpt.length > 0;
+                  return (
+                    <>
+                      {/* Collapsed: one-line summary bar */}
+                      {!codingExpanded && (
+                        <button
+                          onClick={() => setCodingExpanded(true)}
+                          className="w-full rounded-lg border bg-card px-4 py-3 flex items-center gap-2.5 hover:bg-muted/40 transition-colors text-left"
+                        >
+                          <Tag className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex-shrink-0">Medical Coding</span>
+                          {hasCodes ? (
+                            <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
+                              {icd10.map(code => (
+                                <span key={code} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-primary/10 text-primary border border-primary/20">
+                                  {code}
+                                </span>
+                              ))}
+                              {cpt.map(code => (
+                                <span key={code} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800">
+                                  {code}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground flex-1">No codes yet</span>
+                          )}
+                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        </button>
+                      )}
+
+                      {/* Expanded: full coding panel, always mounted to preserve state */}
+                      <div className={codingExpanded ? '' : 'hidden'}>
+                        <div className="rounded-lg border bg-card overflow-hidden">
+                          <button
+                            onClick={() => setCodingExpanded(false)}
+                            className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors text-left border-b border-border"
+                          >
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                              <Tag className="h-3.5 w-3.5" />
+                              Medical Coding
+                            </span>
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground rotate-180" />
+                          </button>
+                          <div className="p-4">
+                            <MedicalCodingPanel
+                              encounterId={encounterId as Id<'encounters'>}
+                              facts={computeFactsFromDetail()}
+                              transcript={encounter.transcription}
+                              existingIcd10={icd10}
+                              existingCpt={cpt}
+                              isEditable={isEditable}
+                              addenda={encounter.addenda ?? []}
+                              encounterType={(encounter.encounterType as 'outpatient' | 'inpatient' | 'ed') ?? 'outpatient'}
+                              reconciledAt={detail?.factReconciliation?.reconciledAt}
+                              unresolvedContradictions={unresolvedContradictions}
+                              embedded
+                            />
                           </div>
-                        ))}
+                        </div>
                       </div>
-                    )}
+                    </>
+                  );
+                })()}
+
+                {/* Attachments */}
+                <div
+                  className="rounded-lg border bg-card p-3"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); handleFileUpload(e.dataTransfer.files); }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Attachments</p>
+                      {evidenceFiles && evidenceFiles.length > 0 && (
+                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">{evidenceFiles.length}</span>
+                      )}
+                    </div>
+                    <button onClick={() => fileInputRef.current?.click()} disabled={isUploading}
+                      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
+                      {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                      Attach
+                    </button>
+                    <input ref={fileInputRef} type="file" className="hidden"
+                      accept="application/pdf,image/jpeg,image/png,image/webp" multiple
+                      onChange={(e) => handleFileUpload(e.target.files)} />
                   </div>
+                  {evidenceFiles === undefined ? (
+                    <div className="flex justify-center py-3"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+                  ) : evidenceFiles.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-1">No attachments — drag and drop or click Attach</p>
+                  ) : (
+                    <div className="divide-y">
+                      {evidenceFiles.map((file) => (
+                        <div key={file._id} className="flex items-center gap-2 py-1.5 first:pt-0 last:pb-0">
+                          <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                          <span className="text-xs flex-1 truncate">{file.fileName}</span>
+                          {file.url && (
+                            <button onClick={() => window.open(file.url!, '_blank')}
+                              className="text-muted-foreground hover:text-foreground transition-colors">
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          <button onClick={() => handleDeleteFile(file._id)}
+                            className="text-muted-foreground hover:text-destructive transition-colors">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-                </div>{/* end right column */}
-
-              </div>{/* end two-column body */}
+              </div>{/* end single-column body */}
 
             </div>
           )}{/* end main content */}
