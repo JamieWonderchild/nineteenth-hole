@@ -8,26 +8,14 @@ import { Layout } from '@/components/layout/Layout';
 import { BillingGuard } from '@/components/billing/BillingGuard';
 import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
 import { AppLink } from '@/components/navigation/AppLink';
-import { ResultsTriagePanel } from '@/components/encounter/ResultsTriagePanel';
 import { OrderSuggestionsPanel } from '@/components/encounter/OrderSuggestionsPanel';
-import { useOrgCtx } from '@/app/providers/org-context-provider';
 
 export default function EncounterInsightsPage() {
   const params = useParams();
   const encounterId = params.id as string;
-  const { orgContext } = useOrgCtx();
 
   const encounter = useQuery(api.encounters.getById, { id: encounterId as Id<'encounters'> });
-  const patient = useQuery(
-    api.patients.getPatientById,
-    encounter?.patientId ? { id: encounter.patientId as Id<'patients'> } : 'skip'
-  );
-  const detail = useQuery(api.encounters.getConsultationDetail, {
-    encounterId: encounterId as Id<'encounters'>,
-  });
-
   const isEditable = encounter?.status !== 'published';
-  const extractionAttempted = !!detail?.factReconciliation?.reconciledAt;
 
   return (
     <Layout>
@@ -59,18 +47,6 @@ export default function EncounterInsightsPage() {
               suggestedOrders={encounter.suggestedOrders as any}
               orderExtractionStatus={encounter.orderExtractionStatus}
               isEditable={isEditable}
-            />
-          )}
-
-          {encounter?.patientId && (encounter.orgId || orgContext?.orgId) && (
-            <ResultsTriagePanel
-              encounterId={encounterId as Id<'encounters'>}
-              patientId={encounter.patientId as Id<'patients'>}
-              orgId={(encounter.orgId ?? orgContext?.orgId) as Id<'organizations'>}
-              providerId={encounter.providerId}
-              patientPhone={patient?.emergencyContact?.phone}
-              isEditable={isEditable}
-              extractionAttempted={extractionAttempted}
             />
           )}
 
