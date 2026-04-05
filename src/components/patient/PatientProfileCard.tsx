@@ -26,6 +26,7 @@ export function PatientProfileCard({ patientId }: PatientProfileCardProps) {
   const profile = useQuery(api.patientProfiles.getByPatient, { patientId });
   const latestEncounter = useQuery(api.encounters.getLatestPublishedByPatient, { patientId });
   const [narrativeExpanded, setNarrativeExpanded] = useState(true);
+  const [careGapsExpanded, setCareGapsExpanded] = useState(false);
   const [isRerunning, setIsRerunning] = useState(false);
 
   const markProcessing = useMutation(api.patientProfiles.markProcessing);
@@ -159,48 +160,62 @@ export function PatientProfileCard({ patientId }: PatientProfileCardProps) {
           </div>
         )}
 
-        {/* Zone 3 — Medications + Care Gaps */}
-        {(hasMeds || hasCareGaps) && (
-          <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {/* Medications */}
-            {hasMeds && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Current Medications</p>
-                <ul className="space-y-1.5">
-                  {profile.currentMedications.map((m, i) => (
-                    <li key={i} className="text-sm text-foreground">
-                      <span className="font-medium">{m.drug}</span>
-                      {(m.dose || m.frequency) && (
-                        <span className="text-muted-foreground">
-                          {m.dose ? ` ${m.dose}` : ''}{m.frequency ? ` · ${m.frequency}` : ''}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+        {/* Zone 3 — Medications */}
+        {hasMeds && (
+          <div className="px-5 py-4">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Current Medications</p>
+            <ul className="space-y-1.5">
+              {profile.currentMedications.map((m, i) => (
+                <li key={i} className="text-sm text-foreground">
+                  <span className="font-medium">{m.drug}</span>
+                  {(m.dose || m.frequency) && (
+                    <span className="text-muted-foreground">
+                      {m.dose ? ` ${m.dose}` : ''}{m.frequency ? ` · ${m.frequency}` : ''}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
-            {/* Care Gaps */}
-            {hasCareGaps && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Care Gaps</p>
-                <ul className="space-y-1.5">
-                  {profile.careGaps.map((g, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className={`mt-0.5 inline-flex px-1.5 py-0.5 rounded border text-[10px] font-semibold uppercase ${PRIORITY_BADGE[g.priority] ?? PRIORITY_BADGE.low}`}>
-                        {g.priority}
-                      </span>
-                      <span className="text-sm text-foreground">{g.description}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+        {/* Zone 4 — Care Gaps (collapsed by default) */}
+        {hasCareGaps && (
+          <div className="px-5 py-3">
+            <button
+              onClick={() => setCareGapsExpanded(v => !v)}
+              className="flex items-center justify-between w-full group"
+            >
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide group-hover:text-foreground transition-colors">
+                Care Gaps
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground text-[10px] font-semibold tabular-nums">
+                  {profile.careGaps.length}
+                </span>
+                {careGapsExpanded ? (
+                  <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                )}
+              </span>
+            </button>
+            {careGapsExpanded && (
+              <ul className="mt-3 space-y-1.5">
+                {profile.careGaps.map((g, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className={`mt-0.5 inline-flex px-1.5 py-0.5 rounded border text-[10px] font-semibold uppercase ${PRIORITY_BADGE[g.priority] ?? PRIORITY_BADGE.low}`}>
+                      {g.priority}
+                    </span>
+                    <span className="text-sm text-foreground">{g.description}</span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         )}
 
-        {/* Zone 4 — Footer */}
+        {/* Zone 5 — Footer */}
         <div className="px-5 py-3 bg-muted/40 flex flex-wrap items-center gap-x-4 gap-y-1">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
