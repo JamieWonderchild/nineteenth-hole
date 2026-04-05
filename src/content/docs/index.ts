@@ -13,6 +13,7 @@ export interface DocArticle {
 export type DocCategory =
   | 'getting-started'
   | 'encounters'
+  | 'patients'
   | 'ai-features'
   | 'billing'
   | 'settings';
@@ -20,63 +21,66 @@ export type DocCategory =
 export const CATEGORY_LABELS: Record<DocCategory, string> = {
   'getting-started': 'Getting Started',
   'encounters': 'Encounters',
+  'patients': 'Patients',
   'ai-features': 'AI Features',
-  'billing': 'Billing',
+  'billing': 'Billing & Coding',
   'settings': 'Settings & Team',
 };
 
 export const CATEGORY_ORDER: DocCategory[] = [
   'getting-started',
   'encounters',
+  'patients',
   'ai-features',
   'billing',
   'settings',
 ];
 
 export const DOCS: DocArticle[] = [
+  // ─── Getting Started ──────────────────────────────────────────────────────
+
   {
     slug: 'overview',
-    title: 'Welcome to [PRODUCT_NAME]',
-    description: 'An overview of what [PRODUCT_NAME] does and how it fits into your encounter workflow.',
+    title: 'Welcome',
+    description: 'An overview of what the platform does and how it fits into your clinical workflow.',
     category: 'getting-started',
     readTime: 3,
-    content: `# Welcome to [PRODUCT_NAME]
+    content: `# Welcome
 
-[PRODUCT_NAME] is a clinical documentation assistant for clinicians. It helps you record encounters by voice, automatically extract clinical facts, generate professional documents, and share visit summaries with patients — all without typing.
+This platform is a clinical documentation assistant for healthcare providers. It records encounters by voice, automatically extracts clinical facts and lab results, generates professional documents, suggests ICD-10 and CPT codes, and keeps a living clinical profile on every patient — all without manual data entry.
 
 ---
 
 ## How it works
 
-The core idea is simple: **you talk, [PRODUCT_NAME] listens**.
+The core idea is simple: **you talk, the platform listens**.
 
-During a encounter, you record your clinical notes by voice. [PRODUCT_NAME] transcribes your speech and automatically extracts structured clinical facts — patient demographics, presenting complaints, examination findings, medications, assessments, and plans. From those facts, it can generate any document you need in seconds.
+During a consultation, you record the encounter by voice. The platform transcribes your speech and automatically extracts structured clinical facts — presenting complaints, examination findings, lab values, medications, assessments, and plans. From those facts, it can generate any document you need in seconds.
 
 ### The encounter flow
 
 \`\`\`
-Record → Review Facts → Save → Generate Documents → Share with Patient
+Record → Review Facts → Publish → Coding + Billing + Profile Update
 \`\`\`
 
-1. **Record** — speak naturally during or after your encounter
-2. **Review facts** — check the extracted clinical data, add your diagnosis
-3. **Save** — the encounter is stored and you land on the detail page
-4. **Generate documents** — pick which document types you need and click Generate
-5. **Share** — publish the encounter and share a companion link with the patient
+1. **Record** — speak naturally during the consultation (ambient mode) or dictate solo (dictation mode)
+2. **Review facts** — check the extracted clinical data, including any lab values mentioned aloud
+3. **Publish** — triggers ICD-10 coding, CPT billing, patient profile update, and patient companion creation simultaneously
+4. **Generate documents** — SOAP note, referral letter, patient summary, and more
 
 ---
 
-## What [PRODUCT_NAME] generates
+## Document types
 
 | Document | What it contains |
 |----------|-----------------|
-| SOAP Note | Full structured note with Subjective, Objective, Assessment, Plan |
-| After-Visit Summary | Plain-language visit summary for the client file |
-| Discharge Instructions | Step-by-step home care instructions for the patient |
+| SOAP Note | Full structured note: Subjective, Objective, Assessment, Plan |
+| After-Visit Summary | Plain-language summary for the patient file |
+| Discharge Instructions | Step-by-step home care instructions |
 | Prescription | Drug names, doses, routes, frequencies, durations |
 | Follow-Up Plan | Return schedule, monitoring instructions, warning signs |
 | Lab Order | Diagnostic tests ordered with rationale |
-| Referral Letter | Professional clinical letter for a specialist or imaging center |
+| Referral Letter | Clinical letter for a specialist or imaging centre |
 | Shift Handoff | Clinical handoff summary for shift change |
 | Invoice | Itemised charges based on services rendered |
 
@@ -84,158 +88,180 @@ Record → Review Facts → Save → Generate Documents → Share with Patient
 
 ## Key features
 
-- **Voice recording** — record once, get everything
-- **Multi-recording** — add follow-up recordings (exam, post-procedure notes) that all feed into the same encounter
-- **Case Reasoning** — ask an AI clinical assistant anything about the case
-- **Patient Companion** — a private AI chat link that gives your patient instant answers about their visit, 24/7
-- **Billing** — automatic extraction of billable items from recordings so nothing gets missed
+- **Ambient consultation** — records both voices in the room, no handoff required
+- **Dictation mode** — solo provider dictation with voice commands
+- **Lab extraction** — values mentioned aloud become structured discrete lab results
+- **ICD-10 coding** — diagnosis codes suggested automatically after publish
+- **CPT billing** — E&M level determined from visit complexity
+- **Patient profiles** — living clinical profiles built from every encounter on record
+- **Case Reasoning** — AI clinical assistant for differentials, drug interactions, and more
+- **Patient Companion** — a private AI chat link for patients to ask questions about their visit, 24/7
+- **Scheduling** — week-view appointment calendar with one-click encounter start
 
 ---
 
 ## Not a replacement for clinical judgment
 
-[PRODUCT_NAME] generates documentation and provides AI-assisted reasoning. It is not a diagnostic tool and never overrides clinical expertise. Diagnoses are always entered by you. The AI assists — you decide.
+The platform generates documentation and provides AI-assisted reasoning. It is not a diagnostic tool and never overrides clinical expertise. Diagnoses are always entered by you. The AI assists — you decide.
 `,
   },
+
+  // ─── Encounters ───────────────────────────────────────────────────────────
+
   {
     slug: 'recording-a-encounter',
-    title: 'Recording a Encounter',
-    description: 'How to start and stop recordings, what to say, and tips for best results.',
+    title: 'Recording an Encounter',
+    description: 'How to start and stop recordings, choosing between ambient and dictation modes.',
     category: 'encounters',
     readTime: 4,
-    content: `# Recording a Encounter
+    content: `# Recording an Encounter
 
-[PRODUCT_NAME] records your voice and converts it into structured clinical data in real time. You don't need to change how you work — just speak naturally.
-
----
-
-## Starting a recording
-
-1. Open a patient's profile from **Patient Records**
-2. Click **New Encounter** to create a draft
-3. On the encounter detail page, click **Begin Encounter**
-4. You're taken to the recording page — click the **microphone button** to start
-
-The recording page shows two panels:
-- **Left** — live transcript of everything you say
-- **Right** — clinical facts being extracted in real time
+There are two recording modes: **Ambient Consultation** and **Dictate Note**. You choose when you start a new encounter.
 
 ---
 
-## What to say
+## Choosing a mode
 
-Speak naturally, as if you were dictating to a colleague. [PRODUCT_NAME] handles the structure automatically.
+**New Encounter → select mode → Record**
+
+| Mode | When to use |
+|------|------------|
+| Ambient Consultation | Doctor–patient consultation in the room. Both voices captured. |
+| Dictate Note | Provider dictating solo — notes after the fact, addenda, billing entries. |
+
+---
+
+## Ambient Consultation
+
+Ambient mode picks up the full room — you don't need to hold a microphone or hand anything to the patient. Speak naturally. Both voices are transcribed and the platform extracts clinical facts from the whole dialogue.
+
+**What gets extracted:**
+- Presenting complaints and history from the patient's own words
+- Examination findings as you narrate them
+- Lab values you read aloud — extracted as discrete structured results
+- Assessment and plan from your discussion with the patient
+
+**Start flow:** New Encounter → Ambient Consultation → Record
+
+---
+
+## Dictation Mode
+
+Dictation mode is for solo provider speech only. Use it when the patient isn't present or you're adding notes after the consultation.
+
+Supports voice commands for editing and navigation. Dictated notes go through the same facts pipeline as ambient recordings — ICD-10 coding and document generation work the same way.
+
+**Start flow:** New Encounter → Dictate Note → Record
+
+---
+
+## During recording
+
+Speak naturally. You don't need to slow down or pause between topics.
 
 ### Example — history and presenting complaint
 
-> "This is Alex, a 45 year old male presenting with chest pain and shortness of breath starting this morning. He reports the pain is 7 out of 10, substernal, radiating to the left arm. No prior cardiac history. Current medications: lisinopril 10mg daily for hypertension. No known drug allergies."
+> "James is a 58-year-old male presenting with fatigue and shortness of breath on exertion for the past few weeks. He has a background of Type 2 diabetes on metformin and hypertension. HbA1c is 8.4%, up from 7.9 at his last visit. Fasting glucose 11.2."
 
-### Example — physical examination
+### Example — examination
 
-> "On examination — temperature 37.1, heart rate 98, blood pressure 142 over 88, respiratory rate 18, oxygen saturation 96% on room air, weight 82 kilograms. Heart sounds regular, no murmurs. Lungs clear to auscultation bilaterally. Abdomen soft, non-tender. No peripheral oedema."
+> "Blood pressure today is 152 over 94. Heart sounds normal, chest is clear, no peripheral oedema."
 
-### Example — assessment and plan
+### Example — plan
 
-> "Assessment: acute coronary syndrome, rule out NSTEMI. Plan: aspirin 325mg stat, nitroglycerin sublingual as needed, IV access obtained, 12-lead ECG ordered, troponin and BMP stat. Cardiology consult requested. Admit to telemetry for monitoring."
-
----
-
-## Tips for better fact extraction
-
-- **State patient demographics clearly** — "45 year old male with hypertension" gives better context than just "middle-aged man"
-- **Say drug names in full** — "metoprolol" not "Lopressor" (although both work)
-- **Include units** — "38.8 degrees" and "34 kilograms" give better facts than raw numbers alone
-- **Speak at a normal pace** — no need to slow down or pause between topics
-- **Cover the full picture in one recording** — history, exam, assessment, and plan all in one is fine
+> "We'll increase metformin to 1 gram twice daily. Starting atorvastatin 40 milligrams at night for the LDL. I want iron studies today, and I'm referring to cardiology for a 24-hour ECG."
 
 ---
 
-## Stopping and saving
+## Tips for better extraction
 
-1. Click **Stop** when you're finished
-2. Review the extracted facts — check them for accuracy
-3. Add your **diagnosis** and **treatment plan** in the provider notes fields
-4. Click **Save** — you're redirected to the encounter detail page
+- **State demographics early** — age, sex, and key history give the AI context from the start
+- **Say drug names in full** — "atorvastatin" not "the statin"
+- **Include values and units** — "HbA1c 8.4 percent", "BP 152 over 94"
+- **Read lab results aloud** — they're extracted as discrete structured results automatically
+- **Cover the full picture** — history, exam, assessment, and plan all in one recording is fine
 
 ---
 
-## Multiple recordings
+## Stopping and reviewing
 
-You can add more recordings to the same encounter — for example, a separate recording after the procedure, or a follow-up the next day. Each recording is kept separate, and all facts feed into your documents.
-
-See [Multi-Recording & Follow-Ups](/docs/multi-recording) for details.
+1. Click **Stop** when you're done
+2. The platform processes the recording — usually takes a few seconds
+3. Review the extracted facts in the **Facts** panel
+4. Click **Publish** when you're ready — this triggers coding, billing, profile update, and patient companion creation
 
 ---
 
 ## Audio tips
 
-- Use a decent microphone — built-in laptop mics work fine in a quiet room
-- On mobile, hold the phone at mid-chest level while talking
-- Avoid background noise if possible (running water, air conditioning vents)
+- Built-in laptop microphone works fine in a quiet room
+- On mobile, hold the phone at mid-chest level
+- Avoid background noise from running water or HVAC vents
 - The browser needs microphone permission — allow it when prompted
 `,
   },
   {
     slug: 'understanding-facts',
     title: 'Understanding Clinical Facts',
-    description: 'What facts are, how they\'re extracted, and how to use the facts panel.',
+    description: "What facts are, how they're extracted, and how to use the facts panel.",
     category: 'encounters',
     readTime: 3,
     content: `# Understanding Clinical Facts
 
-Clinical facts are the structured data [PRODUCT_NAME] extracts from your recordings. They're the foundation for everything — document generation, AI reasoning, and reconciliation.
+Clinical facts are the structured data extracted from your recordings. They're the foundation for everything — document generation, ICD-10 coding, AI reasoning, and patient profiles.
 
 ---
 
 ## What is a fact?
 
-A fact is a single piece of clinical information pulled from your recording. For example, from the sentence:
+A fact is a single piece of clinical information pulled from your recording. For example, from:
 
-> "Temperature is 38.8 degrees Celsius"
+> "Blood pressure today is 152 over 94 — a bit high."
 
-[PRODUCT_NAME] extracts:
+The platform extracts:
 
-> **Temperature** → 38.8°C (group: Physical Exam Findings)
+> **Blood Pressure** → 152/94 mmHg (group: Physical Exam Findings)
 
 Each fact has:
-- **Text** — the content of the fact
-- **Group** — the clinical category it belongs to
+- **Text** — the content
+- **Group** — the clinical category
 
 ---
 
 ## Fact groups
 
-Facts are automatically sorted into groups:
-
 | Group | Examples |
 |-------|---------|
-| Patient Demographics | Age, sex, weight, chief complaint |
+| Patient Demographics | Age, sex, chief complaint |
 | History | Presenting complaint, duration, prior illness |
 | Physical Exam Findings | Vitals, auscultation, palpation findings |
 | Current Medications | Drug names, doses, frequencies |
-| Lab Results | CBC, chemistry, urinalysis values |
-| Diagnostic Imaging | X-ray, ultrasound findings |
+| Lab Results | HbA1c, LDL, haemoglobin, creatinine values |
+| Diagnostic Imaging | X-ray, ultrasound, MRI findings |
 | Assessment | Diagnosis, working diagnosis |
-| Plan | Treatment plan, prescriptions, follow-up instructions |
+| Plan | Treatment, prescriptions, follow-up instructions |
+
+---
+
+## Lab results
+
+Lab values mentioned aloud during a consultation are extracted as discrete structured results — not just as text, but as named values with units and abnormal flags. See [Lab Result Extraction](/docs/lab-extraction) for details.
 
 ---
 
 ## The facts panel
 
-After stopping a recording, you see the **facts panel** — all extracted facts grouped by category. Review them before saving.
+After stopping a recording, the **Facts** panel shows all extracted facts grouped by category. Review them before publishing.
 
 If something is missing or incorrect:
 - Minor errors are fine to leave — they won't affect document quality much
-- Major errors (wrong medication dose, wrong weight) are worth noting in your provider notes
-- You can add a second recording to clarify or correct anything
+- Major errors (wrong medication dose, wrong patient demographics) are worth noting in your provider notes
 
 ---
 
 ## Facts across multiple recordings
 
-If you have more than one recording, facts from all recordings are combined for document generation. [PRODUCT_NAME] also runs **fact reconciliation** to identify any conflicts between recordings.
-
-For example, if Recording 1 says weight is 32kg and Recording 2 says 34kg, reconciliation flags this as a contradiction for you to resolve.
+Facts from all recordings in an encounter are combined for document generation. If there are conflicts between recordings, the platform runs **fact reconciliation** to flag contradictions.
 
 See [Multi-Recording & Follow-Ups](/docs/multi-recording) for details.
 
@@ -243,20 +269,13 @@ See [Multi-Recording & Follow-Ups](/docs/multi-recording) for details.
 
 ## Provider notes vs facts
 
-Facts come from your recording. **Provider notes** are what you type directly — specifically your **diagnosis** and **treatment plan**. These are added to the encounter detail page after saving.
-
-Provider notes are combined with your recording facts when generating documents. The diagnosis you type goes into the Assessment section of the SOAP note; the treatment plan goes into the Plan section.
+Facts come from your recording. **Provider notes** are what you type directly — your diagnosis and treatment plan. These are combined with recording facts when generating documents.
 
 ---
 
-## Why facts matter for document quality
+## Why facts matter
 
-[PRODUCT_NAME]'s document generation works best when:
-- The facts are complete (full history + exam + plan in one or more recordings)
-- Provider notes include a clear diagnosis
-- The patient demographics (age, sex, weight) are present
-
-The more facts, the more detailed and accurate the generated documents will be.
+Document generation, ICD-10 coding, CPT billing, and patient profile updates all work from the same extracted facts. The more complete the recording, the better every downstream output will be.
 `,
   },
   {
@@ -267,69 +286,66 @@ The more facts, the more detailed and accurate the generated documents will be.
     readTime: 4,
     content: `# Multi-Recording & Follow-Ups
 
-A single encounter can have multiple recordings. This is useful for capturing different clinical events — a pre-encounter history, an examination, a post-procedure note, or a follow-up call — all tied to the same patient record.
+A single encounter can have multiple recordings. This is useful for capturing different clinical events — a history, an examination, a post-procedure note, or a follow-up call — all tied to the same patient record.
 
 ---
 
 ## Adding a second recording
 
 1. On the encounter detail page, click **Add Recording**
-2. You're taken to the recording page with the same encounter loaded
-3. Record your additional notes and save
-4. The detail page now shows both recordings in the **Facts** tab
+2. Record your additional notes and save
+3. The detail page now shows both recordings in the **Facts** tab
 
-Each recording is stored separately, labelled by phase (History, Exam, Assessment, Follow-up) and order.
+Each recording is stored separately and labelled by phase and order.
 
 ---
 
 ## When to use multiple recordings
 
 **Scenario 1: History then exam**
-Record the history and presenting complaint while taking the call or at check-in, then add a second recording after the physical examination.
+Record the history and presenting complaint, then add a second recording after the physical examination.
 
 **Scenario 2: Pre- and post-procedure**
-Record your pre-surgical assessment, then add a post-procedure recording summarising what was done, any complications, and discharge instructions.
+Record your pre-procedure assessment, then add a post-procedure recording summarising what was done, any complications, and discharge instructions.
 
 **Scenario 3: Follow-up call**
-Add a recording the next day when the patient calls with an update. This keeps everything in one encounter record.
+Add a recording when the patient calls with an update. This keeps everything in one encounter record.
 
-**Scenario 4: Updated findings**
-Lab results come back after the encounter. Record your interpretation and amended plan as a follow-up recording.
+**Scenario 4: Results come back**
+Lab results return after the encounter. Record your interpretation and amended plan as a follow-up recording.
 
 ---
 
 ## Fact reconciliation
 
-When you have two or more recordings, [PRODUCT_NAME] automatically compares the facts and looks for **conflicts** — cases where the same clinical data appears with different values.
+When you have two or more recordings, the platform automatically compares facts and looks for **conflicts** — cases where the same clinical data appears with different values.
 
-After adding a second recording, you'll see a brief analysis run ("Analysing fact relationships across recordings..."). Facts are then labelled with coloured indicators:
+After adding a second recording, facts are labelled with coloured indicators:
 
 | Colour | Meaning |
 |--------|---------|
 | Green | Confirmed — same fact in both recordings |
-| Blue | Updated — value changed (e.g. weight recorded differently) |
+| Blue | Updated — value changed between recordings |
 | Red | Contradiction — incompatible values that need resolving |
-| Purple | New — fact only appears in the later recording |
+| Purple | New — fact only in the later recording |
 | Grey | Unchanged — not mentioned in the newer recording |
 
 ---
 
 ## Resolving contradictions
 
-Red facts are contradictions. [PRODUCT_NAME] shows you the value from each recording and asks you to choose:
+Red facts are contradictions. The platform shows the value from each recording and asks you to choose:
 
 - **Accept New** — use the value from the more recent recording
 - **Keep Old** — keep the original value
 
-Once resolved, the contradiction is marked with a checkmark. When documents are generated, the resolved value is used.
+Once resolved, the contradiction is marked. When documents are generated, the resolved value is used.
 
 ---
 
 ## Documents use all recordings
 
-When you generate a document, [PRODUCT_NAME] combines facts from all recordings into the context. You don't need to do anything special — all your recordings contribute automatically.
-
-If there are unresolved contradictions, [PRODUCT_NAME] will use the newer value by default. It's worth resolving them for accuracy.
+When you generate a document, facts from all recordings are combined automatically. If there are unresolved contradictions, the newer value is used by default.
 
 ---
 
@@ -342,18 +358,18 @@ You can tag each recording with a clinical phase:
 - **Assessment** — working diagnosis and differential
 - **Follow-up** — post-encounter or next-day update
 
-Phases are optional but help keep multiple recordings organised, especially for longer cases.
+Phases are optional but help keep multiple recordings organised on longer cases.
 `,
   },
   {
     slug: 'generating-documents',
     title: 'Generating Clinical Documents',
-    description: 'How to generate all 7 document types, add provider notes, and edit documents inline.',
+    description: 'How to generate SOAP notes, referral letters, and all other document types.',
     category: 'encounters',
     readTime: 5,
     content: `# Generating Clinical Documents
 
-Document generation is the main output of a encounter. From your recordings and provider notes, [PRODUCT_NAME] generates professional clinical documents in seconds.
+Document generation is the main output of an encounter. From your recordings and provider notes, the platform generates professional clinical documents in seconds.
 
 ---
 
@@ -369,12 +385,12 @@ The more complete your recording — history, exam findings, assessment, plan �
 
 ## Adding provider notes
 
-On the encounter detail page, find the **Provider Notes** section in the workflow panel:
+On the encounter detail page, find the **Provider Notes** section:
 
-- **Diagnosis** — your working diagnosis or final diagnosis (e.g. "Acute gastroenteritis, dietary indiscretion")
-- **Treatment Plan** — what you're prescribing and doing (e.g. "Maropitant 2mg/kg SQ SID x3 days, bland diet, recheck if no improvement in 48h")
+- **Diagnosis** — your working or final diagnosis (e.g. "Type 2 diabetes mellitus with hyperglycaemia, iron deficiency anaemia")
+- **Treatment Plan** — what you're prescribing and doing
 
-These notes are included in every document you generate. The diagnosis flows into the Assessment section of the SOAP note; the treatment plan flows into the Plan section.
+These notes are included in every document. The diagnosis flows into the Assessment section of the SOAP note; the treatment plan flows into the Plan section.
 
 ---
 
@@ -385,39 +401,24 @@ In the **Workflow Panel**, click the document type chips to select which documen
 | Chip | Document |
 |------|---------|
 | SOAP Note | Full structured clinical note |
-| After-Visit Summary | Plain-language record for the client file |
-| Discharge Instructions | Step-by-step care instructions for the patient to take home |
-| Prescription | Drug details formatted for the pharmacy |
+| After-Visit Summary | Plain-language record for the patient file |
+| Discharge Instructions | Step-by-step care instructions to take home |
+| Prescription | Drug details formatted for dispensing |
 | Follow-Up Plan | Return visit schedule and monitoring instructions |
 | Lab Order | Diagnostic tests ordered |
 | Referral Letter | Clinical letter for a specialist |
-| Shift Handoff | Clinical handoff summary for shift change |
-
-You can generate one document at a time or all of them at once.
+| Shift Handoff | Clinical handoff summary |
 
 ---
 
 ## Generating
 
 1. Select the document types you want
-2. Ensure your provider notes (diagnosis, treatment plan) are filled in
+2. Ensure your provider notes are filled in
 3. Click **Generate Documents**
-4. Each document generates in parallel — you'll see progress indicators
-5. Documents appear in the **Documents** tab as they complete
+4. Documents appear in the **Documents** tab as they complete
 
-SOAP notes typically take 5–8 seconds. All 7 together usually complete within 15–20 seconds.
-
----
-
-## Reading your documents
-
-Click any document in the Documents tab to read it. Documents are formatted with clear headings and sections.
-
-**SOAP Note sections:**
-- Subjective — history, presenting complaint, patient observations
-- Objective — physical examination findings, vitals, lab results
-- Assessment — diagnosis, differentials, clinical reasoning
-- Plan — treatment, prescriptions, follow-up, monitoring
+SOAP notes typically take 5–8 seconds. All documents together usually complete within 15–20 seconds.
 
 ---
 
@@ -428,39 +429,37 @@ Everything is editable. Click into any section of a document and type — change
 Common edits:
 - Correct a medication dosage
 - Add a clinical detail that wasn't in the recording
-- Adjust the tone of the client-facing documents
+- Adjust the tone for patient-facing documents
 
 ---
 
 ## Regenerating
 
-If you update your provider notes (e.g. revise the diagnosis after a lab result comes back), you can regenerate any document. Click **Regenerate** on the document — it uses your current provider notes and all your recordings to produce a fresh version.
-
-Prior version is replaced. If you want to keep both, copy the text before regenerating.
+If you update your provider notes (e.g. revise the diagnosis after results come back), click **Regenerate** on any document. It uses your current notes and all recordings to produce a fresh version.
 
 ---
 
 ## Documents are autosaved
 
-Documents are automatically saved to the encounter record. Reload the page and they'll still be there. You don't need to export or save manually.
+Documents are automatically saved to the encounter record. You don't need to export or save manually.
 `,
   },
   {
     slug: 'evidence-files',
     title: 'Uploading Evidence Files',
-    description: 'How to attach lab results, imaging, and referral letters to a encounter.',
+    description: 'How to attach lab reports, imaging, and referral letters to an encounter.',
     category: 'encounters',
     readTime: 3,
     content: `# Uploading Evidence Files
 
-You can attach external files to any encounter — lab result PDFs, radiograph images, referral letters, or any other clinical document. These feed into your document generation as additional context.
+You can attach external files to any encounter — lab result PDFs, imaging reports, referral letters, or any other clinical document. These feed into your document generation as additional context.
 
 ---
 
 ## Supported file types
 
 - PDF (lab results, referral letters, reports)
-- Images (JPEG, PNG — for radiographs, photos)
+- Images (JPEG, PNG — for imaging, clinical photos)
 - Most document formats are accepted
 
 ---
@@ -468,10 +467,10 @@ You can attach external files to any encounter — lab result PDFs, radiograph i
 ## Uploading a file
 
 1. On the encounter detail page, find the **Evidence Files** panel
-2. Drag and drop a file onto the panel, or click to browse
+2. Drag and drop a file, or click to browse
 3. The file uploads and appears in the evidence list
 
-[PRODUCT_NAME] auto-guesses the category based on the filename:
+The platform auto-guesses the category from the filename:
 - "lab_results.pdf" → Lab Result
 - "xray.jpg" → Imaging
 - "referral.pdf" → Referral
@@ -487,31 +486,279 @@ You can attach external files to any encounter — lab result PDFs, radiograph i
 | Referral | Letters from or to specialists |
 | Other | Anything else |
 
-You can change the category by clicking the dropdown next to the file.
-
 ---
 
 ## Adding notes to a file
 
 Click the notes field next to any uploaded file to add your interpretation:
 
-> "External radiograph — no fracture of distal radius. Mild soft tissue swelling. No periosteal reaction."
+> "Chest X-ray — no consolidation, no pleural effusion. Cardiomegaly borderline."
 
-These notes are treated as clinical facts and included in your document generation. They're the most important part — even if the AI can't read the PDF contents directly, your note about what the file shows is used.
+These notes are treated as clinical facts and included in document generation. Even if the platform can't read the PDF contents directly, your interpretation note is used.
 
 ---
 
 ## How evidence feeds into documents
 
-When you generate documents, your evidence file notes are added as additional clinical context alongside your recording facts. For example, if you've noted "radiograph confirms no fracture, mild soft tissue swelling", this finding will appear in the Objective section of your SOAP note and inform the Assessment and discharge instructions.
+When you generate documents, your evidence file notes are added as additional clinical context alongside your recording facts. A chest X-ray interpretation will appear in the Objective section of the SOAP note and inform the Assessment.
 
 ---
 
 ## Viewing evidence files
 
-All uploaded files appear in the Evidence tab of the encounter. Click any file to view it in the browser (PDF) or as an image.
+All uploaded files appear in the Evidence tab. Click any file to view it in the browser. Files are stored securely and attached permanently to the encounter record.
+`,
+  },
+  {
+    slug: 'scheduling',
+    title: 'Scheduling & Appointments',
+    description: 'How to book appointments, use the week calendar, and start encounters from the schedule.',
+    category: 'encounters',
+    readTime: 3,
+    content: `# Scheduling & Appointments
 
-Files are stored securely in the cloud and attached permanently to the encounter record.
+The Schedule page is a full-viewport week calendar for managing appointments. Click any time slot to book; click any appointment to start the encounter.
+
+---
+
+## Navigating the calendar
+
+**Sidebar → Schedule**
+
+The calendar shows Monday through Sunday for the current week. Use the **← →** arrows to move between weeks.
+
+- **Current time** — shown as a red line in today's column
+- **On load** — the calendar scrolls to the current time automatically
+- **Mobile** — shows a single-day view
+
+---
+
+## Booking an appointment
+
+Click any empty time slot to open the booking dialog. It pre-fills the date and time from the slot you clicked (snapped to 30-minute intervals).
+
+**Fields:**
+- Patient name — free text, autocompletes from your patient list
+- Date and time — pre-filled, adjustable
+- Duration — 15, 30, 45, or 60 minutes
+- Appointment type — new patient, follow-up, telehealth, procedure, other
+- Reason — optional
+- Notes — optional
+
+---
+
+## Starting an encounter from the schedule
+
+Click any appointment block to open the detail panel.
+
+**Start Encounter** creates a draft encounter, links it to the appointment, and takes you directly to the recording screen. The appointment status updates to In Progress automatically.
+
+Other actions from the detail panel:
+- **View Patient** — opens the patient's profile
+- **No Show** — marks the appointment as no-show
+- **Cancel** — cancels the appointment
+
+---
+
+## Appointment statuses
+
+| Status | Meaning |
+|--------|---------|
+| Scheduled | Booked, not yet started |
+| In Progress | Encounter started |
+| Completed | Encounter published |
+| No Show | Patient did not attend |
+| Cancelled | Appointment cancelled |
+
+---
+
+## Home page
+
+Upcoming appointments (next 7 days) are shown on the home page alongside pending encounters and overdue follow-ups.
+`,
+  },
+
+  // ─── Patients ─────────────────────────────────────────────────────────────
+
+  {
+    slug: 'patient-profiles',
+    title: 'Patient Profiles',
+    description: 'How living clinical profiles are built automatically from every encounter on record.',
+    category: 'patients',
+    readTime: 4,
+    content: `# Patient Profiles
+
+Every patient has a living clinical profile that is built automatically from their encounter history. After each published encounter, the profile rebuilds — no manual maintenance required.
+
+---
+
+## What the profile contains
+
+- **Clinical narrative** — a 2–4 sentence plain-English summary of the patient's clinical picture
+- **Active problems** — current diagnoses with ICD-10 codes
+- **Current medications** — drugs, doses, and frequencies
+- **Allergies** — allergens, reactions, and severity
+- **Care gaps** — outstanding preventive or monitoring items
+- **Encounter count** — total published encounters on record
+
+---
+
+## How profiles are built
+
+When you publish an encounter, a background process reads all prior encounter facts plus the new encounter's facts and produces a structured profile. The "Built from N encounters" badge on the profile page updates when it's done.
+
+You don't need to do anything — publishing an encounter is all it takes.
+
+---
+
+## Patient list
+
+On the Patient Records page, each row is enriched with live profile data:
+
+- **Condition chips** — up to 3 active problems (administrative Z-codes are filtered out)
+- **Allergy indicator** — count of documented allergies (NKA/NKDA entries are filtered)
+- **Visit count** — total encounters
+- **Last visit** — most recent published encounter date
+
+---
+
+## First encounter
+
+After a patient's very first encounter is published, the profile build runs and the badge appears. From the second encounter onwards, the profile reflects cumulative history.
+
+---
+
+## Care gaps
+
+The profile flags outstanding clinical items — things that were flagged in one encounter but haven't been followed up. For example:
+
+- A referral that was ordered but no follow-up recorded
+- A monitoring item (e.g. "recheck HbA1c in 3 months") that hasn't appeared since
+- A medication that was started without a documented review
+
+These appear in the Care Gaps section and feed into the home page's overdue follow-up list.
+
+---
+
+## Reviewing the profile before an encounter
+
+Open a patient from **Patient Records** before starting an encounter. The profile gives you the clinical briefing — active problems, current medications, recent history — so you walk in with context.
+`,
+  },
+  {
+    slug: 'patient-records',
+    title: 'Patient Records',
+    description: 'Searching, filtering, and navigating your patient list.',
+    category: 'patients',
+    readTime: 2,
+    content: `# Patient Records
+
+**Sidebar → Patient Records**
+
+The patient list shows every patient in your practice with a live clinical summary from their profile.
+
+---
+
+## Searching
+
+Use the search bar to filter by patient name. Results update as you type.
+
+---
+
+## Sorting
+
+Toggle the sort button between:
+- **Recent** — patients sorted by most recent encounter date
+- **A–Z** — alphabetical by name
+
+---
+
+## What each row shows
+
+- **Name** — patient full name
+- **Demographics** — age, sex, and MRN if set
+- **Condition chips** — up to 3 active problems
+- **Allergy indicator** — number of documented allergies (red chip with warning icon)
+- **Visit count + last seen** — on the right side
+
+---
+
+## Creating a new patient
+
+Click **New Patient** → enter the patient's name → Create. You're taken to their profile page immediately. Encounter history, demographics, and full profile build up from there.
+
+---
+
+## Opening a patient
+
+Click any patient row to open their profile. From there you can:
+- View their full clinical profile (problems, medications, allergies, narrative)
+- See all prior encounters
+- Start a new encounter
+`,
+  },
+
+  // ─── AI Features ──────────────────────────────────────────────────────────
+
+  {
+    slug: 'lab-extraction',
+    title: 'Lab Result Extraction',
+    description: 'How lab values mentioned aloud become structured discrete results automatically.',
+    category: 'ai-features',
+    readTime: 3,
+    content: `# Lab Result Extraction
+
+Lab values mentioned during an ambient consultation are automatically extracted as discrete structured results. You read the values aloud; the platform parses and structures them with no manual entry.
+
+---
+
+## How it works
+
+When you say something like:
+
+> "HbA1c is 8.4, up from 7.9 last visit. LDL is 3.8. Haemoglobin 11.8 — mildly low. Creatinine 98, which is stable."
+
+The platform extracts:
+
+| Test | Value | Unit | Flag |
+|------|-------|------|------|
+| HbA1c | 8.4 | % | High |
+| LDL cholesterol | 3.8 | mmol/L | High |
+| Haemoglobin | 11.8 | g/dL | Low |
+| Creatinine | 98 | µmol/L | — |
+
+These appear in the **Lab Results** section of the Facts panel.
+
+---
+
+## Viewing lab results
+
+In the Facts panel after recording, scroll to **Lab Results**. Each value is shown with its test name, result, unit, and any abnormal flag.
+
+---
+
+## Downstream uses
+
+Extracted lab results feed into:
+- **SOAP note** — appear in the Objective section automatically
+- **ICD-10 coding** — high HbA1c suggests E11.65, low haemoglobin suggests D64.9
+- **Patient profile** — abnormal values are captured in active problems and care gaps
+- **Case Reasoning** — the AI knows the lab values when you ask clinical questions about the case
+
+---
+
+## Tips for better extraction
+
+- State the test name clearly before the value: *"HbA1c is 8.4"* not *"the A1c came back at 8.4"*
+- Include units where natural: *"haemoglobin 11.8 grams per decilitre"*
+- Comment on abnormality: *"LDL is 3.8 — high"* helps flag it correctly
+- Results read aloud in sequence are all captured: you can read through a full results printout and every value is extracted
+
+---
+
+## Review before publishing
+
+All extracted lab results are shown in the Facts panel before you publish. Review them for accuracy — they feed directly into coding and the patient profile.
 `,
   },
   {
@@ -531,28 +778,28 @@ Case Reasoning is an AI clinical assistant that lets you think through a case co
 Click **Case Reasoning** in the sidebar. You can:
 
 - Start a **standalone chat** (no case attached — useful for general drug or dosing questions)
-- Start a chat **linked to a encounter** (the AI knows all the clinical facts from your recording)
+- Start a chat **linked to an encounter** (the AI knows all the clinical facts from your recording)
 
-To link a encounter, open a saved encounter and look for the Case Reasoning section on the detail page, or navigate to Case Reasoning and select the encounter from the dropdown.
+To link an encounter, open a saved encounter and look for the Case Reasoning section on the detail page.
 
 ---
 
 ## What you can ask
 
 **Differential diagnoses**
-> "What are the top differentials for a 58-year-old male with acute knee pain, no fracture on X-ray, and tenderness over the medial joint line?"
+> "What are the top differentials for a 58-year-old male with fatigue, mild anaemia, and elevated creatinine?"
 
 **Diagnostic plans**
 > "What tests would you run first for a patient with new-onset polyuria and polydipsia?"
 
 **Drug interactions**
-> "Are there any interactions between metformin and lisinopril?"
+> "Are there any interactions between metformin and atorvastatin?"
 
 **Drug doses**
-> "What's the appropriate metoprolol dose for a 72kg patient with rate-controlled AFib?"
+> "What's the appropriate metoprolol dose for rate-controlled AFib in a 72kg patient?"
 
 **Clinical reasoning**
-> "We found elevated ALT and AST but normal bilirubin in a 45-year-old male with fatigue. What does that suggest?"
+> "We found elevated ALT and AST but normal bilirubin in a 45-year-old with fatigue. What does that suggest?"
 
 **Literature questions**
 > "Is there evidence for early mobilisation in ICU patients on mechanical ventilation?"
@@ -561,41 +808,41 @@ To link a encounter, open a saved encounter and look for the Case Reasoning sect
 
 ## Starter prompts
 
-When a encounter is linked, you'll see suggested prompts at the bottom:
+When an encounter is linked, you'll see suggested prompts:
 
-- **Top differentials** — generates ranked differentials with confirmatory tests
-- **Drug interactions** — checks all current medications for interactions
-- **Diagnostic plan** — recommends prioritised tests based on the presentation
+- **Top differentials** — ranked differentials with confirmatory tests
+- **Drug interactions** — checks all current medications
+- **Diagnostic plan** — prioritised tests based on the presentation
 - **Summarise findings** — concise summary of the clinical picture
 
-Click any of these to send them instantly.
+Click any to send instantly.
 
 ---
 
 ## Multi-turn conversations
 
-You can ask follow-up questions — the AI remembers the context of the conversation:
+Ask follow-up questions — the AI remembers the context of the conversation:
 
-> You: "What are the differentials for this patient's knee pain?"
-> AI: *[lists differentials]*
-> You: "If it is a meniscal tear, what's the typical recovery time?"
+> You: "What are the differentials for this patient's anaemia?"
+> AI: *[lists differentials with probabilities]*
+> You: "If it's CKD-related, how does that change the management?"
 > AI: *[answers in context of the previous response]*
 
-Conversations are saved automatically and can be resumed later from the session list in the sidebar.
+Conversations are saved automatically.
 
 ---
 
 ## Response time
 
-Expect 10–15 seconds for a response. The AI is doing genuine clinical reasoning — not just keyword matching. The loading message updates every few seconds to let you know it's still working.
+Expect 10–15 seconds per response. The AI is doing genuine clinical reasoning, not keyword matching.
 
 ---
 
 ## Important notes
 
-- **The AI doesn't replace your clinical judgment.** It provides information and reasoning to support your decision-making.
-- **Always verify drug doses** against your preferred reference (Plumb's, BSAVA formulary) for the final prescription.
-- **The AI knows about this encounter's facts.** If you ask about the patient's weight for a dose calculation, it uses the weight from your recording.
+- **The AI doesn't replace your clinical judgment.** It supports your decision-making.
+- **Always verify drug doses** against your preferred clinical reference for the final prescription.
+- **The AI knows this encounter's facts.** If you ask about the patient's weight for a dose calculation, it uses the weight from your recording.
 `,
   },
   {
@@ -614,7 +861,7 @@ No login required. The patient just opens the link.
 
 ## What it does
 
-Imagine the patient gets home and wonders: *"What was that medication called again? Can I give her food tonight? What warning signs should I watch for?"*
+Imagine the patient gets home and wonders: *"What was that medication called again? When do I take it? What warning signs should I watch for?"*
 
 Instead of calling the clinic, they open the link and ask the AI directly. It answers accurately from the encounter data — dosages, instructions, warning signs, follow-up dates — everything the provider recorded.
 
@@ -625,7 +872,7 @@ Instead of calling the clinic, they open the link and ask the AI directly. It an
 1. Complete the encounter and generate at least a SOAP note or discharge instructions
 2. Click **Publish** to finalise the encounter
 3. Click **Share with Patient** — a unique link is generated
-4. Copy and share the link however you like: SMS, email, WhatsApp, print it on the discharge sheet
+4. Copy and share the link: SMS, email, or print it on the discharge sheet
 
 ---
 
@@ -634,7 +881,7 @@ Instead of calling the clinic, they open the link and ask the AI directly. It an
 The companion page shows:
 - Your clinic name and the patient's details
 - A welcome message summarising the visit in plain language
-- Suggested questions to get them started ("What medication was prescribed?", "When is the follow-up?")
+- Suggested questions to get them started
 - A chat box for their own questions
 
 ---
@@ -646,7 +893,6 @@ The AI has access to everything in the encounter:
 - Medication names, doses, frequency, duration, and instructions
 - Home care instructions and activity restrictions
 - Follow-up date and reason
-- Dietary instructions
 - Warning signs to watch for
 - Your clinic contact and emergency phone number
 - Invoice/charges (if generated)
@@ -661,27 +907,105 @@ The AI **only** knows about this specific encounter. It cannot:
 - Recommend changes to the treatment plan
 - Act as an emergency triage service
 
-If the patient asks something outside the encounter, the AI says it doesn't have that information and directs them to call the clinic.
+If the patient asks something outside the encounter, the AI directs them to call the clinic.
 
 ---
 
 ## Link management
 
-- Companion links are **active** after publishing and until deactivated
+- Companion links are **active** after publishing until deactivated
 - You can deactivate a link from the encounter detail page
-- The link expires after a set period (set by your organisation's settings)
+- Links expire after a set period (configurable in org settings)
 
 ---
 
 ## Privacy
 
-The companion link is a long, randomly generated token — it cannot be guessed. Only people you share the link with can access it. It contains no login credentials and no personally identifiable URL patterns.
+The companion link contains a long, randomly generated token — it cannot be guessed. Only people you share the link with can access it.
 
 ---
 
 ## Updating the companion
 
-If you need to add information after publishing (e.g. lab results come back), add an addendum to the encounter. The companion AI is automatically updated to include the new information.
+If you add an addendum to the encounter after publishing (e.g. lab results return), the companion AI is automatically updated to include the new information.
+`,
+  },
+
+  // ─── Billing & Coding ─────────────────────────────────────────────────────
+
+  {
+    slug: 'medical-coding',
+    title: 'ICD-10 & CPT Coding',
+    description: 'How diagnosis and procedure codes are suggested automatically after every encounter.',
+    category: 'billing',
+    readTime: 4,
+    content: `# ICD-10 & CPT Coding
+
+After an encounter is published, the platform automatically extracts ICD-10 diagnosis codes and CPT procedure codes from the encounter. A coder reviews and confirms — the system proposes, the coder disposes.
+
+---
+
+## What happens after publish
+
+Publishing an encounter triggers the coding pipeline in the background:
+
+1. ICD-10 codes are extracted from the clinical facts and transcript
+2. CPT codes are determined from encounter type and visit complexity
+3. Codes appear in the **Medical Coding** panel, usually within 30 seconds
+
+---
+
+## ICD-10 codes
+
+Diagnosis codes are extracted from everything discussed in the encounter. Examples from a typical primary care visit:
+
+| Code | Description |
+|------|------------|
+| E11.65 | Type 2 diabetes mellitus with hyperglycaemia |
+| I10 | Essential hypertension |
+| D64.9 | Anaemia, unspecified |
+| E78.5 | Hyperlipidaemia, unspecified |
+| R06.09 | Dyspnoea |
+
+The more complete the clinical facts (including lab values read aloud), the more accurate the coding.
+
+---
+
+## CPT codes
+
+E&M level codes (99202–99215) are determined automatically from:
+
+- Number of diagnoses addressed
+- Amount of data reviewed (labs, imaging, external records)
+- Management decision complexity
+
+For example, an established patient with multiple chronic conditions, lab review, and new prescriptions will typically generate **99214** (moderate complexity).
+
+The billing panel shows the estimated dollar value for the coded visit.
+
+---
+
+## Coder review
+
+In the **Medical Coding** panel, the coder can:
+- Review all suggested codes
+- Add codes that weren't captured
+- Remove codes that don't apply
+- Confirm — moving the encounter to billing-ready status
+
+For straightforward encounters, confirmation takes seconds. For complex cases, the suggestions are a strong starting point.
+
+---
+
+## From coding to billing
+
+Confirmed CPT codes flow directly into the billing panel. The estimated visit value is calculated from the confirmed codes and shown immediately. Nothing falls off the billing cycle.
+
+---
+
+## Accuracy note
+
+Code accuracy depends on the quality of the clinical facts. Lab values, examination findings, and clearly stated diagnoses all contribute to correct code selection. Review the Facts panel before publishing if accuracy is critical for a complex case.
 `,
   },
   {
@@ -692,51 +1016,47 @@ If you need to add information after publishing (e.g. lab results come back), ad
     readTime: 5,
     content: `# Billing & Invoices
 
-[PRODUCT_NAME] automatically extracts billable items from your encounter recordings and matches them to your price list. After each encounter, you review the extracted items, add anything that was missed, and generate a formatted invoice.
+The platform automatically extracts billable items from encounter recordings and matches them to your price list. After each encounter, you review extracted items, add anything missed, and generate a formatted invoice.
 
 ---
 
 ## Setting up your billing catalog
 
-Before the billing feature is useful, you need to add your services to the billing catalog.
+Before billing extraction is useful, add your services to the catalog.
 
 Navigate to **Billing → Catalog** and add your items:
 
-- **Name** — the service name (e.g. "Physical Examination", "CBC Panel")
+- **Name** — the service name (e.g. "Office Visit", "CBC Panel", "Iron Studies")
 - **Code** — your internal code (e.g. "EXAM-001", "LAB-CBC")
 - **Category** — Exam, Procedure, Lab, Medication, Supply, Imaging, Hospitalization, or Other
 - **Price** — base price in your currency
 - **Taxable** — whether tax applies to this item
 
-You can add items manually or import from a CSV file.
-
 ---
 
 ## How billing extraction works
 
-When you save a encounter recording, [PRODUCT_NAME] automatically analyses the clinical facts and matches them to your catalog items. This runs in the background — you don't need to do anything.
+When you save an encounter recording, the platform analyses the clinical facts and matches them to your catalog items in the background.
 
-For example, if your recording says:
-> "I performed a full physical examination and drew blood for a CBC and chemistry panel..."
+For example, if your recording includes:
+> "I want to check iron studies today... starting atorvastatin 40 milligrams at night... I'm referring to cardiology."
 
-[PRODUCT_NAME] matches:
-- Physical Examination → your catalog item
-- CBC Panel → your catalog item
-- Chemistry Panel → your catalog item
+The platform matches:
+- Iron Studies → your catalog item
+- Atorvastatin 40mg → your catalog item
+- Cardiology Referral → your catalog item
 
-These appear in the **Billing** section of the encounter detail page, labelled as **Planned Services**.
+These appear in the **Billing** section of the encounter as **Planned Services**.
 
 ---
 
 ## Two-phase billing
 
-[PRODUCT_NAME] tracks billing items across the entire encounter:
+**Phase 1 — Prospective (planned):** Items mentioned during the encounter as things you're going to do.
 
-**Phase 1 — Prospective (planned):** Items mentioned during the encounter as things you're going to do. *"I'm going to run a CBC... we'll need to do a dental cleaning..."*
+**Phase 2 — Retrospective (completed):** Items confirmed in a post-encounter recording.
 
-**Phase 2 — Retrospective (completed):** Items mentioned in a post-encounter recording as things you actually did. *"I completed the dental cleaning... extracted two teeth... prescribed amoxicillin..."*
-
-The system compares what was planned against what was done. If anything was done but not planned (common with dental extractions, additional medications, or emergency add-ons), it flags those as **Missed Items** — revenue you would have otherwise lost.
+The system compares planned vs completed. If anything was done but not planned, it flags those as **Missed Items** — revenue that would otherwise be lost.
 
 ---
 
@@ -745,19 +1065,17 @@ The system compares what was planned against what was done. If anything was done
 On the encounter detail page, open the **Billing** section:
 
 - **Confirmed items** — planned and completed, green tick
-- **Missed items** — done but not originally planned, highlighted in amber — these are the money savers
-- **Cancelled items** — planned but not done, shown but excluded from the invoice
+- **Missed items** — done but not planned, amber highlight — these are the money savers
+- **Cancelled items** — planned but not done, excluded from invoice
 
-For each missed item, you can:
-- **Add to invoice** — include it
-- **Dismiss** — exclude it (if it was genuinely not billable)
+For each missed item, choose to **Add to Invoice** or **Dismiss**.
 
 ---
 
 ## Adjusting items
 
-Before generating the invoice, you can:
-- Edit quantities (e.g. "Tooth Extraction x2")
+Before generating the invoice:
+- Edit quantities (e.g. "Iron Studies × 1")
 - Override the price for a specific item
 - Add items manually from your catalog
 
@@ -765,27 +1083,30 @@ Before generating the invoice, you can:
 
 ## Generating an invoice
 
-Once you've reviewed the items, click **Generate Invoice**. [PRODUCT_NAME] creates a formatted invoice document showing:
+Click **Generate Invoice**. The platform creates a formatted invoice showing:
 
 - Itemised charges with codes, quantities, and prices
 - Subtotal, tax (if configured), and total
-- Revenue recovery summary: "You almost missed $145 in charges"
+- Revenue recovery summary: "You almost missed $X in charges"
 
-The invoice is saved to the encounter and can be printed or exported as a PDF.
+The invoice is saved to the encounter and can be printed or exported.
 
 ---
 
 ## Tax settings
 
-Configure your tax settings at **Settings → Billing**:
+Configure at **Settings → Billing**:
 
 - **Tax rate** — your VAT, GST, or sales tax rate
-- **Tax name** — what to call it on invoices ("VAT", "GST", "Sales Tax")
+- **Tax name** — label on invoices ("VAT", "GST", "Sales Tax")
 - **Tax mode:**
-  - *Tax-exclusive* (US, Canada) — tax is added on top of prices
-  - *Tax-inclusive* (UK, EU, Australia) — prices already include tax, tax shown as a breakdown
+  - *Tax-exclusive* (US, Canada) — tax added on top
+  - *Tax-inclusive* (UK, EU, Australia) — prices include tax, shown as a breakdown
 `,
   },
+
+  // ─── Settings ─────────────────────────────────────────────────────────────
+
   {
     slug: 'team-settings',
     title: 'Team & Settings',
@@ -804,7 +1125,7 @@ Manage your practice details, team members, and subscription from the Settings p
 
 - **Practice name** — appears on all generated documents
 - **Clinic phone** — included in patient companion and discharge documents
-- **Emergency phone** — shown to owners in the companion app
+- **Emergency phone** — shown to patients and caregivers in the companion
 - **Clinic address** — appears on invoices and referral letters
 
 Keep these up to date — they're pulled into every document you generate.
@@ -822,7 +1143,7 @@ Keep these up to date — they're pulled into every document you generate.
 | Owner | Everything, including billing and team management |
 | Admin | Full clinical access, cannot manage billing |
 | Provider | Full clinical access — create, record, publish encounters |
-| Practice Admin | Location-scoped access — can only see patients/encounters at assigned locations |
+| Practice Admin | Location-scoped access — only sees patients/encounters at assigned locations |
 
 ### Inviting a team member
 
@@ -841,8 +1162,6 @@ Your plan determines how many active members you can have:
 - **Practice** — up to 5 seats
 - **Multi-Location** — unlimited
 
-The team page shows how many seats you've used.
-
 ---
 
 ## Locations
@@ -860,9 +1179,9 @@ Practice Admin members can be scoped to specific locations — they only see pat
 **Settings → Billing**
 
 - View your current plan and billing status
-- See how many encounters you've used this billing period
+- See encounter usage this billing period
 - Upgrade or downgrade your plan
-- Manage your payment method, view invoices → **Manage Subscription** opens the Stripe billing portal
+- Manage payment method and view invoices → **Manage Subscription** opens the Stripe billing portal
 
 ### Plans
 
@@ -872,19 +1191,19 @@ Practice Admin members can be scoped to specific locations — they only see pat
 | Practice | $149/month | Small multi-provider clinic |
 | Multi-Location | $299/month | Multiple clinic locations |
 
-All plans include a 14-day free trial when you sign up.
+All plans include a 14-day free trial.
 
 ---
 
 ## Dark mode
 
-Click the **dark mode toggle** in Settings to switch between light and dark themes. Your preference is saved across sessions.
+Click the **dark mode toggle** in Settings to switch themes. Your preference is saved across sessions.
 
 ---
 
 ## Getting help
 
-If you run into a problem or have a question not covered here, use the **⌘K Ask AI** feature to ask in plain English — or contact support from the Settings page.
+Use the **⌘K Ask AI** feature to ask any question about the platform in plain English, or contact support from the Settings page.
 `,
   },
 ];
