@@ -646,13 +646,6 @@ export default function ConsultationDetailPage() {
       href: `/case-reasoning?encounterId=${encounterId}`,
       hasContent: hasFacts,
     },
-    {
-      title: 'Insights',
-      icon: Sparkles,
-      subtitle: 'Lab triage & order suggestions',
-      href: `/encounter/${encounterId}/insights`,
-      hasContent: status === 'published',
-    },
   ];
 
   return (
@@ -869,7 +862,7 @@ export default function ConsultationDetailPage() {
             <div className="space-y-5">
 
               {/* ── Full-width navigation cards ──────────────────────── */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {cards.map((card) => {
                   const CardIcon = card.icon;
                   return (
