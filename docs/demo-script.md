@@ -3,7 +3,7 @@
 **Audience:** Prospective customers, investors
 **Format:** Live walkthrough (dark mode recommended)
 
-Two versions below: [Full (~18 min)](#full-demo--18-min) and [Short (~4 min)](#short-demo--4-min).
+Two versions below: [Full (~20 min)](#full-demo--20-min) and [Short (~5 min)](#short-demo--5-min).
 
 ---
 
@@ -32,18 +32,19 @@ This case covers:
 | Feature | How it appears |
 |---|---|
 | Ambient consultation | Full doctor–patient dialogue, both voices |
+| Note dictation | Provider solo clinical formulation, same encounter |
 | Lab result extraction | Values read aloud → auto-extracted |
 | ICD-10 coding | T2DM with hyperglycaemia, hypertension, dyspnoea, anaemia, hyperlipidaemia |
 | CPT billing | 99214 office visit, moderate complexity |
-| Facts panel | Symptoms, exam findings, lab values structured |
+| Facts panel | Combined facts from ambient + dictation |
 | Case reasoning | AI flags anaemia pattern, statin appropriateness |
-| Document generation | SOAP note from the consultation |
+| Document generation | SOAP note from both recordings |
 | Patient companion | Patient asks about new medication |
 | Profile update | Second encounter shows longitudinal evolution |
 
 ---
 
-## Full Demo (~18 min)
+## Full Demo (~20 min)
 
 ---
 
@@ -112,24 +113,46 @@ This case covers:
 
 **Stop recording.**
 
-> *"That's the consultation. Now watch what happens."*
+> *"That's the consultation. Now — the patient has left the room. I'm going to add my own clinical note by dictating, same encounter."*
 
 ---
 
-### 4. Facts Panel (2 min)
+### 4. Dictate a Note (1.5 min)
+
+**Click:** Dictate *(header button on the encounter)*
+
+> *"Same encounter, different mode. This is solo dictation — my structured clinical thinking layered on top of the ambient recording."*
+
+**Hit record.**
+
+---
+
+*Read the following — approximately 25 seconds:*
+
+**Provider:** "Clinical note, James Harrison. Assessment: poorly controlled Type 2 diabetes, HbA1c 8.4, up from 7.9. Mild normocytic anaemia, haemoglobin 11.8 — iron deficiency to be confirmed, CKD-related anaemia to be excluded given creatinine 98. LDL elevated at 3.8, statin indicated given diabetes and cardiovascular risk. Blood pressure suboptimally controlled, 152 over 94. Palpitations — low threshold for investigation. Plan as discussed: metformin uptitrated, atorvastatin 40 milligrams nocte initiated, iron studies ordered, 24-hour Holter ECG requested, cardiology referral placed. Review six weeks."
+
+---
+
+**Stop recording.**
+
+> *"Both recordings are now part of the same encounter. The ambient captured the room — the patient's words, the dialogue, the human side. The dictation captured my structured clinical formulation. Every document and every code is generated from both."*
+
+---
+
+### 5. Facts Panel (2 min)
 
 **Navigate to:** Facts
 
-> *"Every clinical fact from that conversation has been pulled out and structured. Symptoms, examination findings, the lab values we discussed — HbA1c 8.4, fasting glucose 11.2, LDL 3.8, haemoglobin 11.8, creatinine 98, BP 152/94. None of this required any typing."*
+> *"Every clinical fact from the consultation and the dictation, combined. Symptoms, examination findings, lab values — HbA1c 8.4, fasting glucose 11.2, LDL 3.8, haemoglobin 11.8, creatinine 98, BP 152/94. None of this required any typing."*
 
 - Scroll through the facts list slowly
 - Pause on lab values
 
-> *"Look at the lab results section. The values I read aloud have been extracted as discrete structured results. The system isn't just transcribing — it's understanding a clinical conversation."*
+> *"Look at the lab results section. The values I read aloud in the consultation have been extracted as discrete structured results. The system isn't just transcribing — it's understanding a clinical conversation."*
 
 ---
 
-### 5. Case Reasoning (1.5 min)
+### 6. Case Reasoning (1.5 min)
 
 **Navigate to:** Case Reasoning
 
@@ -141,17 +164,17 @@ This case covers:
 
 ---
 
-### 6. Document Generation (1 min)
+### 7. Document Generation (1 min)
 
 **Navigate to:** Generate documents → SOAP note
 
-> *"Ten seconds. A complete, structured clinical note — not a transcript, a proper SOAP note. We can generate a referral letter to cardiology or a patient-facing summary from the same consultation."*
+> *"Ten seconds. A complete, structured clinical note — built from both the ambient consultation and the dictation. Not a transcript, a proper SOAP note. We can generate a referral letter to cardiology or a patient-facing summary from the same encounter."*
 
 - Show the generated SOAP note, scrolling through it without reading aloud
 
 ---
 
-### 7. Publish (30 sec)
+### 8. Publish (30 sec)
 
 **Click:** Publish
 
@@ -161,17 +184,17 @@ This case covers:
 
 ---
 
-### 8. ICD-10 Coding (1 min)
+### 9. ICD-10 Coding (1 min)
 
 **Show:** Medical coding panel
 
-> *"ICD-10 codes suggested from what was said in the room. E11.65 — Type 2 diabetes with hyperglycaemia. I10 — hypertension. R06.09 — dyspnoea. D64.9 — anaemia. E78.5 — hyperlipidaemia. The coder reviews and confirms — for straightforward cases like this, it's essentially done."*
+> *"ICD-10 codes suggested from what was said in the room and dictated. E11.65 — Type 2 diabetes with hyperglycaemia. I10 — hypertension. R06.09 — dyspnoea. D64.9 — anaemia. E78.5 — hyperlipidaemia. The coder reviews and confirms — for straightforward cases like this, it's essentially done."*
 
 - Point to each code
 
 ---
 
-### 9. Billing & CPT Codes (1 min)
+### 10. Billing & CPT Codes (1 min)
 
 **Show:** Billing panel
 
@@ -183,7 +206,7 @@ This case covers:
 
 ---
 
-### 10. Patient Companion (1.5 min)
+### 11. Patient Companion (1.5 min)
 
 **Navigate to:** Patient companion
 
@@ -195,7 +218,7 @@ This case covers:
 
 ---
 
-### 11. Updated Profile & Second Encounter (5 min)
+### 12. Updated Profile & Second Encounter (5 min)
 
 **Navigate to:** James Harrison — Patient Records
 
@@ -203,7 +226,7 @@ This case covers:
 
 - Point to updated active problems, medications, clinical narrative
 
-> *"Six weeks later, James comes back. Iron studies confirmed deficiency. Cardiology cleared him on the Holter. Quick follow-up."*
+> *"Six weeks later, James comes back. Iron studies confirmed deficiency. Cardiology cleared him on the Holter. Quick follow-up — ambient again."*
 
 **New Encounter → James Harrison → Ambient → Record**
 
@@ -231,9 +254,9 @@ This case covers:
 
 ---
 
-## Short Demo (~4 min)
+## Short Demo (~5 min)
 
-*Best for investor pitches, trade show conversations, or when time is tight. Covers the core loop only: ambient → facts + labs → coding + billing → profile. Skip document generation, case reasoning, and companion.*
+*Best for investor pitches, trade show conversations, or when time is tight. Shows the full core loop including both ambient and dictation modes. Skip case reasoning and companion.*
 
 ---
 
@@ -246,7 +269,7 @@ Navigate to his patient detail page before starting.
 
 ### Script
 
-**Show:** James Harrison's patient profile (5 sec)
+**Show:** James Harrison's patient profile (10 sec)
 
 > *"This is James. Established patient, Type 2 diabetes, hypertension. His clinical profile is built automatically from every encounter on record — problems, medications, history. We didn't type any of this."*
 
@@ -266,15 +289,27 @@ Navigate to his patient detail page before starting.
 
 **Stop recording.**
 
-> *"Done. Watch what the platform does with that."*
+> *"Patient's left the room. I'll now dictate my clinical note — same encounter."*
+
+**Click:** Dictate → Record
+
+---
+
+*Read the following — approximately 20 seconds:*
+
+**Provider:** "Assessment: poorly controlled Type 2 diabetes, mild anaemia — iron deficiency vs CKD-related. Elevated LDL, statin indicated. Blood pressure suboptimally controlled. Plan: metformin uptitrated, atorvastatin initiated, iron studies, cardiology referral. Review six weeks."
+
+---
+
+**Stop recording.**
+
+> *"Both recordings, one encounter. Now watch what the platform does."*
 
 **Navigate to:** Facts
 
-> *"Symptoms, exam, the lab values I read aloud — HbA1c 8.4, LDL 3.8, haemoglobin 11.8, BP 152/94 — all structured. No typing."*
+> *"Lab values I read aloud — HbA1c 8.4, LDL 3.8, haemoglobin 11.8, BP 152/94 — extracted as discrete structured results. The clinical formulation from the dictation is in there too. No typing."*
 
 - Pause on lab results section
-
-> *"These values are extracted as discrete lab results. From speech."*
 
 **Click:** Publish
 
@@ -282,7 +317,7 @@ Navigate to his patient detail page before starting.
 
 **Show:** ICD coding panel
 
-> *"ICD-10 codes — T2DM with hyperglycaemia, hypertension, anaemia, hyperlipidaemia, dyspnoea. From the conversation."*
+> *"ICD-10 codes — T2DM with hyperglycaemia, hypertension, anaemia, hyperlipidaemia, dyspnoea. From both recordings."*
 
 **Show:** Billing panel
 
@@ -303,13 +338,15 @@ Navigate to his patient detail page before starting.
 | Section | Duration |
 |---|---|
 | Patient profile intro | 20 sec |
-| Start encounter | 10 sec |
+| Start encounter (ambient) | 10 sec |
 | Ambient consultation | 60 sec |
-| Facts + lab results | 45 sec |
+| Start dictation | 10 sec |
+| Dictated note | 20 sec |
+| Facts panel | 40 sec |
 | Publish + ICD coding | 40 sec |
 | Billing | 20 sec |
-| Profile update | 25 sec |
-| **Total** | **~4 min** |
+| Profile update | 20 sec |
+| **Total** | **~5 min** |
 
 ---
 
@@ -320,6 +357,7 @@ Navigate to his patient detail page before starting.
 | Home page & patient list | 2 min |
 | Start encounter | 1 min |
 | Ambient consultation | 3 min |
+| Dictate a note | 1.5 min |
 | Facts panel | 2 min |
 | Case reasoning | 1.5 min |
 | Document generation | 1 min |
@@ -328,7 +366,7 @@ Navigate to his patient detail page before starting.
 | Billing & CPT | 1 min |
 | Patient companion | 1.5 min |
 | Updated profile & second encounter | 5 min |
-| **Total** | **~19 min** |
+| **Total** | **~21 min** |
 
 ---
 
