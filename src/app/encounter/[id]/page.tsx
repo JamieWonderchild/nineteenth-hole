@@ -658,7 +658,7 @@ export default function ConsultationDetailPage() {
   return (
     <Layout>
       <BillingGuard feature="Encounters">
-        <div className="mx-auto max-w-3xl p-4 sm:p-6 space-y-5">
+        <div className="mx-auto max-w-7xl p-4 sm:p-6 space-y-5">
           {/* Header: back + name + status + actions */}
           <div className="flex flex-col sm:flex-row sm:items-start gap-3">
             <div className="flex-1 min-w-0 space-y-1">
