@@ -45,7 +45,6 @@ import {
   Send,
   Sparkles,
   X,
-  Pencil,
   Upload,
   RefreshCw,
   RotateCcw,
@@ -53,7 +52,6 @@ import {
   User,
   Mail,
   Phone,
-  Weight,
   Heart,
   MessageSquare,
   ExternalLink,
@@ -117,9 +115,6 @@ export default function ConsultationDetailPage() {
   const [smsPhone, setSmsPhone] = useState('');
   const [isSendingSms, setIsSendingSms] = useState(false);
   const [smsSent, setSmsSent] = useState(false);
-  // Inline edit state for patient fields
-  const [editingPatientField, setEditingPatientField] = useState<string | null>(null);
-  const [editPatientValue, setEditPatientValue] = useState('');
 
 
   const encounter = useQuery(
@@ -625,34 +620,6 @@ export default function ConsultationDetailPage() {
     .filter(Boolean)
     .join(' · ');
 
-  const startPatientEdit = (field: string, currentValue: string) => {
-    setEditingPatientField(field);
-    setEditPatientValue(currentValue);
-  };
-
-  const cancelPatientEdit = () => {
-    setEditingPatientField(null);
-    setEditPatientValue('');
-  };
-
-  const savePatientEdit = async () => {
-    if (!editingPatientField || !patient) return;
-    const trimmed = editPatientValue.trim();
-    const currentValue = (patient as Record<string, unknown>)[editingPatientField] as string || '';
-    if (trimmed === currentValue) { cancelPatientEdit(); return; }
-
-    try {
-      await updatePatient({
-        patientId: patient._id as Id<'patients'>,
-        [editingPatientField]: trimmed || undefined,
-      });
-      toast({ title: 'Patient updated' });
-    } catch {
-      toast({ title: 'Error', description: 'Failed to save.', variant: 'destructive' });
-    }
-    cancelPatientEdit();
-  };
-
   // Card grid items
   const cards = [
     {
@@ -990,45 +957,6 @@ export default function ConsultationDetailPage() {
 
                 {/* Right: patient + coding + attachments */}
                 <div className="w-[360px] flex-shrink-0 sticky top-6 self-start space-y-4">
-
-                  {/* Patient Details (compact) */}
-                  {patient && (
-                    <div className="rounded-lg border bg-card p-3">
-                      <div className="flex items-center justify-between mb-2.5">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Patient</p>
-                        <AppLink href={`/patient-records/${patient._id}`} className="text-xs text-primary hover:underline flex items-center gap-0.5">
-                          Record <ChevronRight className="h-3 w-3" />
-                        </AppLink>
-                      </div>
-                      <div className="flex flex-wrap gap-x-5 gap-y-2">
-                        {[
-                          { field: 'age', label: 'Age', icon: null, value: patient.age },
-                          { field: 'sex', label: 'Sex', icon: null, value: patient.sex },
-                          { field: 'weight', label: 'Weight', icon: Weight, value: patient.weight ? `${patient.weight}${patient.weightUnit ? ` ${patient.weightUnit}` : ''}` : undefined },
-                        ].map(({ field, label, icon: Icon, value }) => (
-                          <div key={field} className="group">
-                            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5 flex items-center gap-1">
-                              {Icon && <Icon className="h-3 w-3" />}{label}
-                            </p>
-                            {editingPatientField === field ? (
-                              <Input autoFocus value={editPatientValue}
-                                onChange={(e) => setEditPatientValue(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === 'Enter') savePatientEdit(); if (e.key === 'Escape') cancelPatientEdit(); }}
-                                onBlur={savePatientEdit} className="h-6 text-sm w-20" />
-                            ) : isEditable ? (
-                              <p className={`text-sm cursor-pointer flex items-center gap-1 ${value ? '' : 'text-muted-foreground/40 italic'}`}
-                                onClick={() => startPatientEdit(field, field === 'weight' ? (patient.weight || '') : (value || ''))}>
-                                <span>{value || 'Add'}</span>
-                                <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground flex-shrink-0" />
-                              </p>
-                            ) : (
-                              <p className={`text-sm ${value ? '' : 'text-muted-foreground/40 italic'}`}>{value || '—'}</p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   {/* Medical Coding */}
                   <MedicalCodingPanel

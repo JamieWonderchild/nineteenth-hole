@@ -95,6 +95,10 @@ export default function FactsPage() {
     { encounterId: encounterId as Id<'encounters'> }
   );
 
+  const labResults = useQuery(api.resultsTriage.getResultsByEncounter, {
+    encounterId: encounterId as Id<'encounters'>,
+  });
+
   const resolveConflict = useMutation(api.encounters.resolveFactConflict);
   const saveFactReconciliation = useMutation(api.encounters.saveFactReconciliation);
   const updateFactText = useMutation(api.recordings.updateFactText);
@@ -719,6 +723,44 @@ export default function FactsPage() {
                         Confirm
                       </button>
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Lab Results — compact triage summary */}
+          {labResults && labResults.filter(r => r.urgency).length > 0 && (
+            <div className="rounded-lg border bg-card overflow-hidden">
+              <div className="px-5 py-2.5 border-b border-border bg-muted/40">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lab Results</span>
+              </div>
+              <div className="divide-y divide-border">
+                {labResults.filter(r => r.urgency).map(r => (
+                  <div key={r._id} className="px-5 py-2.5 flex items-center gap-3 min-w-0">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium">{r.testName}</span>
+                      <span className="text-sm text-muted-foreground ml-2">
+                        {r.resultValue}{r.units ? ` ${r.units}` : ''}
+                      </span>
+                      {r.referenceRange && (
+                        <span className="text-xs text-muted-foreground ml-1.5">({r.referenceRange})</span>
+                      )}
+                    </div>
+                    {r.urgency !== 'normal' && r.urgency !== 'low' && (
+                      <span className={`flex-shrink-0 text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded border ${
+                        r.urgency === 'critical'
+                          ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800'
+                          : 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800'
+                      }`}>
+                        {r.urgency}
+                      </span>
+                    )}
+                    {r.suggestedFollowUp && (
+                      <span className="text-xs text-muted-foreground flex-shrink-0 max-w-[220px] truncate">
+                        {r.suggestedFollowUp}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>

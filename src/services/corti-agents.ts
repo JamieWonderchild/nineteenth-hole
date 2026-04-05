@@ -899,13 +899,13 @@ Respond ONLY with this exact JSON structure:
 - Keep the notification warm and reassuring unless the result truly warrants concern
 
 ## Output Format
-Respond ONLY with this exact JSON structure:
+Respond ONLY with this exact JSON structure. Be concise — clinicians scan these at a glance.
 {
   "urgency": "critical" | "high" | "normal" | "low",
-  "urgencyReason": "string (clinical explanation of why this urgency level was assigned)",
+  "urgencyReason": "string (one short sentence, max 15 words, e.g. 'Mildly low — monitor for iron deficiency given symptoms')",
   "patientNotificationDraft": "string (plain-language message to patient, 2-3 sentences max)",
-  "suggestedFollowUp": "string (specific clinical action for provider, e.g. 'Increase lisinopril to 10mg daily, recheck BMP in 1 week')",
-  "triageNotes": "string (brief clinical context for the provider)"
+  "suggestedFollowUp": "string (one brief action phrase, e.g. 'Iron studies + repeat CBC in 6 weeks')",
+  "triageNotes": "string (one sentence of clinical context)"
 }`,
 
   SHIFT_HANDOFF: `You are a clinical handoff specialist. Generate structured SBAR (Situation-Background-Assessment-Recommendation) handoff notes for care transitions.

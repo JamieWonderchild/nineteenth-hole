@@ -348,7 +348,7 @@ function ResultCard({
             </div>
 
             {result.urgencyReason && (
-              <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">{result.urgencyReason}</p>
+              <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1 line-clamp-2">{result.urgencyReason}</p>
             )}
 
             {isTriaged && !result.notificationSent && result.patientNotificationDraft && isEditable && (
@@ -386,7 +386,7 @@ function ResultCard({
             )}
 
             {result.followUpAccepted && result.suggestedFollowUp && (
-              <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+              <p className="text-xs text-green-600 dark:text-green-400 mt-1 line-clamp-2">
                 <Check className="inline h-3 w-3 mr-0.5" />
                 Follow-up noted: {result.suggestedFollowUp}
               </p>
