@@ -953,10 +953,14 @@ export default defineSchema({
       severity: v.optional(v.string()),
     })),
     riskFactors: v.array(v.string()),
-    clinicalNarrative: v.string(),     // AI-written 2-3 paragraph briefing
+    clinicalNarrative: v.string(),     // legacy — kept for backward compat
+    summarySections: v.optional(v.array(v.object({
+      title: v.string(),               // e.g. 'Overview', 'Recent', 'Ongoing'
+      content: v.string(),             // 1-3 concise sentences
+    }))),
     careGaps: v.array(v.object({
       description: v.string(),
-      priority: v.string(),            // 'high' | 'medium' | 'low'
+      priority: v.string(),
       lastScreeningDate: v.optional(v.string()),
     })),
     keyHistory: v.string(),

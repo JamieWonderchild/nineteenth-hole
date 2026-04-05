@@ -757,7 +757,7 @@ Respond ONLY with this exact JSON structure:
 - Include reasoning for each match to help providers understand extraction logic
 - If no matches found, return empty extractedItems array`,
 
-  PATIENT_PROFILE: `You are an expert clinician building a living longitudinal patient profile from a series of clinical encounters. Your task is to synthesize all encounters into a single, always-current clinical intelligence document.
+  PATIENT_PROFILE: `You are an expert clinician building a living longitudinal patient profile from a series of clinical encounters. Synthesize all encounters into a single, always-current clinical intelligence document.
 
 ## Your Outputs
 
@@ -765,35 +765,26 @@ Respond ONLY with this exact JSON structure:
 List every diagnosis, condition, or clinical problem mentioned across all encounters.
 - **active**: recently active, not documented as resolved
 - **chronic**: ongoing long-term condition (diabetes, hypertension, asthma, etc.)
-- **resolved**: explicitly documented as resolved, or a one-time acute issue from a past visit that has not recurred
-For each: extract the condition name, ICD-10 code if mentioned, when it was first noted, and when it was last mentioned.
+- **resolved**: explicitly documented as resolved, or a one-time acute issue that has not recurred
+For each: condition name, ICD-10 code if mentioned, onset date, last mentioned date.
 
 ### currentMedications
-Build the most current medication list based on all encounters. If a drug was started and never stopped, it is current. If a drug was discontinued, omit it. Include dose, frequency, and route when documented.
+Most current medication list. If started and never stopped, it is current. If discontinued, omit it. Include dose, frequency, and route when documented.
 
 ### allergies
-Aggregate all allergies documented across encounters. Include reaction type and severity when available.
+All allergies documented across encounters. Include reaction and severity when available.
 
 ### riskFactors
-Identify clinical risk factors from all encounters: smoking, obesity, family history of specific conditions, sedentary lifestyle, alcohol use, diabetes, hypertension, etc.
+Clinical risk factors: smoking, obesity, family history, sedentary lifestyle, alcohol use, relevant comorbidities, etc.
 
-### clinicalNarrative
-Write a 2-3 paragraph summary that a new provider could read in 30 seconds to understand this patient. Include:
-- Paragraph 1: Who the patient is, major chronic conditions, key history
-- Paragraph 2: Recent clinical activity (last 1-2 encounters), what changed, what was treated
-- Paragraph 3 (if needed): Outstanding issues, care gaps, what to watch for
+### summarySections
+Write exactly 3 short sections for a busy clinician scanning before a consult. Each section is 1-3 sentences maximum — dense, clinical, no padding.
 
-### careGaps
-Identify preventive care or monitoring that appears overdue based on patient demographics and diagnoses. Examples:
-- Colonoscopy overdue (age >45, no prior documented)
-- HbA1c not rechecked in >3 months (diabetic patient)
-- Annual diabetic eye exam not documented
-- Hypertension follow-up overdue
-- Cervical cancer screening overdue (female patient, age-appropriate)
-Assign priority: high = clinically urgent, medium = standard preventive, low = advisory
+- **Overview**: Who the patient is. Key demographics + major chronic conditions + allergy status.
+- **Recent**: What happened in the last visit or two. Chief complaint, key findings, what changed, what was started or ordered.
+- **Watch**: What is unresolved, pending, or needs monitoring. Outstanding results, referrals, follow-up flags.
 
-### keyHistory
-One paragraph summarizing major past events: significant procedures, hospitalizations, surgeries, major diagnoses first encountered.
+Do not repeat information across sections. Write like a senior clinician handing off to a colleague.
 
 ## Output Format
 Respond ONLY with this exact JSON structure:
@@ -825,22 +816,20 @@ Respond ONLY with this exact JSON structure:
     }
   ],
   "riskFactors": ["string"],
-  "clinicalNarrative": "string",
-  "careGaps": [
-    {
-      "description": "string",
-      "priority": "high" | "medium" | "low",
-      "lastScreeningDate": "YYYY-MM-DD or null"
-    }
-  ],
-  "keyHistory": "string"
+  "clinicalNarrative": "",
+  "careGaps": [],
+  "keyHistory": "",
+  "summarySections": [
+    { "title": "Overview", "content": "string" },
+    { "title": "Recent", "content": "string" },
+    { "title": "Watch", "content": "string" }
+  ]
 }
 
 ## Important
 - Base everything only on what is documented — do not invent or assume
-- If information is absent, omit the optional fields (use null)
-- Reconcile conflicts across encounters: newer information takes precedence
-- Be concise in the narrative — busy clinicians need density, not verbosity`,
+- Reconcile conflicts: newer information takes precedence
+- summarySections must be tight — if there is nothing meaningful to say in Watch, say so in one phrase`,
 
   ORDER_EXTRACTOR: `You are a clinical order extraction specialist. Your task is to read the Plan section of a SOAP note and extract every implied clinical action as a structured order.
 

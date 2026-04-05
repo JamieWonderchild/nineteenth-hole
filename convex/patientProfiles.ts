@@ -162,6 +162,7 @@ export const getPatientContextData = internalMutation({
       allergies: existingProfile.allergies,
       riskFactors: existingProfile.riskFactors,
       clinicalNarrative: existingProfile.clinicalNarrative,
+      summarySections: existingProfile.summarySections,
       careGaps: existingProfile.careGaps,
       keyHistory: existingProfile.keyHistory,
     } : null;
@@ -209,6 +210,10 @@ export const saveProfile = internalMutation({
         lastScreeningDate: v.optional(v.any()),
       })),
       keyHistory: v.string(),
+      summarySections: v.optional(v.array(v.object({
+        title: v.string(),
+        content: v.string(),
+      }))),
     }),
   },
   handler: async (ctx, args) => {
@@ -252,6 +257,7 @@ export const saveProfile = internalMutation({
       allergies: normalizeAllergies,
       riskFactors: args.profile.riskFactors,
       clinicalNarrative: args.profile.clinicalNarrative,
+      summarySections: args.profile.summarySections ?? undefined,
       careGaps: normalizeCareGaps,
       keyHistory: args.profile.keyHistory,
       generatedAt: timestamp,

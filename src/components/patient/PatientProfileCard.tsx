@@ -3,18 +3,13 @@
 import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from 'convex/_generated/api';
 import type { Id } from 'convex/_generated/dataModel';
-import { Brain, AlertTriangle, ChevronDown, ChevronUp, Clock, RotateCw } from 'lucide-react';
+import { Brain, RotateCw, Clock } from 'lucide-react';
 import { useState } from 'react';
 
 interface PatientProfileCardProps {
   patientId: Id<'patients'>;
+  embedded?: boolean; // strips outer card chrome when rendered inside PatientHeader
 }
-
-const PRIORITY_BADGE: Record<string, string> = {
-  high: 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800',
-  medium: 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
-  low: 'bg-gray-100 dark:bg-muted/40 text-gray-600 dark:text-muted-foreground border-gray-200 dark:border-border',
-};
 
 const PROBLEM_CHIP: Record<string, string> = {
   active: 'border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300',
@@ -22,20 +17,17 @@ const PROBLEM_CHIP: Record<string, string> = {
   resolved: 'border-gray-300 dark:border-border bg-gray-50 dark:bg-muted/20 text-gray-400 dark:text-muted-foreground line-through',
 };
 
-export function PatientProfileCard({ patientId }: PatientProfileCardProps) {
+export function PatientProfileCard({ patientId, embedded = false }: PatientProfileCardProps) {
   const profile = useQuery(api.patientProfiles.getByPatient, { patientId });
   const latestEncounter = useQuery(api.encounters.getLatestPublishedByPatient, { patientId });
-  const [narrativeExpanded, setNarrativeExpanded] = useState(true);
-  const [careGapsExpanded, setCareGapsExpanded] = useState(false);
   const [isRerunning, setIsRerunning] = useState(false);
 
   const markProcessing = useMutation(api.patientProfiles.markProcessing);
   const buildProfile = useAction(api.patientProfiles.buildPatientProfile);
 
   async function handleRerun() {
-    const enc = profile ?? null;
-    const encounterId = enc ? enc.triggerEncounterId : latestEncounter?._id;
-    const orgId = enc ? enc.orgId : latestEncounter?.orgId;
+    const encounterId = profile?.triggerEncounterId ?? latestEncounter?._id;
+    const orgId = profile?.orgId ?? latestEncounter?.orgId;
     if (!encounterId || !orgId || isRerunning) return;
     setIsRerunning(true);
     try {
@@ -46,17 +38,15 @@ export function PatientProfileCard({ patientId }: PatientProfileCardProps) {
     }
   }
 
-  // Still loading from Convex
   if (profile === undefined) return null;
 
-  // No profile yet
   if (profile === null) {
     const canGenerate = !!latestEncounter;
     return (
       <div className="rounded-xl border border-dashed border-border p-6 text-center space-y-3">
         <Brain className="h-8 w-8 text-muted-foreground/30 mx-auto" />
         <p className="text-sm text-muted-foreground">
-          No clinical profile yet — will be generated after the first published encounter.
+          No clinical profile yet — generated after the first published encounter.
         </p>
         {canGenerate && (
           <button
@@ -72,7 +62,6 @@ export function PatientProfileCard({ patientId }: PatientProfileCardProps) {
     );
   }
 
-  // Processing / loading state
   if (profile.buildStatus === 'processing') {
     return (
       <div className="rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/20 p-6">
@@ -91,56 +80,60 @@ export function PatientProfileCard({ patientId }: PatientProfileCardProps) {
 
   const hasProblems = profile.activeProblems.length > 0;
   const hasMeds = profile.currentMedications.length > 0;
-  const hasCareGaps = profile.careGaps.length > 0;
-  const hasRiskFactors = profile.riskFactors.length > 0;
+  const hasSections = profile.summarySections && profile.summarySections.length > 0;
 
-  return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/40">
-        <div className="flex items-center gap-2">
-          <Brain className="h-4 w-4 text-primary" />
-          <span className="text-sm font-semibold text-foreground">Clinical Profile</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">
-            Built from {profile.encounterCount} encounter{profile.encounterCount !== 1 ? 's' : ''}
-          </span>
-          {profile.buildStatus !== 'processing' && (
-            <button
-              onClick={handleRerun}
-              disabled={isRerunning}
-              className="text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
-              title="Regenerate profile"
-            >
-              <RotateCw className={`h-3.5 w-3.5 ${isRerunning ? 'animate-spin' : ''}`} />
-            </button>
-          )}
-        </div>
+  const profileMeta = (
+    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+      <div className="flex items-center gap-1.5">
+        <Clock className="h-3 w-3" />
+        {new Date(profile.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
       </div>
+      <span>{profile.encounterCount} encounter{profile.encounterCount !== 1 ? 's' : ''}</span>
+      {profile.buildStatus !== 'processing' && (
+        <button onClick={handleRerun} disabled={isRerunning}
+          className="text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+          title="Regenerate profile">
+          <RotateCw className={`h-3.5 w-3.5 ${isRerunning ? 'animate-spin' : ''}`} />
+        </button>
+      )}
+    </div>
+  );
 
-      <div className="divide-y divide-border">
-        {/* Zone 1 — Narrative */}
-        {profile.clinicalNarrative && (
-          <div className="px-5 py-4">
-            <button
-              onClick={() => setNarrativeExpanded(v => !v)}
-              className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 hover:text-foreground transition-colors"
-            >
-              Summary
-              {narrativeExpanded ? (
-                <ChevronUp className="h-3 w-3" />
-              ) : (
-                <ChevronDown className="h-3 w-3" />
-              )}
-            </button>
-            {narrativeExpanded && (
-              <p className="text-sm text-foreground leading-relaxed">{profile.clinicalNarrative}</p>
-            )}
+  const content = (
+    <div className="divide-y divide-border">
+      {/* Profile meta row — only shown when not embedded (embedded header handles spacing) */}
+      {!embedded && (
+        <div className="flex items-center justify-between px-5 py-3 bg-muted/40">
+          <div className="flex items-center gap-2">
+            <Brain className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold">Clinical Profile</span>
+          </div>
+          {profileMeta}
+        </div>
+      )}
+        {/* Summary sections (structured) */}
+        {hasSections && (
+          <div className="px-5 py-4 space-y-3">
+            {profile.summarySections!.map((section, i) => (
+              <div key={i}>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                  {section.title}
+                </p>
+                <p className="text-sm text-foreground leading-relaxed">{section.content}</p>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Zone 2 — Active Problems */}
+        {/* Fallback: legacy clinicalNarrative */}
+        {!hasSections && profile.clinicalNarrative && (
+          <div className="px-5 py-4">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Summary</p>
+            <p className="text-sm text-foreground leading-relaxed">{profile.clinicalNarrative}</p>
+          </div>
+        )}
+
+        {/* Active Problems */}
         {hasProblems && (
           <div className="px-5 py-4">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Active Problems</p>
@@ -160,7 +153,7 @@ export function PatientProfileCard({ patientId }: PatientProfileCardProps) {
           </div>
         )}
 
-        {/* Zone 3 — Medications */}
+        {/* Medications */}
         {hasMeds && (
           <div className="px-5 py-4">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Current Medications</p>
@@ -179,62 +172,32 @@ export function PatientProfileCard({ patientId }: PatientProfileCardProps) {
           </div>
         )}
 
-        {/* Zone 4 — Care Gaps (collapsed by default) */}
-        {hasCareGaps && (
-          <div className="px-5 py-3">
-            <button
-              onClick={() => setCareGapsExpanded(v => !v)}
-              className="flex items-center justify-between w-full group"
-            >
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide group-hover:text-foreground transition-colors">
-                Care Gaps
+        {/* Allergies + risk factors footer */}
+        <div className="px-5 py-3 bg-muted/40 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            {profile.allergies.length > 0 ? (
+              <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                <span className="font-medium">Allergies:</span>
+                {profile.allergies.map(a => a.allergen).join(', ')}
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground">No known allergies</span>
+            )}
+            {profile.riskFactors.length > 0 && (
+              <span className="text-xs text-muted-foreground">
+                Risk: {profile.riskFactors.join(', ')}
               </span>
-              <span className="flex items-center gap-1.5">
-                <span className="px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground text-[10px] font-semibold tabular-nums">
-                  {profile.careGaps.length}
-                </span>
-                {careGapsExpanded ? (
-                  <ChevronUp className="h-3 w-3 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                )}
-              </span>
-            </button>
-            {careGapsExpanded && (
-              <ul className="mt-3 space-y-1.5">
-                {profile.careGaps.map((g, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className={`mt-0.5 inline-flex px-1.5 py-0.5 rounded border text-[10px] font-semibold uppercase ${PRIORITY_BADGE[g.priority] ?? PRIORITY_BADGE.low}`}>
-                      {g.priority}
-                    </span>
-                    <span className="text-sm text-foreground">{g.description}</span>
-                  </li>
-                ))}
-              </ul>
             )}
           </div>
-        )}
-
-        {/* Zone 5 — Footer */}
-        <div className="px-5 py-3 bg-muted/40 flex flex-wrap items-center gap-x-4 gap-y-1">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            Updated {new Date(profile.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-          </div>
-          {hasRiskFactors && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <AlertTriangle className="h-3 w-3 text-amber-500" />
-              <span>Risk factors: {profile.riskFactors.join(', ')}</span>
-            </div>
-          )}
-          {profile.allergies.length > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
-              <span className="font-medium">Allergies:</span>
-              {profile.allergies.map(a => a.allergen).join(', ')}
-            </div>
-          )}
+          {embedded && profileMeta}
         </div>
       </div>
+  );
+
+  if (embedded) return content;
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+      {content}
     </div>
   );
 }
