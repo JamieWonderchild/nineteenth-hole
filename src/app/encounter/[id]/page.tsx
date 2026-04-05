@@ -704,14 +704,6 @@ export default function ConsultationDetailPage() {
                       Dictate
                     </Button>
                   </AppLink>
-                  <Button
-                    variant="outline"
-                    className="gap-2 text-destructive hover:text-destructive"
-                    onClick={() => setShowDeleteConfirm(true)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </Button>
                 </>
               )}
 
@@ -736,16 +728,6 @@ export default function ConsultationDetailPage() {
                     )}
                     Publish
                   </Button>
-                  {isAdmin && (
-                    <Button
-                      variant="outline"
-                      className="gap-2 text-destructive hover:text-destructive"
-                      onClick={() => setShowDeleteConfirm(true)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </Button>
-                  )}
                 </>
               )}
 
@@ -783,16 +765,6 @@ export default function ConsultationDetailPage() {
                     )}
                     Unpublish
                   </Button>
-                  {isAdmin && (
-                    <Button
-                      variant="outline"
-                      className="gap-2 text-destructive hover:text-destructive"
-                      onClick={() => setShowDeleteConfirm(true)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </Button>
-                  )}
                 </>
               )}
             </div>
@@ -1062,6 +1034,19 @@ export default function ConsultationDetailPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Delete */}
+                {(status === 'draft' || isAdmin) && (
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/50 hover:text-destructive transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete encounter
+                    </button>
+                  </div>
+                )}
 
               </div>{/* end single-column body */}
 
