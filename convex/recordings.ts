@@ -43,6 +43,7 @@ export const createRecording = mutation({
 
     // When a note recording is saved with real facts, trigger billing extraction
     if (args.phase === 'note' && args.facts && args.facts.length > 0 && encounter.orgId) {
+      await ctx.db.patch(recordingId, { billingExtractionStatus: 'processing' as const });
       await ctx.scheduler.runAfter(0, api.billingExtraction.extractFromRecording, {
         encounterId: args.encounterId,
         recordingId,
