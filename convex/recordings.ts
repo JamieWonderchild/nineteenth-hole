@@ -2,6 +2,7 @@
 // CRUD for recordings table — each recording is a child of a encounter.
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { api } from "./_generated/api";
 
 // Create a recording linked to a encounter
 export const createRecording = mutation({
@@ -39,6 +40,16 @@ export const createRecording = mutation({
       orderIndex: existing.length,
       createdAt: new Date().toISOString(),
     });
+
+    // When a note recording is saved with real facts, trigger billing extraction
+    if (args.phase === 'note' && args.facts && args.facts.length > 0 && encounter.orgId) {
+      await ctx.scheduler.runAfter(0, api.billingExtraction.extractFromRecording, {
+        encounterId: args.encounterId,
+        recordingId,
+        orgId: encounter.orgId,
+        userId: encounter.providerId,
+      });
+    }
 
     return recordingId;
   },
