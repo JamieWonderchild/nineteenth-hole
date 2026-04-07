@@ -106,6 +106,7 @@ export default function ConsultationDetailPage() {
   const isAdmin = orgContext?.isAdmin ?? false;
   const encounterId = params.id as string;
 
+  const [isExtractingNoteFacts, setIsExtractingNoteFacts] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [showAddendum, setShowAddendum] = useState(false);
@@ -701,7 +702,7 @@ export default function ConsultationDetailPage() {
 
               {(status === 'in-progress' || status === 'review') && (
                 <>
-                  <DictationModal encounterId={encounterId as Id<'encounters'>} />
+                  <DictationModal encounterId={encounterId as Id<'encounters'>} onFactsExtracting={setIsExtractingNoteFacts} />
                   <AppLink href={`/encounter/new?encounterId=${encounterId}`}>
                     <Button variant="outline" className="gap-2">
                       <Mic className="h-4 w-4" />
@@ -725,7 +726,7 @@ export default function ConsultationDetailPage() {
 
               {status === 'published' && (
                 <>
-                  <DictationModal encounterId={encounterId as Id<'encounters'>} />
+                  <DictationModal encounterId={encounterId as Id<'encounters'>} onFactsExtracting={setIsExtractingNoteFacts} />
                   <Button
                     variant="outline"
                     className="gap-2"
@@ -882,6 +883,12 @@ export default function ConsultationDetailPage() {
 
                 {/* Recording Timeline */}
                 <div ref={timelineRef}>
+                  {isExtractingNoteFacts && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Extracting facts from note…
+                    </div>
+                  )}
                   <RecordingTimeline
                     recordings={detail?.recordings || []}
                     factReconciliation={detail?.factReconciliation}

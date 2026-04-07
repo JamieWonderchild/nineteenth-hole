@@ -33,6 +33,7 @@ type Stage = 'idle' | 'recording' | 'processing' | 'reviewing' | 'saving';
 
 interface DictationModalProps {
   encounterId: Id<'encounters'>;
+  onFactsExtracting?: (extracting: boolean) => void;
 }
 
 const MODE_LABELS: Record<DictationMode, { label: string; icon: React.ReactNode }> = {
@@ -42,7 +43,7 @@ const MODE_LABELS: Record<DictationMode, { label: string; icon: React.ReactNode 
 };
 
 
-export function DictationModal({ encounterId }: DictationModalProps) {
+export function DictationModal({ encounterId, onFactsExtracting }: DictationModalProps) {
   const { user } = useUser();
   const { language } = useLanguagePreference();
   const [open, setOpen] = useState(false);
@@ -148,12 +149,12 @@ export function DictationModal({ encounterId }: DictationModalProps) {
     try {
       const result = await addAddendum({ encounterId, text, providerId: user.id });
       const noteIndex = result?.noteIndex ?? -1;
-      // Fire-and-forget: extract clinical facts, save as a note recording, and reconcile
+      onFactsExtracting?.(true);
       extractAndSaveNoteFacts(
         encounterId, text, createRecording, runReconciliation,
         noteIndex >= 0 ? (count) => setAddendumFactCount({ encounterId, index: noteIndex, factCount: count }) : undefined,
         language,
-      );
+      ).finally(() => onFactsExtracting?.(false));
       toast({ title: 'Note saved' });
       setOpen(false);
     } catch {
