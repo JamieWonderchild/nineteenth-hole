@@ -15,8 +15,13 @@ export function getStripe(): Stripe {
   return stripeInstance;
 }
 
-// Club subscription price IDs
-export const CLUB_PLAN_PRICE_ID = process.env.STRIPE_PRICE_CLUB_PLAN || '';
+// Platform takes 10% on top of every entry fee.
+// e.g. organizer sets £20 entry → member pays £22 → pot gets £20 → we keep £2.
+export const PLATFORM_FEE_PERCENT = 10;
+
+export function platformFeeAmount(entryFeeInPence: number): number {
+  return Math.round(entryFeeInPence * PLATFORM_FEE_PERCENT / 100);
+}
 
 export async function createEntryCheckoutSession({
   entryId,
@@ -30,13 +35,15 @@ export async function createEntryCheckoutSession({
 }: {
   entryId: string;
   competitionId: string;
-  entryFee: number; // in pence/cents
+  entryFee: number; // in pence/cents — this is the pot contribution
   currency: string;
   competitionName: string;
   userId: string;
   successUrl: string;
   cancelUrl: string;
 }): Promise<Stripe.Checkout.Session> {
+  const platformFee = platformFeeAmount(entryFee);
+
   return getStripe().checkout.sessions.create({
     mode: 'payment',
     line_items: [
@@ -46,7 +53,18 @@ export async function createEntryCheckoutSession({
           unit_amount: entryFee,
           product_data: {
             name: `${competitionName} — Pool Entry`,
-            description: 'Tiered draw. One player per tier. Best player wins.',
+            description: 'Tiered draw. One player per tier. Best player wins the pot.',
+          },
+        },
+        quantity: 1,
+      },
+      {
+        price_data: {
+          currency: currency.toLowerCase(),
+          unit_amount: platformFee,
+          product_data: {
+            name: 'Platform fee',
+            description: 'Play The Pool service fee',
           },
         },
         quantity: 1,
@@ -61,27 +79,4 @@ export async function createEntryCheckoutSession({
       userId,
     },
   });
-}
-
-export async function createClubSubscriptionSession({
-  clubId,
-  stripeCustomerId,
-  successUrl,
-  cancelUrl,
-}: {
-  clubId: string;
-  stripeCustomerId?: string;
-  successUrl: string;
-  cancelUrl: string;
-}): Promise<Stripe.Checkout.Session> {
-  const params: Stripe.Checkout.SessionCreateParams = {
-    mode: 'subscription',
-    line_items: [{ price: CLUB_PLAN_PRICE_ID, quantity: 1 }],
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    metadata: { type: 'club_subscription', clubId },
-    subscription_data: { metadata: { clubId }, trial_period_days: 14 },
-  };
-  if (stripeCustomerId) params.customer = stripeCustomerId;
-  return getStripe().checkout.sessions.create(params);
 }

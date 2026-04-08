@@ -34,58 +34,19 @@ export async function POST(request: NextRequest) {
   if (!isNew) return NextResponse.json({ received: true, duplicate: true });
 
   try {
-    switch (event.type) {
-      case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
-        const type = session.metadata?.type;
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
 
-        if (type === "entry") {
-          // Pool entry payment confirmed
-          const sessionId = session.id;
-          const paymentIntentId = typeof session.payment_intent === "string"
-            ? session.payment_intent
-            : session.payment_intent?.id;
+      if (session.metadata?.type === "entry") {
+        const paymentIntentId = typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : session.payment_intent?.id;
 
-          await convex.mutation(api.entries.markPaid, {
-            stripeCheckoutSessionId: sessionId,
-            stripePaymentIntentId: paymentIntentId,
-          });
-          console.log(`[StripeWebhook] Entry paid: session=${sessionId}`);
-        } else if (type === "club_subscription" && session.metadata?.clubId) {
-          // Club plan subscription started
-          const clubId = session.metadata.clubId;
-          const customerId = typeof session.customer === "string"
-            ? session.customer : session.customer?.id;
-          const subscriptionId = typeof session.subscription === "string"
-            ? session.subscription : session.subscription?.id;
-
-          if (customerId) {
-            await convex.mutation(api.clubs.updateStripeCustomer, {
-              clubId: clubId as any,
-              stripeCustomerId: customerId,
-            });
-          }
-          await convex.mutation(api.clubs.updateSubscription, {
-            clubId: clubId as any,
-            plan: "club",
-            billingStatus: "active",
-            stripeSubscriptionId: subscriptionId,
-          });
-        }
-        break;
-      }
-
-      case "customer.subscription.deleted": {
-        const subscription = event.data.object as Stripe.Subscription;
-        const clubId = subscription.metadata?.clubId;
-        if (clubId) {
-          await convex.mutation(api.clubs.updateSubscription, {
-            clubId: clubId as any,
-            plan: "free",
-            billingStatus: "canceled",
-          });
-        }
-        break;
+        await convex.mutation(api.entries.markPaid, {
+          stripeCheckoutSessionId: session.id,
+          stripePaymentIntentId: paymentIntentId,
+        });
+        console.log(`[StripeWebhook] Entry paid: session=${session.id}`);
       }
     }
 
