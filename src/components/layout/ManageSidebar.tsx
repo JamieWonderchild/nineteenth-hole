@@ -7,7 +7,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, BookOpen, Plus, LogOut,
-  Globe, ChevronRight, Menu, X, Flag, Trophy, Zap
+  Globe, ChevronRight, Menu, X, Flag, Trophy, Zap, ListOrdered
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -125,6 +125,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               onClick={onNav}
             />
             <NavItem href="/manage/results" icon={<BookOpen size={16} />} label="Game Book" active={is("/manage/results")} onClick={onNav} />
+            <NavItem href="/manage/series" icon={<ListOrdered size={16} />} label="Season Series" active={pathname.startsWith("/manage/series")} onClick={onNav} />
             <div className="my-2 border-t border-border" />
             <NavItem href={`/${club.slug}`} icon={<ChevronRight size={16} />} label="View public page" active={false} onClick={onNav} />
           </>

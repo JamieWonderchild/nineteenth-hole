@@ -3,19 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
 
 function slugify(str: string) {
-  return str
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+  return str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { user } = useUser();
+  const superAdmin = useQuery(api.clubs.isSuperAdmin);
   const createClub = useMutation(api.clubs.create);
 
   const [name, setName] = useState("");
@@ -24,6 +22,20 @@ export default function OnboardingPage() {
   const [error, setError] = useState("");
 
   const slug = slugify(name);
+
+  // Non-super-admins shouldn't be here — redirect to home
+  if (superAdmin === false) {
+    router.replace("/home");
+    return null;
+  }
+
+  if (superAdmin === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,22 +62,20 @@ export default function OnboardingPage() {
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
           <div className="text-4xl mb-3">⛳</div>
-          <h1 className="text-2xl font-bold text-gray-900">Create your club</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Create a club</h1>
           <p className="text-gray-500 mt-1 text-sm">
-            You can run unlimited competitions once your club is set up.
+            Super admin — set up a new golf club on the platform.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Club name
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Club name</label>
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="e.g. Sunningdale GC, Jamie's Masters Pool"
+              placeholder="e.g. Finchley Golf Club"
               required
               className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             />
@@ -77,9 +87,7 @@ export default function OnboardingPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Currency
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
             <select
               value={currency}
               onChange={e => setCurrency(e.target.value)}
@@ -92,9 +100,7 @@ export default function OnboardingPage() {
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
-              {error}
-            </p>
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{error}</p>
           )}
 
           <button
