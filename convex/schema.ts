@@ -36,6 +36,7 @@ export default defineSchema({
     clubId: v.id("clubs"),
     userId: v.string(),         // Clerk user ID
     role: v.string(),           // 'admin' | 'member'
+    status: v.string(),         // 'pending' | 'active'
     displayName: v.string(),
     avatarUrl: v.optional(v.string()),
     // Cumulative stats — updated whenever a competition resolves
@@ -50,6 +51,7 @@ export default defineSchema({
   })
     .index("by_club", ["clubId"])
     .index("by_club_and_user", ["clubId", "userId"])
+    .index("by_club_and_status", ["clubId", "status"])
     .index("by_user", ["userId"])
     .index("by_club_total_won", ["clubId", "totalWon"]),
 

@@ -26,23 +26,34 @@ export const listByClub = query({
   handler: async (ctx, { clubId }) => {
     return ctx.db
       .query("clubMembers")
-      .withIndex("by_club", q => q.eq("clubId", clubId))
+      .withIndex("by_club_and_status", q => q.eq("clubId", clubId).eq("status", "active"))
       .collect();
   },
 });
 
-// Leaderboard ordered by totalWon descending
+export const listPending = query({
+  args: { clubId: v.id("clubs") },
+  handler: async (ctx, { clubId }) => {
+    return ctx.db
+      .query("clubMembers")
+      .withIndex("by_club_and_status", q => q.eq("clubId", clubId).eq("status", "pending"))
+      .collect();
+  },
+});
+
+// Leaderboard ordered by totalWon descending (active members only)
 export const leaderboard = query({
   args: { clubId: v.id("clubs") },
   handler: async (ctx, { clubId }) => {
     const members = await ctx.db
       .query("clubMembers")
-      .withIndex("by_club", q => q.eq("clubId", clubId))
+      .withIndex("by_club_and_status", q => q.eq("clubId", clubId).eq("status", "active"))
       .collect();
     return members.sort((a, b) => b.totalWon - a.totalWon);
   },
 });
 
+// Creates a pending membership request if none exists
 export const ensureMember = mutation({
   args: {
     clubId: v.id("clubs"),
@@ -62,6 +73,7 @@ export const ensureMember = mutation({
       clubId: args.clubId,
       userId: args.userId,
       role: "member",
+      status: "pending",
       displayName: args.displayName,
       avatarUrl: args.avatarUrl,
       totalEntered: 0,
@@ -71,6 +83,53 @@ export const ensureMember = mutation({
       joinedAt: now,
       updatedAt: now,
     });
+  },
+});
+
+export const approveMember = mutation({
+  args: { memberId: v.id("clubMembers") },
+  handler: async (ctx, { memberId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const member = await ctx.db.get(memberId);
+    if (!member) throw new Error("Member not found");
+
+    // Must be a club admin or super admin
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+    if (!isSuperAdmin) {
+      const caller = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", member.clubId).eq("userId", identity.subject))
+        .unique();
+      if (!caller || caller.role !== "admin") throw new Error("Not authorised");
+    }
+
+    await ctx.db.patch(memberId, { status: "active", updatedAt: new Date().toISOString() });
+  },
+});
+
+export const rejectMember = mutation({
+  args: { memberId: v.id("clubMembers") },
+  handler: async (ctx, { memberId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const member = await ctx.db.get(memberId);
+    if (!member) throw new Error("Member not found");
+
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+    if (!isSuperAdmin) {
+      const caller = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", member.clubId).eq("userId", identity.subject))
+        .unique();
+      if (!caller || caller.role !== "admin") throw new Error("Not authorised");
+    }
+
+    await ctx.db.delete(memberId);
   },
 });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -34,17 +34,43 @@ export default function ManagePage() {
     api.clubMembers.listByClub,
     club ? { clubId: club._id } : "skip"
   );
+  const pendingMembers = useQuery(
+    api.clubMembers.listPending,
+    club ? { clubId: club._id } : "skip"
+  );
+  const approveMember = useMutation(api.clubMembers.approveMember);
+  const rejectMember = useMutation(api.clubMembers.rejectMember);
 
-  // No club yet → go to onboarding (unless super admin)
-  useEffect(() => {
-    if (superAdmin === false && memberships !== undefined && memberships.length === 0) {
-      router.push("/onboarding");
-    }
-  }, [memberships, superAdmin, router]);
+  useEffect(() => {}, [memberships, superAdmin, router]);
 
   // Super admin with no club of their own → show platform overview
   if (superAdmin && !adminMembership) {
     return <PlatformOverview allClubs={allClubs ?? []} />;
+  }
+
+  // Still loading
+  if (superAdmin === undefined || memberships === undefined) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  // Signed in but not an admin of any club
+  if (!adminMembership) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center max-w-sm">
+          <div className="text-5xl mb-4">⛳</div>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">You're not set up as a club admin</h1>
+          <p className="text-gray-500 text-sm">If you're a golf club organiser and want to run pools on Play The Pool, get in touch and we'll get you set up.</p>
+          <a href="mailto:hello@playthepool.golf" className="mt-6 inline-block px-5 py-2.5 bg-green-700 text-white rounded-lg text-sm font-medium hover:bg-green-600">
+            Get in touch →
+          </a>
+        </div>
+      </div>
+    );
   }
 
   if (!club || !competitions || !members) {
@@ -132,6 +158,37 @@ export default function ManagePage() {
             </div>
           )}
         </section>
+
+        {/* Pending membership requests */}
+        {pendingMembers && pendingMembers.length > 0 && (
+          <section>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Membership requests
+              <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-full">{pendingMembers.length}</span>
+            </h2>
+            <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
+              {pendingMembers.map(m => (
+                <div key={m._id} className="flex items-center justify-between px-5 py-3">
+                  <span className="text-sm font-medium text-gray-900">{m.displayName}</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => approveMember({ memberId: m._id })}
+                      className="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-500"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => rejectMember({ memberId: m._id })}
+                      className="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg hover:bg-red-50 hover:text-red-600"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Members leaderboard */}
         <section>

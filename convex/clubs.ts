@@ -60,6 +60,8 @@ export const create = mutation({
     displayName: v.string(),
   },
   handler: async (ctx, args) => {
+    await assertSuperAdmin(ctx);
+
     const existing = await ctx.db.query("clubs").withIndex("by_slug", q => q.eq("slug", args.slug)).unique();
     if (existing) throw new Error(`Slug "${args.slug}" is already taken`);
 
@@ -80,6 +82,7 @@ export const create = mutation({
       clubId,
       userId: args.userId,
       role: "admin",
+      status: "active",
       displayName: args.displayName,
       totalEntered: 0,
       totalSpent: 0,
