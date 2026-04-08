@@ -1,8 +1,8 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, MutationCtx } from "./_generated/server";
 
 async function assertClubAdminOrSuperAdmin(
-  ctx: Parameters<Parameters<typeof mutation>[0]["handler"]>[0],
+  ctx: MutationCtx,
   clubId: import("./_generated/dataModel").Id<"clubs">
 ) {
   const identity = await ctx.auth.getUserIdentity();
