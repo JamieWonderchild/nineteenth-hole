@@ -18,8 +18,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "[PRODUCT_NAME]",
-  description: "AI-powered clinical documentation assistant",
+  title: "The 19th Hole",
+  description: "Golf sweepstake pools for every competition",
 };
 
 export default function RootLayout({

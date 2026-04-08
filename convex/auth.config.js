@@ -1,9 +1,8 @@
-// convex/auth.config.js
 export default {
-    providers: [
-      {
-        domain: "clerk.heathplatform.com", // Production
-        applicationID: "convex",
-      }
-    ]
-  };
+  providers: [
+    {
+      domain: process.env.CLERK_JWT_ISSUER_DOMAIN,
+      applicationID: "convex",
+    }
+  ]
+};

@@ -1,5 +1,0 @@
-test_number,timestamp,consultation_id,prompt_type,api_start_time,api_end_time,api_duration_ms,task_status_on_return,ui_response_visible_time,total_user_wait_ms,success,notes
-1,2026-03-18T10:00:00.000Z,k123abc456def789,starter_1,10:00:00.000,10:00:00.250,250,pending,N/A,N/A,false,API returned too fast - task still pending
-2,2026-03-18T10:01:00.000Z,k123abc456def789,starter_1,10:01:00.000,10:01:02.800,2800,completed,10:01:03.100,3100,true,Response appeared after ~3s total
-3,2026-03-18T10:02:00.000Z,k123abc456def789,starter_2,10:02:00.000,10:02:00.320,320,running,N/A,N/A,false,Task in running state
-4,2026-03-18T10:03:00.000Z,k123abc456def789,starter_2,10:03:00.000,10:03:02.500,2500,completed,10:03:02.750,2750,true,Successful response

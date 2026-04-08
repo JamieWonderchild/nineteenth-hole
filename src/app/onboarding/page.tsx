@@ -1,142 +1,111 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth, useUser } from '@clerk/nextjs';
-import { useQuery } from 'convex/react';
-import { api } from 'convex/_generated/api';
-import { Wizard, WizardStep } from '@/components/ui/Wizard';
-import { PracticeSetupStep } from './steps/PracticeSetupStep';
-import { LocationSetupStep } from './steps/LocationSetupStep';
-import { CompleteStep } from './steps/CompleteStep';
-import { useWizardState } from '@/hooks/useWizardState';
-import { Loader2, Stethoscope } from 'lucide-react';
-import { debugLog } from '@/lib/debug-logger';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
+import { useMutation } from "convex/react";
+import { api } from "convex/_generated/api";
 
-const WIZARD_ID = 'onboarding-v1';
+function slugify(str: string) {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { userId, orgId: clerkOrgId, isLoaded } = useAuth();
   const { user } = useUser();
+  const createClub = useMutation(api.clubs.create);
 
-  // Redirect to sign-in if not authenticated
-  React.useEffect(() => {
-    if (isLoaded && !userId) {
-      debugLog.warn('OnboardingPage', 'User not authenticated, redirecting to sign-in');
-      router.replace('/sign-in');
-    }
-  }, [isLoaded, userId, router]);
+  const [name, setName] = useState("");
+  const [currency, setCurrency] = useState("GBP");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  // Check if user already has an org — if so, redirect to dashboard
-  const existingMemberships = useQuery(
-    api.memberships.getByUser,
-    userId ? { userId } : 'skip'
-  );
+  const slug = slugify(name);
 
-  React.useEffect(() => {
-    debugLog.debug('OnboardingPage', 'Membership check', {
-      hasMemberships: !!existingMemberships,
-      count: existingMemberships?.length ?? 'undefined',
-      hasClerkOrgId: !!clerkOrgId,
-    });
-
-    // Only redirect if user has BOTH Convex memberships AND a Clerk org
-    // This prevents redirect loop when user has stale memberships but no Clerk orgs
-    if (existingMemberships && existingMemberships.length > 0 && clerkOrgId) {
-      // User already has an org — go to dashboard
-      debugLog.info('OnboardingPage', 'User has memberships AND Clerk org, REDIRECTING to /', {
-        count: existingMemberships.length,
-        clerkOrgId,
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!user) return;
+    setLoading(true);
+    setError("");
+    try {
+      await createClub({
+        name,
+        slug,
+        currency,
+        userId: user.id,
+        displayName: user.fullName ?? user.username ?? "Admin",
       });
-      router.replace('/');
-    } else if (existingMemberships && existingMemberships.length > 0 && !clerkOrgId) {
-      // User has stale Convex memberships but no Clerk org
-      debugLog.warn('OnboardingPage', 'User has stale memberships but no Clerk org - staying on onboarding', {
-        count: existingMemberships.length,
-      });
-      // Stay on onboarding page - they need to create a new org
+      router.push("/manage");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setLoading(false);
     }
-  }, [existingMemberships, clerkOrgId, router]);
-
-  // Get org context for wizard state tracking
-  const firstOrgId = existingMemberships?.[0]?.orgId;
-
-  // Wizard state management
-  const {
-    currentStep,
-    data,
-    setData,
-    goToNext,
-    goToBack,
-    complete,
-    isInitialized,
-  } = useWizardState({
-    wizardId: WIZARD_ID,
-    userId,
-    orgId: firstOrgId,
-    totalSteps: 3,
-    autoSave: true,
-    onComplete: () => {
-      // Completion is handled in CompleteStep component
-      // which redirects to billing or dashboard
-    },
-  });
-
-  // Define wizard steps
-  const steps: WizardStep[] = [
-    {
-      id: 'practice-setup',
-      title: 'Practice Setup',
-      component: PracticeSetupStep,
-    },
-    {
-      id: 'location-setup',
-      title: 'Location Setup',
-      component: LocationSetupStep,
-    },
-    {
-      id: 'complete',
-      title: 'Complete',
-      component: CompleteStep,
-    },
-  ];
-
-  // Show loading while checking existing memberships
-  if (existingMemberships === undefined || !isInitialized) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-          <h2 className="text-lg font-semibold">Loading...</h2>
-        </div>
-      </div>
-    );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header with branding */}
-      <div className="border-b border-border px-6 py-4">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <Stethoscope className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <h1 className="text-xl font-bold">[PRODUCT_NAME]</h1>
+    <div className="min-h-screen bg-green-950 flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="text-4xl mb-3">⛳</div>
+          <h1 className="text-2xl font-bold text-gray-900">Create your club</h1>
+          <p className="text-gray-500 mt-1 text-sm">
+            You can run unlimited competitions once your club is set up.
+          </p>
         </div>
-      </div>
 
-      {/* Wizard */}
-      <Wizard
-        steps={steps}
-        currentStep={currentStep}
-        onNext={goToNext}
-        onBack={goToBack}
-        onComplete={complete}
-        data={data}
-        setData={setData}
-        showStepIndicator={true}
-      />
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Club name
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Sunningdale GC, Jamie's Masters Pool"
+              required
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            {name && (
+              <p className="text-xs text-gray-400 mt-1">
+                URL: the19th.golf/<span className="font-mono text-green-700">{slug}</span>
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Currency
+            </label>
+            <select
+              value={currency}
+              onChange={e => setCurrency(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="GBP">£ GBP</option>
+              <option value="EUR">€ EUR</option>
+              <option value="USD">$ USD</option>
+            </select>
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading || !name}
+            className="w-full bg-green-700 hover:bg-green-600 disabled:bg-gray-300 text-white font-semibold py-3 rounded-lg transition-colors"
+          >
+            {loading ? "Creating…" : "Create club →"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

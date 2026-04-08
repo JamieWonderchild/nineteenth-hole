@@ -3,10 +3,12 @@ import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
-crons.daily(
-  "expire trials",
-  { hourUTC: 6, minuteUTC: 0 },
-  internal.organizations.expireTrials,
+// Sync scores every 5 minutes during tournament hours
+crons.interval(
+  "sync-live-scores",
+  { minutes: 5 },
+  internal.scores.syncAllLive,
+  {}
 );
 
 export default crons;

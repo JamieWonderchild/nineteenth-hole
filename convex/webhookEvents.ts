@@ -10,7 +10,7 @@ export const checkAndRecord = mutation({
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
-      .query("processedWebhookEvents")
+      .query("webhookEvents")
       .withIndex("by_event_id", (q) => q.eq("eventId", args.eventId))
       .first();
 
@@ -18,7 +18,7 @@ export const checkAndRecord = mutation({
       return false; // Already processed
     }
 
-    await ctx.db.insert("processedWebhookEvents", {
+    await ctx.db.insert("webhookEvents", {
       eventId: args.eventId,
       source: args.source,
       processedAt: new Date().toISOString(),
