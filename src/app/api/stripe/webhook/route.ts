@@ -4,7 +4,9 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "convex/_generated/api";
 import type Stripe from "stripe";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+function getConvex() {
+  return new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+}
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
 export async function POST(request: NextRequest) {
@@ -24,6 +26,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Idempotency
+  const convex = getConvex();
   const isNew = await convex.mutation(api.webhookEvents.checkAndRecord, {
     eventId: event.id,
     source: "stripe",

@@ -6,7 +6,11 @@ import { AuthLoading, Authenticated, ConvexReactClient, Unauthenticated } from "
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+let _convex: ConvexReactClient | null = null;
+function getConvex() {
+  if (!_convex) _convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+  return _convex;
+}
 
 function LoadingState() {
   return (
@@ -41,7 +45,7 @@ export function ConvexClientProvider({ children }: { children: React.ReactNode }
 
   return (
     <ClerkProvider>
-      <ConvexProviderWithClerk useAuth={useAuth} client={convex}>
+      <ConvexProviderWithClerk useAuth={useAuth} client={getConvex()}>
         {isPublic ? (
           children
         ) : (

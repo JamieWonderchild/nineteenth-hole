@@ -5,7 +5,9 @@ import { api } from "convex/_generated/api";
 import { createEntryCheckoutSession } from "@/lib/stripe";
 import type { Id } from "convex/_generated/dataModel";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+function getConvex() {
+  return new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+}
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -16,6 +18,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
+  const convex = getConvex();
   const competition = await convex.query(api.competitions.get, {
     competitionId: competitionId as Id<"competitions">,
   });

@@ -18,7 +18,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "The 19th Hole",
+  title: "Play The Pool",
   description: "Golf sweepstake pools for every competition",
 };
 

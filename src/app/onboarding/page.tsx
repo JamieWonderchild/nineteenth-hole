@@ -71,7 +71,7 @@ export default function OnboardingPage() {
             />
             {name && (
               <p className="text-xs text-gray-400 mt-1">
-                URL: the19th.golf/<span className="font-mono text-green-700">{slug}</span>
+                URL: playthepool.golf/<span className="font-mono text-green-700">{slug}</span>
               </p>
             )}
           </div>

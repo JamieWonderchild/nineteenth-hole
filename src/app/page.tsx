@@ -8,7 +8,7 @@ export default function HomePage() {
         <div className="text-6xl">⛳</div>
 
         <h1 className="text-5xl font-bold tracking-tight">
-          The 19th Hole
+          Play The Pool
         </h1>
         <p className="text-xl text-green-200 max-w-xl">
           Run sweepstake pools for any golf competition — the Masters, The Open, your club medal.
