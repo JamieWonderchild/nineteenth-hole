@@ -13,7 +13,7 @@ export default function ManagePage() {
   const { user } = useUser();
 
   const superAdmin = useQuery(api.clubs.isSuperAdmin);
-  const allClubs = useQuery(api.clubs.listAll);
+  const allClubs = useQuery(api.clubs.listAll, superAdmin === true ? {} : "skip");
 
   // Find the club where this user is an admin
   const memberships = useQuery(
