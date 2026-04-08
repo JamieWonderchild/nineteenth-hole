@@ -1,6 +1,34 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+function getSuperAdminEmails(): string[] {
+  return (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+}
+
+async function assertSuperAdmin(ctx: { auth: { getUserIdentity: () => Promise<{ email?: string } | null> } }) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity?.email || !getSuperAdminEmails().includes(identity.email)) {
+    throw new Error("Unauthorized");
+  }
+}
+
+export const isSuperAdmin = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.email) return false;
+    return getSuperAdminEmails().includes(identity.email);
+  },
+});
+
+export const listAll = query({
+  args: {},
+  handler: async (ctx) => {
+    await assertSuperAdmin(ctx);
+    return ctx.db.query("clubs").collect();
+  },
+});
+
 export const get = query({
   args: { clubId: v.id("clubs") },
   handler: async (ctx, { clubId }) => {

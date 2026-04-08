@@ -12,6 +12,9 @@ export default function ManagePage() {
   const router = useRouter();
   const { user } = useUser();
 
+  const superAdmin = useQuery(api.clubs.isSuperAdmin);
+  const allClubs = useQuery(api.clubs.listAll);
+
   // Find the club where this user is an admin
   const memberships = useQuery(
     api.clubMembers.listByUser,
@@ -32,12 +35,17 @@ export default function ManagePage() {
     club ? { clubId: club._id } : "skip"
   );
 
-  // No club yet → go to onboarding
+  // No club yet → go to onboarding (unless super admin)
   useEffect(() => {
-    if (memberships !== undefined && memberships.length === 0) {
+    if (superAdmin === false && memberships !== undefined && memberships.length === 0) {
       router.push("/onboarding");
     }
-  }, [memberships, router]);
+  }, [memberships, superAdmin, router]);
+
+  // Super admin with no club of their own → show platform overview
+  if (superAdmin && !adminMembership) {
+    return <PlatformOverview allClubs={allClubs ?? []} />;
+  }
 
   if (!club || !competitions || !members) {
     return (
@@ -164,6 +172,43 @@ export default function ManagePage() {
             </table>
           </div>
         </section>
+      </div>
+    </div>
+  );
+}
+
+function PlatformOverview({ allClubs }: { allClubs: Array<{ _id: string; name: string; slug: string; currency: string; plan: string; createdAt: string }> }) {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-green-900 text-white px-6 py-4 flex items-center gap-3">
+        <span className="text-2xl">⛳</span>
+        <div>
+          <h1 className="font-bold text-lg leading-tight">Play The Pool</h1>
+          <p className="text-green-300 text-xs">Platform overview · Super admin</p>
+        </div>
+      </header>
+      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 text-sm text-gray-500">
+          {allClubs.length} club{allClubs.length !== 1 ? "s" : ""} on the platform
+        </div>
+        <div className="space-y-3">
+          {allClubs.map(c => (
+            <Link
+              key={c._id}
+              href={`/manage?club=${c._id}`}
+              className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-4 hover:border-green-400 transition-colors"
+            >
+              <div>
+                <div className="font-medium text-gray-900">{c.name}</div>
+                <div className="text-sm text-gray-400">playthepool.golf/{c.slug}</div>
+              </div>
+              <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleDateString("en-GB")}</span>
+            </Link>
+          ))}
+        </div>
+        <Link href="/onboarding" className="inline-block px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600">
+          + Create a club
+        </Link>
       </div>
     </div>
   );
