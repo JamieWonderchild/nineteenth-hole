@@ -6,11 +6,12 @@ import { api } from "convex/_generated/api";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Trophy, Users, BookOpen,
-  Plus, LogOut, Globe, ChevronRight, Menu, X
+  LayoutDashboard, Users, BookOpen, Plus, LogOut,
+  Globe, ChevronRight, Menu, X, Flag, Trophy
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 function NavItem({
   href, icon, label, active, onClick
@@ -26,12 +27,15 @@ function NavItem({
       href={href}
       onClick={onClick}
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+        "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
         active
-          ? "bg-green-800 text-white font-medium"
-          : "text-green-300 hover:bg-green-900/60 hover:text-white"
+          ? "bg-primary/10 text-primary"
+          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
       )}
     >
+      {active && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />
+      )}
       <span className="shrink-0">{icon}</span>
       {label}
     </Link>
@@ -53,126 +57,90 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
     api.clubs.get,
     adminMembership ? { clubId: adminMembership.clubId } : "skip"
   );
+  const pending = useQuery(
+    api.clubMembers.listPending,
+    club ? { clubId: club._id } : "skip"
+  );
 
   const is = (path: string) => pathname === path;
-  const starts = (path: string) => pathname.startsWith(path);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-card border-r border-border">
       {/* Logo */}
-      <div className="px-4 py-4 border-b border-green-900/60">
-        <Link href="/" className="flex items-center gap-2.5">
-          <span className="text-2xl">⛳</span>
-          <span className="font-bold text-white text-sm leading-tight">Play The Pool</span>
-        </Link>
+      <div className="flex items-center gap-3 px-4 py-4 border-b border-border">
+        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+          <Flag size={16} className="text-primary-foreground" />
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold text-sm leading-tight text-foreground">Play The Pool</p>
+          {club && <p className="text-xs text-muted-foreground truncate">{club.name}</p>}
+        </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
         {superAdmin && (
           <>
-            <p className="text-green-500 text-[10px] font-semibold uppercase tracking-widest px-3 pt-1 pb-2">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-3 py-2">
               Platform
             </p>
-            <NavItem
-              href="/manage/platform"
-              icon={<Globe size={15} />}
-              label="All Clubs"
-              active={is("/manage/platform")}
-              onClick={onNav}
-            />
-            <NavItem
-              href="/onboarding"
-              icon={<Plus size={15} />}
-              label="Create Club"
-              active={is("/onboarding")}
-              onClick={onNav}
-            />
-            {club && <div className="border-t border-green-900/60 my-3" />}
+            <NavItem href="/manage/platform" icon={<Globe size={16} />} label="All Clubs" active={is("/manage/platform")} onClick={onNav} />
+            <NavItem href="/onboarding" icon={<Plus size={16} />} label="Create Club" active={is("/onboarding")} onClick={onNav} />
+            {club && <div className="my-2 border-t border-border" />}
           </>
         )}
 
         {club && (
           <>
-            <p className="text-green-500 text-[10px] font-semibold uppercase tracking-widest px-3 pt-1 pb-2">
-              {club.name}
-            </p>
-            <NavItem
-              href="/manage"
-              icon={<LayoutDashboard size={15} />}
-              label="Dashboard"
-              active={is("/manage")}
-              onClick={onNav}
-            />
+            {superAdmin && (
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-3 py-2">
+                {club.name}
+              </p>
+            )}
+            <NavItem href="/manage" icon={<LayoutDashboard size={16} />} label="Dashboard" active={is("/manage")} onClick={onNav} />
             <NavItem
               href="/manage/competitions/new"
-              icon={<Plus size={15} />}
+              icon={<Trophy size={16} />}
               label="New Competition"
               active={is("/manage/competitions/new")}
               onClick={onNav}
             />
             <NavItem
               href="/manage/members"
-              icon={<Users size={15} />}
-              label="Members"
+              icon={<Users size={16} />}
+              label={pending?.length ? `Members (${pending.length})` : "Members"}
               active={is("/manage/members")}
               onClick={onNav}
             />
-            <NavItem
-              href="/manage/results"
-              icon={<BookOpen size={15} />}
-              label="Game Book"
-              active={is("/manage/results")}
-              onClick={onNav}
-            />
-
-            {/* Active competitions quick-links */}
-            <div className="border-t border-green-900/60 my-3" />
-            <p className="text-green-500 text-[10px] font-semibold uppercase tracking-widest px-3 pt-1 pb-2">
-              Club Page
-            </p>
-            <NavItem
-              href={`/${club.slug}`}
-              icon={<ChevronRight size={15} />}
-              label="View public page"
-              active={false}
-              onClick={onNav}
-            />
+            <NavItem href="/manage/results" icon={<BookOpen size={16} />} label="Game Book" active={is("/manage/results")} onClick={onNav} />
+            <div className="my-2 border-t border-border" />
+            <NavItem href={`/${club.slug}`} icon={<ChevronRight size={16} />} label="View public page" active={false} onClick={onNav} />
           </>
-        )}
-
-        {/* Signed in but no club and not super admin */}
-        {superAdmin === false && !club && memberships !== undefined && (
-          <p className="text-green-500 text-xs px-3 py-2">No club assigned yet.</p>
         )}
       </nav>
 
       {/* User */}
-      <div className="border-t border-green-900/60 px-4 py-4">
-        <div className="flex items-center gap-3 mb-3">
+      <div className="border-t border-border p-3">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-accent transition-colors">
           {user?.imageUrl ? (
-            <img src={user.imageUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+            <img src={user.imageUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-green-700 flex items-center justify-center text-xs font-bold">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
               {user?.firstName?.[0] ?? "?"}
             </div>
           )}
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-white truncate">
-              {user?.fullName ?? user?.username ?? "You"}
-            </p>
-            {superAdmin && (
-              <p className="text-[10px] text-green-400 font-medium">Super admin</p>
-            )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">{user?.fullName ?? user?.username ?? "You"}</p>
+            {superAdmin && <p className="text-[10px] text-primary font-medium">Super admin</p>}
           </div>
+          <button
+            onClick={() => signOut({ redirectUrl: "/" })}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            title="Sign out"
+          >
+            <LogOut size={15} />
+          </button>
         </div>
-        <button
-          onClick={() => signOut({ redirectUrl: "/" })}
-          className="flex items-center gap-2 text-green-400 hover:text-white text-xs transition-colors"
-        >
-          <LogOut size={13} />
-          Sign out
-        </button>
       </div>
     </div>
   );
@@ -184,36 +152,38 @@ export function ManageSidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-56 bg-green-950 flex-col shrink-0 h-screen sticky top-0">
+      <aside className="hidden md:flex w-56 shrink-0 h-screen sticky top-0">
         <SidebarContent />
       </aside>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-green-950 text-white flex items-center justify-between px-4 py-3 border-b border-green-900">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="text-lg">⛳</span>
-          <span className="font-bold text-sm">Play The Pool</span>
-        </Link>
-        <button onClick={() => setMobileOpen(true)}>
-          <Menu size={22} />
-        </button>
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border flex items-center justify-between px-4 h-12">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded bg-primary flex items-center justify-center">
+            <Flag size={12} className="text-primary-foreground" />
+          </div>
+          <span className="font-semibold text-sm text-foreground">Play The Pool</span>
+        </div>
+        <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)}>
+          <Menu size={20} />
+        </Button>
       </div>
 
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
-          <div className="w-64 bg-green-950 h-full flex flex-col">
-            <div className="flex items-center justify-between px-4 py-4 border-b border-green-900/60">
-              <span className="font-bold text-white text-sm">Menu</span>
-              <button onClick={() => setMobileOpen(false)}>
-                <X size={20} className="text-green-400" />
-              </button>
+          <div className="w-64 h-full">
+            <div className="flex items-center justify-between px-4 h-12 border-b border-border bg-card">
+              <span className="font-semibold text-sm text-foreground">Menu</span>
+              <Button variant="ghost" size="icon" onClick={() => setMobileOpen(false)}>
+                <X size={18} />
+              </Button>
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="h-[calc(100%-3rem)]">
               <SidebarContent onNav={() => setMobileOpen(false)} />
             </div>
           </div>
-          <div className="flex-1 bg-black/40" onClick={() => setMobileOpen(false)} />
+          <div className="flex-1 bg-black/30" onClick={() => setMobileOpen(false)} />
         </div>
       )}
     </>
