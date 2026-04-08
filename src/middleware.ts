@@ -7,6 +7,9 @@ const isPublicRoute = createRouteMatcher([
   "/terms",
   "/privacy",
   "/api/stripe/webhook",
+  // Platform tour pools — public leaderboard
+  "/pools",
+  "/pools/(.*)",
   // Club pool pages — public leaderboard & entry
   "/:clubSlug/:competitionSlug",
   "/:clubSlug/:competitionSlug/enter",

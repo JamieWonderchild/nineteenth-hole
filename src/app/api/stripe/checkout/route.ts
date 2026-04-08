@@ -13,8 +13,10 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { competitionId, entryId, clubSlug, competitionSlug } = await req.json();
-  if (!competitionId || !entryId || !clubSlug || !competitionSlug) {
+  const body = await req.json();
+  const { competitionId, entryId, isPlatformPool, poolSlug, clubSlug, competitionSlug } = body;
+
+  if (!competitionId || !entryId) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
@@ -25,8 +27,21 @@ export async function POST(req: NextRequest) {
   if (!competition) return NextResponse.json({ error: "Competition not found" }, { status: 404 });
 
   const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const successUrl = `${origin}/${clubSlug}/${competitionSlug}?success=1&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${origin}/${clubSlug}/${competitionSlug}/enter`;
+
+  let successUrl: string;
+  let cancelUrl: string;
+
+  if (isPlatformPool && poolSlug) {
+    // Platform pool — redirect to /pools/[slug]
+    successUrl = `${origin}/pools/${poolSlug}?success=1&session_id={CHECKOUT_SESSION_ID}`;
+    cancelUrl = `${origin}/pools/${poolSlug}/enter`;
+  } else if (clubSlug && competitionSlug) {
+    // Club competition
+    successUrl = `${origin}/${clubSlug}/${competitionSlug}?success=1&session_id={CHECKOUT_SESSION_ID}`;
+    cancelUrl = `${origin}/${clubSlug}/${competitionSlug}/enter`;
+  } else {
+    return NextResponse.json({ error: "Missing URL routing info" }, { status: 400 });
+  }
 
   const session = await createEntryCheckoutSession({
     entryId,
@@ -39,7 +54,6 @@ export async function POST(req: NextRequest) {
     cancelUrl,
   });
 
-  // Store session ID on the entry so webhook can match it
   await convex.mutation(api.entries.linkStripeSession, {
     entryId: entryId as Id<"entries">,
     stripeCheckoutSessionId: session.id,

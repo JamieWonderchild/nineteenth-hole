@@ -56,11 +56,15 @@ export default defineSchema({
     .index("by_club_total_won", ["clubId", "totalWon"]),
 
   // ============================================================================
-  // Competitions
+  // Competitions (Tour Pools + Club Events)
   // ============================================================================
 
   competitions: defineTable({
-    clubId: v.id("clubs"),
+    // clubId is null for platform-wide tour pools (e.g. Masters sweep)
+    clubId: v.optional(v.id("clubs")),
+    // 'platform' = super admin created, open to all users
+    // 'club'     = club admin created, for club members
+    scope: v.optional(v.string()),
     name: v.string(),           // "Masters 2026 Pool"
     slug: v.string(),           // URL segment
     description: v.optional(v.string()),
@@ -90,6 +94,8 @@ export default defineSchema({
   })
     .index("by_club", ["clubId"])
     .index("by_club_and_slug", ["clubId", "slug"])
+    .index("by_slug", ["slug"])          // global slug lookup (platform pools)
+    .index("by_scope", ["scope"])        // list all platform pools
     .index("by_status", ["status"]),
 
   // ============================================================================
@@ -120,12 +126,12 @@ export default defineSchema({
     .index("by_competition_and_tier", ["competitionId", "tier"]),
 
   // ============================================================================
-  // Entries
+  // Entries (into competitions)
   // ============================================================================
 
   entries: defineTable({
     competitionId: v.id("competitions"),
-    clubId: v.id("clubs"),
+    clubId: v.optional(v.id("clubs")), // null for platform pool entries
     userId: v.string(),         // Clerk user ID
     displayName: v.string(),
     // Payment
@@ -150,12 +156,92 @@ export default defineSchema({
     .index("by_stripe_session", ["stripeCheckoutSessionId"]),
 
   // ============================================================================
+  // Quick Games (informal rounds between friends)
+  // ============================================================================
+
+  quickGames: defineTable({
+    createdBy: v.string(),      // Clerk user ID
+    name: v.string(),           // "Saturday fourball", "The Ward 2026"
+    // 'stableford' | 'strokeplay' | 'betterball' | 'skins' | 'nassau' | 'custom'
+    type: v.string(),
+    status: v.string(),         // 'setup' | 'active' | 'complete'
+    currency: v.string(),       // 'GBP' | 'EUR' | 'USD'
+    // Stake — how the money works
+    stakePerPlayer: v.number(), // in pence/cents per player (0 = just for fun)
+    settlementType: v.string(), // 'cash' | 'stripe'
+    // Players — stored inline for quick games (no club membership needed)
+    players: v.array(v.object({
+      id: v.string(),           // nanoid
+      name: v.string(),
+      userId: v.optional(v.string()), // Clerk ID if they're on the platform
+      handicap: v.optional(v.number()),
+    })),
+    // Pairs (for betterball / nassau) — array of [playerId, playerId]
+    pairings: v.optional(v.array(v.array(v.string()))),
+    // Scores entered after the round
+    scores: v.optional(v.array(v.object({
+      playerId: v.string(),
+      gross: v.optional(v.number()),      // gross strokes
+      net: v.optional(v.number()),        // net (after handicap)
+      points: v.optional(v.number()),     // stableford points
+    }))),
+    // Result computed when completed
+    result: v.optional(v.object({
+      winnerIds: v.array(v.string()),     // player IDs who won
+      settlement: v.array(v.object({
+        fromName: v.string(),
+        toName: v.string(),
+        amount: v.number(),               // pence/cents
+      })),
+      summary: v.string(),               // "Jamie wins with 36 points"
+    })),
+    date: v.string(),           // ISO date of the round
+    notes: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_creator", ["createdBy"])
+    .index("by_status", ["status"]),
+
+  // ============================================================================
+  // Season Series (cumulative points across club events)
+  // ============================================================================
+
+  series: defineTable({
+    clubId: v.id("clubs"),
+    name: v.string(),           // "Race to Swinley Forest 2026"
+    description: v.optional(v.string()),
+    status: v.string(),         // 'active' | 'complete'
+    season: v.string(),         // '2026'
+    pointsStructure: v.array(v.object({
+      position: v.number(),
+      points: v.number(),       // e.g. 1st = 10pts, 2nd = 8pts, ...
+    })),
+    prizePool: v.optional(v.number()), // pence/cents — optional season end prize
+    currency: v.string(),
+    createdBy: v.string(),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_club", ["clubId"]),
+
+  // Competitions that count toward a series
+  seriesCompetitions: defineTable({
+    seriesId: v.id("series"),
+    competitionId: v.id("competitions"),
+    weight: v.optional(v.number()), // multiplier (default 1)
+    addedAt: v.string(),
+  })
+    .index("by_series", ["seriesId"])
+    .index("by_competition", ["competitionId"]),
+
+  // ============================================================================
   // Side Bets (optional pots within a competition)
   // ============================================================================
 
   sideBets: defineTable({
     competitionId: v.id("competitions"),
-    clubId: v.id("clubs"),
+    clubId: v.optional(v.id("clubs")),
     name: v.string(),           // "Eagle Watch", "Top Brit", etc.
     type: v.string(),           // 'eagle_watch' | 'top_nationality' | 'prediction' | 'first_leader' | 'hole_in_one' | 'custom'
     description: v.string(),
@@ -178,7 +264,7 @@ export default defineSchema({
     .index("by_user", ["userId"]),
 
   // ============================================================================
-  // Webhook idempotency (kept from health-platform)
+  // Webhook idempotency
   // ============================================================================
 
   webhookEvents: defineTable({

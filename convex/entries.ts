@@ -35,7 +35,7 @@ export const getByStripeSession = query({
 export const create = mutation({
   args: {
     competitionId: v.id("competitions"),
-    clubId: v.id("clubs"),
+    clubId: v.optional(v.id("clubs")),
     userId: v.string(),
     displayName: v.string(),
     stripeCheckoutSessionId: v.optional(v.string()),
