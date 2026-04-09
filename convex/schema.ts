@@ -45,6 +45,8 @@ export default defineSchema({
     totalWon: v.number(),       // total prize money received (pence/cents)
     totalProfit: v.number(),    // totalWon - totalSpent (can be negative)
     bestFinish: v.optional(v.number()), // best leaderboard position (1 = winner)
+    // External system linkage — used when importing from club website data
+    fgcMemberId: v.optional(v.string()), // Finchley Golf Club member ID (from Alan's scraper)
     // Timestamps
     joinedAt: v.string(),
     updatedAt: v.string(),
@@ -52,6 +54,7 @@ export default defineSchema({
     .index("by_club", ["clubId"])
     .index("by_club_and_user", ["clubId", "userId"])
     .index("by_club_and_status", ["clubId", "status"])
+    .index("by_club_and_fgc_member", ["clubId", "fgcMemberId"])
     .index("by_user", ["userId"])
     .index("by_club_total_won", ["clubId", "totalWon"]),
 

@@ -15,6 +15,7 @@ import type * as crons from "../crons.js";
 import type * as entries from "../entries.js";
 import type * as players from "../players.js";
 import type * as quickGames from "../quickGames.js";
+import type * as resultsImport from "../resultsImport.js";
 import type * as scores from "../scores.js";
 import type * as series from "../series.js";
 import type * as webhookEvents from "../webhookEvents.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   entries: typeof entries;
   players: typeof players;
   quickGames: typeof quickGames;
+  resultsImport: typeof resultsImport;
   scores: typeof scores;
   series: typeof series;
   webhookEvents: typeof webhookEvents;
