@@ -91,19 +91,11 @@ export default function TeeTimesPage({ params }: { params: Promise<{ clubSlug: s
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-green-900 text-white">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
-          <Link href={`/${clubSlug}`} className="text-green-300 text-sm hover:text-white mb-2 block">
-            ← {club.name}
-          </Link>
-          <h1 className="text-2xl font-bold">Tee Times</h1>
-          <p className="text-green-300 text-sm mt-1">Book your tee time at {club.name}</p>
-        </div>
-      </header>
-
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Tee Times</h1>
+        <p className="text-gray-500 text-sm mt-1">Book your tee time at {club.name}</p>
+      </div>
 
         {/* Not a member */}
         {!isMember && (
@@ -280,7 +272,6 @@ export default function TeeTimesPage({ params }: { params: Promise<{ clubSlug: s
             )}
           </section>
         )}
-      </div>
     </div>
   );
 }

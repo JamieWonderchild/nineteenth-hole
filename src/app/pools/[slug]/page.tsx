@@ -86,30 +86,23 @@ export default function PoolPage({ params }: { params: Promise<{ slug: string }>
   const totalWithFee = pool.entryFee + Math.round(pool.entryFee * 0.1);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
       {/* Header */}
-      <header className="bg-green-900 text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-lg">🏆</div>
-                <span className="text-green-300 text-sm font-medium">Play The Pool · Tour Pool</span>
-              </div>
-              <h1 className="text-2xl font-bold mt-2">{pool.name}</h1>
-              <p className="text-green-300 text-sm mt-1">
-                {new Date(pool.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                {" – "}
-                {new Date(pool.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                {pool.description && ` · ${pool.description}`}
-              </p>
-            </div>
-            <StatusPill status={pool.status} />
+      <div>
+        <Link href="/pools" className="text-sm text-gray-500 hover:text-gray-700 mb-3 block">← Tour Pools</Link>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{pool.name}</h1>
+            <p className="text-gray-500 text-sm mt-1">
+              {new Date(pool.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+              {" – "}
+              {new Date(pool.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              {pool.description && ` · ${pool.description}`}
+            </p>
           </div>
+          <StatusPill status={pool.status} />
         </div>
-      </header>
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      </div>
 
         {/* Pot + entry CTA */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
@@ -312,7 +305,6 @@ export default function PoolPage({ params }: { params: Promise<{ slug: string }>
             </div>
           </section>
         )}
-      </div>
     </div>
   );
 }

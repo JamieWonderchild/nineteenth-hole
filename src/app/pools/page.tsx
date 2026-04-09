@@ -26,21 +26,11 @@ export default function PoolsPage() {
   const draft = pools?.filter(p => p.status === "draft") ?? [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-green-900 text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-lg">🏆</div>
-            <span className="text-green-300 text-sm font-medium">Play The Pool</span>
-          </div>
-          <h1 className="text-2xl font-bold mt-2">Tour Pools</h1>
-          <p className="text-green-300 text-sm mt-1">
-            Platform-wide sweepstakes for professional golf tournaments.
-          </p>
-        </div>
-      </header>
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Tour Pools</h1>
+        <p className="text-gray-500 text-sm mt-1">Platform-wide sweepstakes for professional golf tournaments.</p>
+      </div>
         {pools === undefined ? (
           <div className="space-y-2">
             {[...Array(3)].map((_, i) => (
@@ -84,7 +74,6 @@ export default function PoolsPage() {
             )}
           </>
         )}
-      </div>
     </div>
   );
 }

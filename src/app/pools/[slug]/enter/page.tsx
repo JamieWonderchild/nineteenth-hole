@@ -24,7 +24,7 @@ export default function EnterPoolPage({ params }: { params: Promise<{ slug: stri
 
   if (pool === undefined) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
       </div>
     );
@@ -32,7 +32,7 @@ export default function EnterPoolPage({ params }: { params: Promise<{ slug: stri
 
   if (!pool) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="flex items-center justify-center min-h-[60vh] px-4">
         <div className="text-center">
           <div className="text-4xl mb-3">⛳</div>
           <p className="text-xl font-semibold text-gray-900">Pool not found</p>
@@ -44,7 +44,7 @@ export default function EnterPoolPage({ params }: { params: Promise<{ slug: stri
 
   if (pool.status !== "open") {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <p className="text-4xl mb-4">🚫</p>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Entries are closed</h1>
@@ -57,7 +57,7 @@ export default function EnterPoolPage({ params }: { params: Promise<{ slug: stri
 
   if (myEntry?.paidAt) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <p className="text-5xl mb-4">✅</p>
           <h1 className="text-xl font-bold text-gray-900 mb-2">You&apos;re in!</h1>
@@ -103,7 +103,7 @@ export default function EnterPoolPage({ params }: { params: Promise<{ slug: stri
   const totalWithFee = pool.entryFee + Math.round(pool.entryFee * 0.1);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="flex items-center justify-center min-h-[70vh] px-4">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 w-full max-w-sm">
         <div className="text-center mb-6">
           <div className="text-4xl mb-3">🏌️</div>

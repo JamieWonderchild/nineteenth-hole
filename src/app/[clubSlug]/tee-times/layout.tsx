@@ -1,6 +1,6 @@
 import { ManageSidebar } from "@/components/layout/ManageSidebar";
 
-export default function PoolsLayout({ children }: { children: React.ReactNode }) {
+export default function TeeTimesLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <ManageSidebar />
