@@ -28,11 +28,13 @@ function calcPoints(
 
   if (category === "major" || category === "medal" || category === "stableford") {
     const BF = category === "major" ? 3 : category === "medal" ? 2 : 1;
-    if (position === 1) return 50 + N * BF;
-    if (position === 2) return 25 + N * BF;
-    if (position === 3) return 10 + N * BF;
-    if (position === 4) return 5 + N * BF;
-    return Math.max(0, (N + 5 - position) * BF);
+    // Raw RTSF points (no multiplier), then × weight (BF)
+    // Formula: (basePoints + N) × BF  — positions 1-4 have fixed base; 5+ decay from N
+    if (position === 1) return (50 + N) * BF;
+    if (position === 2) return (25 + N) * BF;
+    if (position === 3) return (10 + N) * BF;
+    if (position === 4) return (5 + N) * BF;
+    return Math.max(0, (N + 5 - position)) * BF;
   }
 
   if (category === "knockout") {
@@ -173,7 +175,7 @@ export const computeStandings = query({
     const standings = [...memberMap.values()].map(m => {
       const majorTotal = sumBestN(m.majorScores, 3);
       const medalTotal = sumBestN(m.medalScores, 4);
-      const stablefordTotal = sumBestN(m.stablefordScores, 4) * 2;
+      const stablefordTotal = sumBestN(m.stablefordScores, 4); // weight=1 already baked in per-comp
       const total =
         majorTotal + medalTotal + stablefordTotal + m.knockoutTotal + m.trophyTotal;
 

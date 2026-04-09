@@ -105,9 +105,9 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm">
         <p className="font-semibold text-amber-900 mb-1.5">Race to Swinley Forest scoring</p>
         <div className="text-amber-800 space-y-0.5 text-xs leading-relaxed">
-          <p><strong>Majors (BF=3):</strong> 50+N·3 / 25+N·3 / 10+N·3 / 5+N·3 / max(0,N+5−pos)·3 — best 3 count</p>
+          <p><strong>Majors (BF=3):</strong> (50+N)·3 / (25+N)·3 / (10+N)·3 / (5+N)·3 / max(0,N+5−pos)·3 — best 3 count</p>
           <p><strong>Medals (BF=2):</strong> same formula · BF=2 — best 4 count</p>
-          <p><strong>Stablefords (BF=1):</strong> same formula · BF=1 — best 4 count, subtotal ×2</p>
+          <p><strong>Stablefords (BF=1):</strong> same formula · BF=1 — best 4 count</p>
           <p><strong>Knockouts:</strong> 300 / 150 / 75 (semi) / 50 (quarter) — all count</p>
           <p><strong>Trophies:</strong> 100 / 50 — all count (÷2 for pairs events)</p>
         </div>
