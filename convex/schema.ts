@@ -239,7 +239,10 @@ export default defineSchema({
   seriesCompetitions: defineTable({
     seriesId: v.id("series"),
     competitionId: v.id("competitions"),
-    weight: v.optional(v.number()), // multiplier (default 1)
+    // 'major' | 'medal' | 'stableford' | 'knockout' | 'trophy'
+    category: v.string(),
+    isPairsEvent: v.optional(v.boolean()), // trophy pairs events get ÷2 points
+    weight: v.optional(v.number()),
     addedAt: v.string(),
   })
     .index("by_series", ["seriesId"])

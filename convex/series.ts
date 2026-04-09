@@ -16,6 +16,48 @@ async function assertClubAdmin(
   if (!member || member.role !== "admin") throw new Error("Not authorised");
 }
 
+// ── Scoring helpers (Finchley Race to Swinley Forest rules) ──────────────────
+
+function calcPoints(
+  position: number,
+  participantCount: number,
+  category: string,
+  isPairsEvent: boolean
+): number {
+  const N = participantCount;
+
+  if (category === "major" || category === "medal" || category === "stableford") {
+    const BF = category === "major" ? 3 : category === "medal" ? 2 : 1;
+    if (position === 1) return 50 + N * BF;
+    if (position === 2) return 25 + N * BF;
+    if (position === 3) return 10 + N * BF;
+    if (position === 4) return 5 + N * BF;
+    return Math.max(0, (N + 5 - position) * BF);
+  }
+
+  if (category === "knockout") {
+    // 1=winner(300), 2=finalist(150), 3-4=semi(75), 5-8=quarter-final(50)
+    if (position === 1) return 300;
+    if (position === 2) return 150;
+    if (position <= 4) return 75;
+    if (position <= 8) return 50;
+    return 0;
+  }
+
+  if (category === "trophy") {
+    const base = position === 1 ? 100 : position === 2 ? 50 : 0;
+    return isPairsEvent ? Math.floor(base / 2) : base;
+  }
+
+  return 0;
+}
+
+function sumBestN(scores: number[], n: number): number {
+  return [...scores].sort((a, b) => b - a).slice(0, n).reduce((s, x) => s + x, 0);
+}
+
+// ── Queries ──────────────────────────────────────────────────────────────────
+
 export const listByClub = query({
   args: { clubId: v.id("clubs") },
   handler: async (ctx, { clubId }) => {
@@ -34,6 +76,24 @@ export const get = query({
   },
 });
 
+// Returns competitions with their series-link metadata (category, isPairsEvent)
+export const getCompetitionsWithLinks = query({
+  args: { seriesId: v.id("series") },
+  handler: async (ctx, { seriesId }) => {
+    const links = await ctx.db
+      .query("seriesCompetitions")
+      .withIndex("by_series", q => q.eq("seriesId", seriesId))
+      .collect();
+    return Promise.all(
+      links.map(async link => ({
+        link,
+        competition: await ctx.db.get(link.competitionId),
+      }))
+    );
+  },
+});
+
+// Legacy — kept for backwards compat but getCompetitionsWithLinks is preferred
 export const getCompetitions = query({
   args: { seriesId: v.id("series") },
   handler: async (ctx, { seriesId }) => {
@@ -45,6 +105,99 @@ export const getCompetitions = query({
     return comps.filter(Boolean);
   },
 });
+
+// Finchley Race to Swinley Forest standings
+// Formula: best-3 Majors + best-4 Medals + best-4 Stablefords×2 + all Knockouts + all Trophies
+export const computeStandings = query({
+  args: { seriesId: v.id("series") },
+  handler: async (ctx, { seriesId }) => {
+    const links = await ctx.db
+      .query("seriesCompetitions")
+      .withIndex("by_series", q => q.eq("seriesId", seriesId))
+      .collect();
+
+    type MemberAccum = {
+      userId: string;
+      displayName: string;
+      majorScores: number[];
+      medalScores: number[];
+      stablefordScores: number[];
+      knockoutTotal: number;
+      trophyTotal: number;
+      competitionsPlayed: number;
+    };
+
+    const memberMap = new Map<string, MemberAccum>();
+
+    for (const link of links) {
+      const comp = await ctx.db.get(link.competitionId);
+      if (!comp || comp.status !== "complete") continue;
+
+      const allEntries = await ctx.db
+        .query("entries")
+        .withIndex("by_competition", q => q.eq("competitionId", link.competitionId))
+        .collect();
+
+      const paidEntries = allEntries.filter(e => e.paidAt && e.leaderboardPosition != null);
+      const N = paidEntries.length;
+      const category = link.category;
+      const isPairsEvent = link.isPairsEvent ?? false;
+
+      for (const entry of paidEntries) {
+        const pos = entry.leaderboardPosition!;
+        const pts = calcPoints(pos, N, category, isPairsEvent);
+
+        if (!memberMap.has(entry.userId)) {
+          memberMap.set(entry.userId, {
+            userId: entry.userId,
+            displayName: entry.displayName,
+            majorScores: [],
+            medalScores: [],
+            stablefordScores: [],
+            knockoutTotal: 0,
+            trophyTotal: 0,
+            competitionsPlayed: 0,
+          });
+        }
+        const m = memberMap.get(entry.userId)!;
+        m.competitionsPlayed++;
+
+        if (category === "major") m.majorScores.push(pts);
+        else if (category === "medal") m.medalScores.push(pts);
+        else if (category === "stableford") m.stablefordScores.push(pts);
+        else if (category === "knockout") m.knockoutTotal += pts;
+        else if (category === "trophy") m.trophyTotal += pts;
+      }
+    }
+
+    const standings = [...memberMap.values()].map(m => {
+      const majorTotal = sumBestN(m.majorScores, 3);
+      const medalTotal = sumBestN(m.medalScores, 4);
+      const stablefordTotal = sumBestN(m.stablefordScores, 4) * 2;
+      const total =
+        majorTotal + medalTotal + stablefordTotal + m.knockoutTotal + m.trophyTotal;
+
+      return {
+        userId: m.userId,
+        displayName: m.displayName,
+        majorTotal,
+        majorPlayed: m.majorScores.length,
+        medalTotal,
+        medalPlayed: m.medalScores.length,
+        stablefordTotal,
+        stablefordPlayed: m.stablefordScores.length,
+        knockoutTotal: m.knockoutTotal,
+        trophyTotal: m.trophyTotal,
+        competitionsPlayed: m.competitionsPlayed,
+        total,
+      };
+    });
+
+    return standings.sort((a, b) => b.total - a.total);
+  },
+});
+
+// ── Mutations ────────────────────────────────────────────────────────────────
 
 export const create = mutation({
   args: {
@@ -77,6 +230,8 @@ export const addCompetition = mutation({
   args: {
     seriesId: v.id("series"),
     competitionId: v.id("competitions"),
+    category: v.string(),          // 'major' | 'medal' | 'stableford' | 'knockout' | 'trophy'
+    isPairsEvent: v.optional(v.boolean()),
     weight: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -93,6 +248,8 @@ export const addCompetition = mutation({
     await ctx.db.insert("seriesCompetitions", {
       seriesId: args.seriesId,
       competitionId: args.competitionId,
+      category: args.category,
+      isPairsEvent: args.isPairsEvent,
       weight: args.weight,
       addedAt: new Date().toISOString(),
     });
