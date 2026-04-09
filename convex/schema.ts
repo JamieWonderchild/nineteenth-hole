@@ -285,6 +285,41 @@ export default defineSchema({
     .index("by_user", ["userId"]),
 
   // ============================================================================
+  // ============================================================================
+  // Tee Time Bookings
+  // ============================================================================
+
+  teeTimeSlots: defineTable({
+    clubId: v.id("clubs"),
+    date: v.string(),           // "2026-04-12"
+    time: v.string(),           // "07:00"
+    maxPlayers: v.number(),     // typically 4
+    isBlocked: v.optional(v.boolean()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_club", ["clubId"])
+    .index("by_club_and_date", ["clubId", "date"]),
+
+  teeTimeBookings: defineTable({
+    clubId: v.id("clubs"),
+    slotId: v.id("teeTimeSlots"),
+    date: v.string(),           // denormalised for easy querying
+    time: v.string(),           // denormalised
+    userId: v.string(),
+    displayName: v.string(),
+    playerCount: v.number(),    // 1–4
+    notes: v.optional(v.string()),
+    status: v.string(),         // "confirmed" | "cancelled"
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_club", ["clubId"])
+    .index("by_slot", ["slotId"])
+    .index("by_club_and_date", ["clubId", "date"])
+    .index("by_user", ["userId"])
+    .index("by_club_and_user", ["clubId", "userId"]),
+
   // Webhook idempotency
   // ============================================================================
 

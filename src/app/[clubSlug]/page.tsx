@@ -182,6 +182,23 @@ export default function ClubPage({ params }: { params: Promise<{ clubSlug: strin
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
 
+        {/* Tee times link — members only */}
+        {membership?.status === "active" && (
+          <Link
+            href={`/${clubSlug}/tee-times`}
+            className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-4 hover:border-green-400 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-xl">⏰</span>
+              <div>
+                <div className="font-semibold text-gray-900">Book a tee time</div>
+                <p className="text-sm text-gray-500">View available slots and make a booking</p>
+              </div>
+            </div>
+            <span className="text-sm text-green-700 font-medium">View →</span>
+          </Link>
+        )}
+
         {/* Active competitions */}
         {activeComps.length > 0 && (
           <section>

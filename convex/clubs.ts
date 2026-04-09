@@ -39,7 +39,7 @@ export const get = query({
 export const getBySlug = query({
   args: { slug: v.string() },
   handler: async (ctx, { slug }) => {
-    return ctx.db.query("clubs").withIndex("by_slug", q => q.eq("slug", slug)).unique();
+    return ctx.db.query("clubs").withIndex("by_slug", q => q.eq("slug", slug)).first();
   },
 });
 

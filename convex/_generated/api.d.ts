@@ -19,6 +19,7 @@ import type * as quickGames from "../quickGames.js";
 import type * as resultsImport from "../resultsImport.js";
 import type * as scores from "../scores.js";
 import type * as series from "../series.js";
+import type * as teeTimes from "../teeTimes.js";
 import type * as webhookEvents from "../webhookEvents.js";
 
 import type {
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   resultsImport: typeof resultsImport;
   scores: typeof scores;
   series: typeof series;
+  teeTimes: typeof teeTimes;
   webhookEvents: typeof webhookEvents;
 }>;
 
