@@ -114,14 +114,14 @@ def push_competition(
         Response JSON dict from the server (or dry_run payload).
     """
     url     = (convex_url or CONVEX_URL).rstrip("/") + "/api/import-results"
-    key     = api_key or CONVEX_API_KEY
+    key     = api_key or IMPORT_TOKEN
     slug    = club_slug or CLUB_SLUG
     cat     = category or auto_category(competition_name)
 
     if not url or "/api/import-results" == url:
         raise ValueError("CONVEX_URL not set. Add it as an environment variable or pass convex_url=...")
     if not key:
-        raise ValueError("CONVEX_API_KEY not set. Add it as an environment variable or pass api_key=...")
+        raise ValueError("FGC_IMPORT_TOKEN not set. Add it as an environment variable or pass api_key=...")
 
     # Validate / normalise date
     if isinstance(competition_date, datetime.date):
