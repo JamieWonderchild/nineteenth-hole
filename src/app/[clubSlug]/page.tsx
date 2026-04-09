@@ -1,7 +1,9 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
+import { useClerk } from "@clerk/nextjs";
+import { useState } from "react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import Link from "next/link";
@@ -59,6 +61,11 @@ function SeriesStandingsWidget({ seriesId }: { seriesId: Id<"series"> }) {
 export default function ClubPage({ params }: { params: Promise<{ clubSlug: string }> }) {
   const { clubSlug } = use(params);
   const { user } = useUser();
+  const { openSignIn } = useClerk();
+  const [joining, setJoining] = useState(false);
+  const [joined, setJoined] = useState(false);
+
+  const ensureMember = useMutation(api.clubMembers.ensureMember);
 
   const club = useQuery(api.clubs.getBySlug, { slug: clubSlug });
   const competitions = useQuery(
@@ -79,6 +86,23 @@ export default function ClubPage({ params }: { params: Promise<{ clubSlug: strin
   );
 
   const activeSeries = seriesList?.find(s => s.status === "active");
+
+  async function handleJoin() {
+    if (!user) { openSignIn(); return; }
+    if (!club) return;
+    setJoining(true);
+    try {
+      await ensureMember({
+        clubId: club._id,
+        userId: user.id,
+        displayName: user.fullName ?? user.username ?? user.primaryEmailAddress?.emailAddress ?? "Member",
+        avatarUrl: user.imageUrl ?? undefined,
+      });
+      setJoined(true);
+    } finally {
+      setJoining(false);
+    }
+  }
 
   if (club === undefined) {
     return (
@@ -131,6 +155,26 @@ export default function ClubPage({ params }: { params: Promise<{ clubSlug: strin
               >
                 Manage club
               </Link>
+            )}
+            {!membership && (
+              joined ? (
+                <span className="text-xs bg-white/20 text-green-200 px-3 py-1.5 rounded-lg font-medium">
+                  Request sent ✓
+                </span>
+              ) : (
+                <button
+                  onClick={handleJoin}
+                  disabled={joining}
+                  className="text-xs bg-white text-green-900 hover:bg-green-50 px-3 py-1.5 rounded-lg transition-colors font-medium disabled:opacity-60"
+                >
+                  {joining ? "Joining…" : "Join club"}
+                </button>
+              )
+            )}
+            {membership?.status === "pending" && (
+              <span className="text-xs bg-white/20 text-green-200 px-3 py-1.5 rounded-lg font-medium">
+                Request pending
+              </span>
             )}
           </div>
         </div>

@@ -217,6 +217,34 @@ export const updateStatus = mutation({
   },
 });
 
+// Super-admin hard delete — removes competition + all entries, players, and series links
+export const deleteCompetition = mutation({
+  args: { competitionId: v.id("competitions") },
+  handler: async (ctx, { competitionId }) => {
+    await assertSuperAdmin(ctx);
+
+    const entries = await ctx.db
+      .query("entries")
+      .withIndex("by_competition", q => q.eq("competitionId", competitionId))
+      .collect();
+    for (const e of entries) await ctx.db.delete(e._id);
+
+    const players = await ctx.db
+      .query("players")
+      .withIndex("by_competition", q => q.eq("competitionId", competitionId))
+      .collect();
+    for (const p of players) await ctx.db.delete(p._id);
+
+    const links = await ctx.db
+      .query("seriesCompetitions")
+      .withIndex("by_competition", q => q.eq("competitionId", competitionId))
+      .collect();
+    for (const l of links) await ctx.db.delete(l._id);
+
+    await ctx.db.delete(competitionId);
+  },
+});
+
 export const markDrawComplete = mutation({
   args: { competitionId: v.id("competitions") },
   handler: async (ctx, { competitionId }) => {

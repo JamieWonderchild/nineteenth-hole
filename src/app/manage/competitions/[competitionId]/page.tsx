@@ -181,8 +181,11 @@ export default function CompetitionManagePage({
     competition?.clubId ? { clubId: competition.clubId } : "skip"
   );
 
+  const superAdmin = useQuery(api.clubs.isSuperAdmin);
+
   const bulkCreatePlayers = useMutation(api.players.bulkCreate);
   const updateStatus = useMutation(api.competitions.updateStatus);
+  const deleteCompetition = useMutation(api.competitions.deleteCompetition);
   const runDraw = useMutation(api.entries.runDraw);
   const upsertScore = useMutation(api.players.upsertScore);
   const updatePrizeMoney = useMutation(api.players.updatePrizeMoney);
@@ -284,6 +287,18 @@ export default function CompetitionManagePage({
     await navigator.clipboard.writeText(`${origin}${publicUrl}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleDelete() {
+    if (!confirm(`Permanently delete "${competition?.name}"? This will also delete all entries, players, and series links. This cannot be undone.`)) return;
+    setLoading("delete");
+    try {
+      await deleteCompetition({ competitionId: competitionId as Id<"competitions"> });
+      router.push("/manage");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Delete failed");
+      setLoading(null);
+    }
   }
 
   const statusFlow = ["draft", "open", "live", "complete"] as const;
@@ -450,6 +465,18 @@ export default function CompetitionManagePage({
               </Button>
             )}
           </div>
+
+          {superAdmin && (
+            <div className="pt-3 border-t border-gray-100 mt-1">
+              <button
+                onClick={handleDelete}
+                disabled={loading === "delete"}
+                className="text-xs text-red-500 hover:text-red-700 hover:underline disabled:opacity-50"
+              >
+                {loading === "delete" ? "Deleting…" : "Delete competition"}
+              </button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

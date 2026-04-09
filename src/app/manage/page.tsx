@@ -227,8 +227,8 @@ export default function ManagePage() {
         )}
       </section>
 
-      {/* Data Import */}
-      <section>
+      {/* Data Import — super admin only */}
+      {superAdmin && <section>
         <h2 className="text-base font-semibold text-gray-900 mb-3">Data import</h2>
         <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-3">
           <p className="text-sm text-gray-500">
@@ -265,7 +265,7 @@ export default function ManagePage() {
             </button>
           )}
         </div>
-      </section>
+      </section>}
 
       {/* Club leaderboard */}
       <section>
