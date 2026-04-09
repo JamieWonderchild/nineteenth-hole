@@ -58,16 +58,13 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-green-950 flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="text-4xl mb-3">⛳</div>
-          <h1 className="text-2xl font-bold text-gray-900">Create a club</h1>
-          <p className="text-gray-500 mt-1 text-sm">
-            Super admin — set up a new golf club on the platform.
-          </p>
-        </div>
+    <div className="max-w-lg mx-auto px-6 py-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Create a club</h1>
+        <p className="text-gray-500 mt-1 text-sm">Set up a new golf club on the platform.</p>
+      </div>
 
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Club name</label>

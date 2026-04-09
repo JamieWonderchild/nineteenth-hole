@@ -1,6 +1,6 @@
 import { ManageSidebar } from "@/components/layout/ManageSidebar";
 
-export default function GamesLayout({ children }: { children: React.ReactNode }) {
+export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <ManageSidebar />

@@ -7,7 +7,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, BookOpen, LogOut,
-  Globe, ChevronRight, Menu, X, Flag, Trophy, ListOrdered
+  Globe, ChevronRight, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -89,6 +89,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               Platform
             </p>
             <NavItem href="/manage/platform" icon={<Globe size={16} />} label="All Clubs" active={is("/manage/platform")} onClick={onNav} />
+            <NavItem href="/onboarding" icon={<Plus size={16} />} label="Create Club" active={is("/onboarding")} onClick={onNav} />
             <NavItem
               href="/manage/pools"
               icon={<Trophy size={16} />}
@@ -96,6 +97,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               active={pathname.startsWith("/manage/pools")}
               onClick={onNav}
             />
+            <NavItem href="/games" icon={<Zap size={16} />} label="Quick Games" active={pathname.startsWith("/games")} onClick={onNav} />
             {club && <div className="my-2 border-t border-border" />}
           </>
         )}
