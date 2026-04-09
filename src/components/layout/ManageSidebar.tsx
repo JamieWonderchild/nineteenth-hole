@@ -103,6 +103,14 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
           </>
         )}
 
+        {!superAdmin && (
+          <>
+            <NavItem href="/pools" icon={<Trophy size={16} />} label="Tour Pools" active={pathname.startsWith("/pools")} onClick={onNav} />
+            <NavItem href="/games" icon={<Zap size={16} />} label="My Games" active={pathname.startsWith("/games")} onClick={onNav} />
+            {club && <div className="my-2 border-t border-border" />}
+          </>
+        )}
+
         {club && (
           <>
             {superAdmin && (

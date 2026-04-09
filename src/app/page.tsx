@@ -4,7 +4,7 @@ import Link from "next/link";
 
 export default async function HomePage() {
   const { userId } = await auth();
-  if (userId) redirect("/home");
+  if (userId) redirect("/manage");
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-green-950 to-green-900 text-white">
