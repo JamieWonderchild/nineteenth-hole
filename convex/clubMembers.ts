@@ -32,6 +32,17 @@ export const listByClub = query({
   },
 });
 
+// All members (any status) — used by listNonMembers action
+export const listAllForClub = query({
+  args: { clubId: v.id("clubs") },
+  handler: async (ctx, { clubId }) => {
+    return ctx.db
+      .query("clubMembers")
+      .withIndex("by_club", q => q.eq("clubId", clubId))
+      .collect();
+  },
+});
+
 export const listPending = query({
   args: { clubId: v.id("clubs") },
   handler: async (ctx, { clubId }) => {
@@ -260,41 +271,64 @@ export const setRole = mutation({
   },
 });
 
-// Super admin: look up a Clerk user by email and add them to a club
-export const addMemberByEmail = action({
-  args: {
-    email: v.string(),
-    clubId: v.id("clubs"),
-    role: v.optional(v.string()), // 'member' | 'admin', default 'member'
-  },
-  handler: async (ctx, { email, clubId, role }) => {
+type ClerkUser = {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  email_addresses: Array<{ email_address: string }>;
+};
+
+async function fetchAllClerkUsers(): Promise<ClerkUser[]> {
+  const res = await fetch(
+    "https://api.clerk.com/v1/users?limit=500&order_by=-created_at",
+    { headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` } }
+  );
+  if (!res.ok) throw new Error(`Clerk API error: ${res.status}`);
+  return res.json();
+}
+
+// Super admin: list all Clerk users who are not already active members of this club
+export const listNonMembers = action({
+  args: { clubId: v.id("clubs") },
+  handler: async (ctx, { clubId }) => {
     const identity = await ctx.auth.getUserIdentity();
     const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
     if (!identity?.email || !superAdminEmails.includes(identity.email)) throw new Error("Not authorised");
 
-    // Look up user in Clerk by email
-    const res = await fetch(
-      `https://api.clerk.com/v1/users?email_address=${encodeURIComponent(email.trim())}`,
-      { headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` } }
-    );
-    if (!res.ok) throw new Error(`Clerk API error: ${res.status}`);
-    const users: Array<{ id: string; first_name?: string; last_name?: string; email_addresses: Array<{ email_address: string }> }> = await res.json();
+    const [clerkUsers, allMembers] = await Promise.all([
+      fetchAllClerkUsers(),
+      ctx.runQuery(api.clubMembers.listAllForClub, { clubId }),
+    ]);
 
-    if (!users.length) throw new Error(`No Clerk user found with email: ${email}`);
-    const clerkUser = users[0];
-    const displayName = [clerkUser.first_name, clerkUser.last_name].filter(Boolean).join(" ") || email;
+    const memberUserIds = new Set((allMembers as Array<{ userId: string }>).map(m => m.userId));
 
-    const memberId = await ctx.runMutation(api.clubMembers.assignToClub, {
-      userId: clerkUser.id,
-      clubId,
-      displayName,
-    });
+    return clerkUsers
+      .filter(u => !memberUserIds.has(u.id))
+      .map(u => ({
+        userId: u.id,
+        displayName: [u.first_name, u.last_name].filter(Boolean).join(" ") || (u.email_addresses[0]?.email_address ?? u.id),
+        email: u.email_addresses[0]?.email_address ?? "",
+      }));
+  },
+});
 
-    // Upgrade role to admin if requested
+// Super admin: add a known user (by userId) directly to a club
+export const addMemberById = action({
+  args: {
+    userId: v.string(),
+    clubId: v.id("clubs"),
+    displayName: v.string(),
+    role: v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, clubId, displayName, role }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    if (!identity?.email || !superAdminEmails.includes(identity.email)) throw new Error("Not authorised");
+
+    const memberId = await ctx.runMutation(api.clubMembers.assignToClub, { userId, clubId, displayName });
     if (role === "admin") {
       await ctx.runMutation(api.clubMembers.setRole, { memberId: memberId as never, role: "admin" });
     }
-
-    return { userId: clerkUser.id, displayName };
+    return memberId;
   },
 });

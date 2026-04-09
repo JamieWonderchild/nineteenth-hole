@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "convex/_generated/api";
+import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
 
 export default function MembersPage() {
@@ -19,28 +20,32 @@ export default function MembersPage() {
   const approveMember = useMutation(api.clubMembers.approveMember);
   const rejectMember = useMutation(api.clubMembers.rejectMember);
   const deleteMember = useMutation(api.clubMembers.deleteMember);
-  const addMemberByEmail = useAction(api.clubMembers.addMemberByEmail);
+  const listNonMembers = useAction(api.clubMembers.listNonMembers);
+  const addMemberById = useAction(api.clubMembers.addMemberById);
 
-  const [addEmail, setAddEmail] = useState("");
-  const [addRole, setAddRole] = useState<"member" | "admin">("member");
-  const [addLoading, setAddLoading] = useState(false);
-  const [addResult, setAddResult] = useState<string | null>(null);
-  const [addError, setAddError] = useState<string | null>(null);
+  const [nonMembers, setNonMembers] = useState<Array<{ userId: string; displayName: string; email: string }> | null>(null);
+  const [nonMembersLoading, setNonMembersLoading] = useState(false);
+  const [addingId, setAddingId] = useState<string | null>(null);
 
-  async function handleAddMember(e: React.FormEvent) {
-    e.preventDefault();
-    if (!club || !addEmail.trim()) return;
-    setAddLoading(true);
-    setAddResult(null);
-    setAddError(null);
+  async function handleLoadNonMembers() {
+    if (!club) return;
+    setNonMembersLoading(true);
     try {
-      const result = await addMemberByEmail({ email: addEmail.trim(), clubId: club._id, role: addRole });
-      setAddResult(`Added ${result.displayName} as ${addRole}`);
-      setAddEmail("");
-    } catch (err: unknown) {
-      setAddError(err instanceof Error ? err.message : "Something went wrong");
+      const result = await listNonMembers({ clubId: club._id });
+      setNonMembers(result as Array<{ userId: string; displayName: string; email: string }>);
     } finally {
-      setAddLoading(false);
+      setNonMembersLoading(false);
+    }
+  }
+
+  async function handleAddMember(userId: string, displayName: string, role: "member" | "admin" = "member") {
+    if (!club) return;
+    setAddingId(userId);
+    try {
+      await addMemberById({ userId, clubId: club._id as Id<"clubs">, displayName, role });
+      setNonMembers(prev => prev?.filter(u => u.userId !== userId) ?? null);
+    } finally {
+      setAddingId(null);
     }
   }
 
@@ -93,56 +98,61 @@ export default function MembersPage() {
         </section>
       )}
 
-      {/* Super admin: add member by email */}
+      {/* Super admin: add registered users to the club */}
       {superAdmin && (
         <section>
-          <h2 className="text-base font-semibold text-gray-900 mb-3">Add member by email</h2>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <p className="text-sm text-gray-500 mb-4">
-              Look up a registered user by their email address and add them directly to this club.
-            </p>
-            <form onSubmit={handleAddMember} className="flex flex-wrap gap-2 items-end">
-              <div className="flex-1 min-w-[220px]">
-                <label className="text-xs text-gray-500 block mb-1">Email address</label>
-                <input
-                  type="email"
-                  value={addEmail}
-                  onChange={e => { setAddEmail(e.target.value); setAddResult(null); setAddError(null); }}
-                  placeholder="allan.yarish@gmail.com"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30"
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Role</label>
-                <select
-                  value={addRole}
-                  onChange={e => setAddRole(e.target.value as "member" | "admin")}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 h-[38px]"
-                >
-                  <option value="member">Member</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-gray-900">Add registered users</h2>
+            {nonMembers === null && (
               <button
-                type="submit"
-                disabled={addLoading || !addEmail.trim()}
-                className="px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors disabled:opacity-60"
+                onClick={handleLoadNonMembers}
+                disabled={nonMembersLoading}
+                className="text-sm text-green-700 font-medium hover:underline disabled:opacity-60"
               >
-                {addLoading ? "Adding…" : "Add member"}
+                {nonMembersLoading ? "Loading…" : "Show users not in club →"}
               </button>
-            </form>
-            {addResult && (
-              <p className="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                ✓ {addResult}
-              </p>
             )}
-            {addError && (
-              <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                {addError}
-              </p>
+            {nonMembers !== null && (
+              <button onClick={() => setNonMembers(null)} className="text-sm text-gray-400 hover:text-gray-600">
+                Hide
+              </button>
             )}
           </div>
+
+          {nonMembers !== null && (
+            nonMembers.length === 0 ? (
+              <p className="text-sm text-gray-400 bg-white border border-gray-200 rounded-xl px-5 py-4">
+                All registered users are already members of this club.
+              </p>
+            ) : (
+              <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
+                {nonMembers.map(u => (
+                  <div key={u.userId} className="flex items-center justify-between px-5 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{u.displayName}</p>
+                      <p className="text-xs text-gray-400">{u.email}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleAddMember(u.userId, u.displayName, "member")}
+                        disabled={addingId === u.userId}
+                        className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-500 transition-colors disabled:opacity-60"
+                      >
+                        {addingId === u.userId ? "Adding…" : "Add as member"}
+                      </button>
+                      <button
+                        onClick={() => handleAddMember(u.userId, u.displayName, "admin")}
+                        disabled={addingId === u.userId}
+                        className="px-3 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-60"
+                      >
+                        Add as admin
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
         </section>
       )}
 
