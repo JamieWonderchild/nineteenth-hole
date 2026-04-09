@@ -13,10 +13,10 @@ export default function ResultsPage() {
     api.clubMembers.listByUser,
     user ? { userId: user.id } : "skip"
   );
-  const adminMembership = memberships?.find(m => m.role === "admin");
+  const activeMembership = memberships?.find(m => m.status === "active");
   const club = useQuery(
     api.clubs.get,
-    adminMembership ? { clubId: adminMembership.clubId } : "skip"
+    activeMembership ? { clubId: activeMembership.clubId } : "skip"
   );
   const competitions = useQuery(
     api.competitions.listByClub,

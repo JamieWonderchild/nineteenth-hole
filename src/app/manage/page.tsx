@@ -18,10 +18,12 @@ export default function ManagePage() {
     api.clubMembers.listByUser,
     user ? { userId: user.id } : "skip"
   );
-  const adminMembership = memberships?.find(m => m.role === "admin");
+  const activeMembership = memberships?.find(m => m.status === "active");
+  const pendingMembership = memberships?.find(m => m.status === "pending");
+  const isAdmin = activeMembership?.role === "admin" || superAdmin === true;
   const club = useQuery(
     api.clubs.get,
-    adminMembership ? { clubId: adminMembership.clubId } : "skip"
+    activeMembership ? { clubId: activeMembership.clubId } : "skip"
   );
   const competitions = useQuery(
     api.competitions.listByClub,
@@ -33,7 +35,7 @@ export default function ManagePage() {
   );
   const pendingMembers = useQuery(
     api.clubMembers.listPending,
-    club ? { clubId: club._id } : "skip"
+    (club && isAdmin) ? { clubId: club._id } : "skip"
   );
   const approveMember = useMutation(api.clubMembers.approveMember);
   const rejectMember = useMutation(api.clubMembers.rejectMember);
@@ -45,16 +47,29 @@ export default function ManagePage() {
 
   // Super admin with no club → redirect to platform overview
   useEffect(() => {
-    if (superAdmin && !adminMembership && memberships !== undefined) {
+    if (superAdmin && !activeMembership && memberships !== undefined) {
       router.push("/manage/platform");
     }
-  }, [superAdmin, adminMembership, memberships, router]);
+  }, [superAdmin, activeMembership, memberships, router]);
 
   if (superAdmin === undefined || memberships === undefined) {
     return <Spinner />;
   }
 
-  if (!adminMembership) {
+  if (!activeMembership) {
+    if (pendingMembership) {
+      return (
+        <div className="flex items-center justify-center h-full min-h-[60vh] px-4">
+          <div className="text-center max-w-sm">
+            <div className="text-5xl mb-4">⏳</div>
+            <h1 className="text-xl font-semibold text-gray-900 mb-2">Membership pending</h1>
+            <p className="text-gray-500 text-sm">
+              Your request to join has been received. An admin will approve you shortly.
+            </p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex items-center justify-center h-full min-h-[60vh] px-4">
         <div className="text-center max-w-sm">
@@ -115,14 +130,16 @@ export default function ManagePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{club.name}</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Admin dashboard</p>
+          <p className="text-gray-500 text-sm mt-0.5">{isAdmin ? "Admin dashboard" : "Member dashboard"}</p>
         </div>
-        <Link
-          href="/manage/competitions/new"
-          className="px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors"
-        >
-          + New competition
-        </Link>
+        {isAdmin && (
+          <Link
+            href="/manage/competitions/new"
+            className="px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors"
+          >
+            + New competition
+          </Link>
+        )}
       </div>
 
       {/* Stats */}
@@ -140,8 +157,8 @@ export default function ManagePage() {
         ))}
       </div>
 
-      {/* Invite members */}
-      <section>
+      {/* Invite members — admin only */}
+      {isAdmin && <section>
         <h2 className="text-base font-semibold text-gray-900 mb-3">Invite members</h2>
         <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
           <p className="text-sm text-gray-500 mb-3">
@@ -159,7 +176,7 @@ export default function ManagePage() {
             </button>
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* Pending membership requests */}
       {pendingMembers && pendingMembers.length > 0 && (
@@ -200,16 +217,18 @@ export default function ManagePage() {
         {activeComps.length === 0 ? (
           <div className="bg-white border border-dashed border-gray-300 rounded-xl p-10 text-center">
             <p className="text-gray-400 mb-3">No active competitions</p>
-            <Link href="/manage/competitions/new" className="text-green-700 font-medium hover:underline text-sm">
-              Create your first pool →
-            </Link>
+            {isAdmin && (
+              <Link href="/manage/competitions/new" className="text-green-700 font-medium hover:underline text-sm">
+                Create your first pool →
+              </Link>
+            )}
           </div>
         ) : (
           <div className="space-y-2">
             {activeComps.map(comp => (
               <Link
                 key={comp._id}
-                href={`/manage/competitions/${comp._id}`}
+                href={isAdmin ? `/manage/competitions/${comp._id}` : `/${club.slug}/${comp.slug}`}
                 className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-4 hover:border-green-400 transition-colors"
               >
                 <div>

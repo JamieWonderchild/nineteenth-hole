@@ -156,9 +156,11 @@ function NewSeriesModal({
 
 export default function SeriesListPage() {
   const { user } = useUser();
+  const superAdmin = useQuery(api.clubs.isSuperAdmin);
   const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const adminMembership = memberships?.find(m => m.role === "admin");
-  const club = useQuery(api.clubs.get, adminMembership ? { clubId: adminMembership.clubId } : "skip");
+  const activeMembership = memberships?.find(m => m.status === "active");
+  const isAdmin = activeMembership?.role === "admin" || superAdmin === true;
+  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
   const seriesList = useQuery(api.series.listByClub, club ? { clubId: club._id } : "skip");
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -182,13 +184,15 @@ export default function SeriesListPage() {
             Cumulative competitions — like the Race to Swinley Forest
           </p>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors"
-        >
-          <Plus size={16} />
-          New series
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors"
+          >
+            <Plus size={16} />
+            New series
+          </button>
+        )}
       </div>
 
       <NewSeriesModal
@@ -208,12 +212,14 @@ export default function SeriesListPage() {
         <div className="text-center py-16 bg-white border border-dashed border-gray-200 rounded-xl">
           <div className="text-4xl mb-3">🏆</div>
           <p className="text-gray-500 mb-4">No season series yet</p>
-          <button
-            onClick={() => setModalOpen(true)}
-            className="text-green-700 font-medium hover:underline"
-          >
-            Create your first series →
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setModalOpen(true)}
+              className="text-green-700 font-medium hover:underline"
+            >
+              Create your first series →
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-2">
@@ -237,7 +243,7 @@ export default function SeriesListPage() {
                   {s.prizePool && ` · ${(s.prizePool / 100).toFixed(0)} ${s.currency} prize pool`}
                 </p>
               </div>
-              <span className="text-sm text-green-700 font-medium">Manage →</span>
+              <span className="text-sm text-green-700 font-medium">{isAdmin ? "Manage →" : "View →"}</span>
             </Link>
           ))}
         </div>

@@ -52,14 +52,15 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
     api.clubMembers.listByUser,
     user ? { userId: user.id } : "skip"
   );
-  const adminMembership = memberships?.find(m => m.role === "admin");
+  const activeMembership = memberships?.find(m => m.status === "active");
+  const isAdmin = activeMembership?.role === "admin" || superAdmin === true;
   const club = useQuery(
     api.clubs.get,
-    adminMembership ? { clubId: adminMembership.clubId } : "skip"
+    activeMembership ? { clubId: activeMembership.clubId } : "skip"
   );
   const pending = useQuery(
     api.clubMembers.listPending,
-    club ? { clubId: club._id } : "skip"
+    (club && isAdmin) ? { clubId: club._id } : "skip"
   );
   const platformPools = useQuery(
     api.competitions.listPlatform,
@@ -110,23 +111,29 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               </p>
             )}
             <NavItem href="/manage" icon={<LayoutDashboard size={16} />} label="Dashboard" active={is("/manage")} onClick={onNav} />
-            <NavItem
-              href="/manage/competitions/new"
-              icon={<Trophy size={16} />}
-              label="New Competition"
-              active={is("/manage/competitions/new")}
-              onClick={onNav}
-            />
+            {isAdmin && (
+              <NavItem
+                href="/manage/competitions/new"
+                icon={<Trophy size={16} />}
+                label="New Competition"
+                active={is("/manage/competitions/new")}
+                onClick={onNav}
+              />
+            )}
             <NavItem
               href="/manage/members"
               icon={<Users size={16} />}
-              label={pending?.length ? `Members (${pending.length})` : "Members"}
+              label={(isAdmin && pending?.length) ? `Members (${pending.length})` : "Members"}
               active={is("/manage/members")}
               onClick={onNav}
             />
             <NavItem href="/manage/results" icon={<BookOpen size={16} />} label="Game Book" active={is("/manage/results")} onClick={onNav} />
             <NavItem href="/manage/series" icon={<ListOrdered size={16} />} label="Season Series" active={pathname.startsWith("/manage/series")} onClick={onNav} />
-            <NavItem href="/manage/tee-times" icon={<Clock size={16} />} label="Tee Times" active={pathname.startsWith("/manage/tee-times")} onClick={onNav} />
+            {isAdmin ? (
+              <NavItem href="/manage/tee-times" icon={<Clock size={16} />} label="Tee Times" active={pathname.startsWith("/manage/tee-times")} onClick={onNav} />
+            ) : (
+              <NavItem href={`/${club.slug}/tee-times`} icon={<Clock size={16} />} label="Tee Times" active={pathname.startsWith(`/${club.slug}/tee-times`)} onClick={onNav} />
+            )}
             <div className="my-2 border-t border-border" />
             <NavItem href={`/${club.slug}`} icon={<ChevronRight size={16} />} label="View public page" active={false} onClick={onNav} />
           </>

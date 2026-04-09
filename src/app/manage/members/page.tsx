@@ -8,11 +8,13 @@ import { formatCurrency } from "@/lib/format";
 export default function MembersPage() {
   const { user } = useUser();
 
+  const superAdmin = useQuery(api.clubs.isSuperAdmin);
   const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const adminMembership = memberships?.find(m => m.role === "admin");
-  const club = useQuery(api.clubs.get, adminMembership ? { clubId: adminMembership.clubId } : "skip");
+  const activeMembership = memberships?.find(m => m.status === "active");
+  const isAdmin = activeMembership?.role === "admin" || superAdmin === true;
+  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
   const members = useQuery(api.clubMembers.listByClub, club ? { clubId: club._id } : "skip");
-  const pending = useQuery(api.clubMembers.listPending, club ? { clubId: club._id } : "skip");
+  const pending = useQuery(api.clubMembers.listPending, (club && isAdmin) ? { clubId: club._id } : "skip");
   const approveMember = useMutation(api.clubMembers.approveMember);
   const rejectMember = useMutation(api.clubMembers.rejectMember);
 
@@ -31,8 +33,8 @@ export default function MembersPage() {
         <p className="text-gray-500 text-sm mt-0.5">{members.length} active member{members.length !== 1 ? "s" : ""} at {club.name}</p>
       </div>
 
-      {/* Pending requests */}
-      {pending && pending.length > 0 && (
+      {/* Pending requests — admin only */}
+      {isAdmin && pending && pending.length > 0 && (
         <section>
           <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
             Pending requests
