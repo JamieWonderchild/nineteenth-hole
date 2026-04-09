@@ -128,6 +128,7 @@ export const create = mutation({
       position: v.number(),
       percentage: v.number(),
     })),
+    paymentCollection: v.optional(v.string()),
     createdBy: v.string(),
   },
   handler: async (ctx, args) => {

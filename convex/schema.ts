@@ -98,6 +98,8 @@ export default defineSchema({
     })),
     // Metadata
     drawCompletedAt: v.optional(v.string()),
+    // 'stripe' (default) | 'cash' — cash means admin marks entries as paid manually
+    paymentCollection: v.optional(v.string()),
     createdBy: v.string(),      // Clerk user ID
     createdAt: v.string(),
     updatedAt: v.string(),

@@ -84,6 +84,63 @@ export const create = mutation({
   },
 });
 
+// Register interest without payment — for cash-collection competitions
+export const enterFree = mutation({
+  args: {
+    competitionId: v.id("competitions"),
+    clubId: v.optional(v.id("clubs")),
+    userId: v.string(),
+    displayName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("entries")
+      .withIndex("by_competition_and_user", q =>
+        q.eq("competitionId", args.competitionId).eq("userId", args.userId)
+      )
+      .collect();
+    if (existing.length > 0) return existing[0]._id;
+
+    const now = new Date().toISOString();
+    return ctx.db.insert("entries", {
+      competitionId: args.competitionId,
+      clubId: args.clubId,
+      userId: args.userId,
+      displayName: args.displayName,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+// Club admin marks a cash entry as paid
+export const markEntryPaidByAdmin = mutation({
+  args: { entryId: v.id("entries") },
+  handler: async (ctx, { entryId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const entry = await ctx.db.get(entryId);
+    if (!entry) throw new Error("Entry not found");
+
+    if (entry.clubId) {
+      const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+      const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+      if (!isSuperAdmin) {
+        const member = await ctx.db
+          .query("clubMembers")
+          .withIndex("by_club_and_user", q => q.eq("clubId", entry.clubId!).eq("userId", identity.subject))
+          .unique();
+        if (!member || member.role !== "admin") throw new Error("Not authorised");
+      }
+    }
+
+    const now = new Date().toISOString();
+    await ctx.db.patch(entryId, { paidAt: now, updatedAt: now });
+    return entryId;
+  },
+});
+
 export const markPaid = mutation({
   args: {
     stripeCheckoutSessionId: v.string(),

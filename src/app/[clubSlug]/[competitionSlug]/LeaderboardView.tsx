@@ -43,17 +43,31 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
   }
 
   const paidEntries = entries.filter(e => e.paidAt);
+  const unpaidEntries = entries.filter(e => !e.paidAt);
   const pot = paidEntries.length * competition.entryFee;
   const playerMap = new Map<Id<"players">, Doc<"players">>(players.map(p => [p._id, p]));
   const sortedEntries = [...paidEntries].sort((a, b) =>
     (a.leaderboardPosition ?? 999) - (b.leaderboardPosition ?? 999)
   );
   const isPickFormat = competition.drawType === "pick";
+  const isCash = competition.paymentCollection === "cash";
   const myPaidEntries = (myEntries ?? []).filter(e => e.paidAt);
+  const myUnpaidEntry = (myEntries ?? []).find(e => !e.paidAt);
+
+  // Tote-style: group by position to split prizes among ties
+  const positionCounts = new Map<number, number>();
+  for (const e of paidEntries) {
+    if (e.leaderboardPosition) {
+      positionCounts.set(e.leaderboardPosition, (positionCounts.get(e.leaderboardPosition) ?? 0) + 1);
+    }
+  }
 
   const prizeAmounts = competition.prizeStructure.map(p => ({
     position: p.position,
-    amount: Math.floor(pot * p.percentage / 100),
+    total: Math.floor(pot * p.percentage / 100),
+    // per-person amount (split among ties at this position)
+    perPerson: Math.floor(pot * p.percentage / 100 / Math.max(1, positionCounts.get(p.position) ?? 1)),
+    count: positionCounts.get(p.position) ?? 0,
   }));
 
   return (
@@ -83,15 +97,25 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
               <div className="text-3xl font-bold text-green-800 mt-0.5">
                 {formatCurrency(pot, competition.currency)}
               </div>
-              <div className="text-xs text-gray-400 mt-0.5">{paidEntries.length} paid entries</div>
+              <div className="text-xs text-gray-400 mt-0.5">
+                {paidEntries.length} paid
+                {unpaidEntries.length > 0 && ` · ${unpaidEntries.length} awaiting payment`}
+              </div>
             </div>
-            {competition.status === "open" && (
+            {competition.status === "open" && !myUnpaidEntry && myPaidEntries.length === 0 && (
               <Link
                 href={`/${clubSlug}/${competitionSlug}/enter`}
                 className="px-5 py-2.5 bg-green-700 text-white text-sm font-semibold rounded-lg hover:bg-green-600 transition-colors"
               >
-                Enter pool
+                {isCash ? "Register" : "Enter pool"}
               </Link>
+            )}
+            {myUnpaidEntry && isCash && (
+              <div className="text-right">
+                <span className="inline-block px-3 py-1.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-lg">
+                  Awaiting payment
+                </span>
+              </div>
             )}
           </div>
           <div className="flex gap-3">
@@ -99,8 +123,13 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
               <div key={p.position} className="flex-1 text-center bg-gray-50 rounded-lg py-2">
                 <div className="text-xs text-gray-500">{ordinal(p.position)} place</div>
                 <div className="font-semibold text-gray-900 text-sm mt-0.5">
-                  {formatCurrency(p.amount, competition.currency)}
+                  {formatCurrency(p.total, competition.currency)}
                 </div>
+                {p.count > 1 && (
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    {formatCurrency(p.perPerson, competition.currency)} each ({p.count} way)
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -221,7 +250,8 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
                         )}
                         {i < 3 && prizeAmounts[i] && (
                           <div className="text-xs text-gray-400">
-                            {formatCurrency(prizeAmounts[i].amount, competition.currency)}
+                            {formatCurrency(prizeAmounts[i].perPerson, competition.currency)}
+                            {prizeAmounts[i].count > 1 && " ea"}
                           </div>
                         )}
                       </div>
@@ -243,6 +273,22 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
           <div className="text-center py-12 text-gray-400">
             <p>{isPickFormat ? "No entries yet. Be the first to pick your team!" : "Draw hasn't happened yet. Check back soon."}</p>
           </div>
+        )}
+
+        {/* Unpaid registrants (cash competitions, before draw) */}
+        {isCash && unpaidEntries.length > 0 && competition.status === "open" && (
+          <section>
+            <h2 className="text-base font-semibold text-gray-900 mb-3">Awaiting payment ({unpaidEntries.length})</h2>
+            <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
+              {unpaidEntries.map(e => (
+                <div key={e._id} className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-gray-700">{e.displayName}</span>
+                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Unconfirmed</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-2 text-center">Pay {formatCurrency(competition.entryFee, competition.currency)} cash to the organiser to be included in the draw.</p>
+          </section>
         )}
 
         {/* Golf leaderboard (player scores, sweep format only) */}

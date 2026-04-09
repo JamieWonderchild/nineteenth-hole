@@ -33,6 +33,7 @@ export function EntryForm({ clubSlug, competitionSlug }: Props) {
   );
 
   const createEntry = useMutation(api.entries.create);
+  const enterFree = useMutation(api.entries.enterFree);
   const ensureMember = useMutation(api.clubMembers.ensureMember);
 
   // Pick format state
@@ -66,6 +67,7 @@ export function EntryForm({ clubSlug, competitionSlug }: Props) {
   // ── Standard draw entry ─────────────────────────────────────────────────────
   if (!isPickFormat) {
     const myEntry = myEntries[0];
+    const isCash = competition.paymentCollection === "cash";
 
     if (myEntry?.paidAt) {
       return (
@@ -78,6 +80,36 @@ export function EntryForm({ clubSlug, competitionSlug }: Props) {
           </div>
         </div>
       );
+    }
+
+    if (myEntry && !myEntry.paidAt && isCash) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+          <div className="text-center">
+            <p className="text-5xl mb-4">🤝</p>
+            <h1 className="text-xl font-bold text-gray-900 mb-2">You&apos;re registered!</h1>
+            <p className="text-gray-500 mb-2">
+              Pay <strong>{formatCurrency(competition.entryFee, competition.currency)}</strong> cash to the organiser to confirm your place.
+            </p>
+            <p className="text-sm text-gray-400 mb-6">You&apos;ll be included in the draw once marked as paid.</p>
+            <Link href={`/${clubSlug}/${competitionSlug}`} className="text-green-700 font-medium hover:underline">Back to pool →</Link>
+          </div>
+        </div>
+      );
+    }
+
+    async function handleCashEnter() {
+      if (!user || !club || !competition) return;
+      setLoading(true);
+      setError("");
+      try {
+        await ensureMember({ clubId: club._id, userId: user.id, displayName: user.fullName ?? user.username ?? user.emailAddresses[0]?.emailAddress ?? "Member", avatarUrl: user.imageUrl });
+        await enterFree({ competitionId: competition._id, clubId: club._id, userId: user.id, displayName: user.fullName ?? user.username ?? "Member" });
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Something went wrong");
+      } finally {
+        setLoading(false);
+      }
     }
 
     async function handleDrawEnter() {
@@ -110,16 +142,31 @@ export function EntryForm({ clubSlug, competitionSlug }: Props) {
             <div className="flex justify-between"><span className="text-gray-500">Draw type</span><span className="text-gray-700 capitalize">{competition.drawType}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Players drawn</span><span className="text-gray-700">{competition.tierCount} (one per tier)</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Entry deadline</span><span className="text-gray-700">{new Date(competition.entryDeadline).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span></div>
+            {isCash && (
+              <div className="flex justify-between"><span className="text-gray-500">Payment</span><span className="text-gray-700">Cash to organiser</span></div>
+            )}
           </div>
-          <p className="text-xs text-gray-400 mb-4 text-center">You&apos;ll be randomly assigned one player from each tier after the entry deadline.</p>
+          {isCash ? (
+            <p className="text-xs text-gray-400 mb-4 text-center">
+              Register your interest now. Pay {formatCurrency(competition.entryFee, competition.currency)} cash to the organiser — you&apos;ll be in the draw once marked as paid.
+            </p>
+          ) : (
+            <p className="text-xs text-gray-400 mb-4 text-center">You&apos;ll be randomly assigned one player from each tier after the entry deadline.</p>
+          )}
           {!user ? (
             <SignInButton mode="modal"><button className="w-full px-5 py-3 bg-green-700 text-white font-semibold rounded-lg hover:bg-green-600 transition-colors">Sign in to enter</button></SignInButton>
           ) : (
             <>
               {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2 mb-4">{error}</p>}
-              <button onClick={handleDrawEnter} disabled={loading} className="w-full px-5 py-3 bg-green-700 text-white font-semibold rounded-lg hover:bg-green-600 disabled:bg-gray-300 transition-colors">
-                {loading ? "Setting up payment…" : `Enter for ${formatCurrency(competition.entryFee, competition.currency)}`}
-              </button>
+              {isCash ? (
+                <button onClick={handleCashEnter} disabled={loading} className="w-full px-5 py-3 bg-green-700 text-white font-semibold rounded-lg hover:bg-green-600 disabled:bg-gray-300 transition-colors">
+                  {loading ? "Registering…" : "Register interest"}
+                </button>
+              ) : (
+                <button onClick={handleDrawEnter} disabled={loading} className="w-full px-5 py-3 bg-green-700 text-white font-semibold rounded-lg hover:bg-green-600 disabled:bg-gray-300 transition-colors">
+                  {loading ? "Setting up payment…" : `Enter for ${formatCurrency(competition.entryFee, competition.currency)}`}
+                </button>
+              )}
             </>
           )}
           <Link href={`/${clubSlug}/${competitionSlug}`} className="block mt-3 text-center text-sm text-gray-400 hover:text-gray-600">← Back to pool</Link>

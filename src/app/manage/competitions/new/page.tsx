@@ -105,6 +105,7 @@ export default function NewCompetitionPage() {
   const [entryFeeStr, setEntryFeeStr] = useState("10");
   const [entryDeadline, setEntryDeadline] = useState("");
   const [prizePreset, setPrizePreset] = useState(0);
+  const [paymentCollection, setPaymentCollection] = useState<"stripe" | "cash">("cash");
 
   // Submission
   const [loading, setLoading] = useState(false);
@@ -186,6 +187,7 @@ export default function NewCompetitionPage() {
         entryFee,
         currency: club.currency,
         prizeStructure: PRIZE_PRESETS[prizePreset].structure,
+        paymentCollection,
         createdBy: user.id,
       });
       router.push(`/manage/competitions/${compId}`);
@@ -556,7 +558,7 @@ export default function NewCompetitionPage() {
                 className="pl-7"
               />
             </div>
-            {entryFee > 0 && (
+            {entryFee > 0 && paymentCollection === "stripe" && (
               <div className="rounded-lg bg-muted px-3 py-2 text-sm space-y-1 mt-2">
                 <div className="flex justify-between text-muted-foreground">
                   <span>Entry fee (goes to pot)</span>
@@ -573,6 +575,34 @@ export default function NewCompetitionPage() {
               </div>
             )}
           </div>
+
+          {/* Payment collection */}
+          {entryFee > 0 && (
+            <div className="space-y-1.5">
+              <Label>How do you collect payment?</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { id: "cash", label: "Cash / offline", desc: "Members register interest. You mark them as paid manually." },
+                  { id: "stripe", label: "Online (Stripe)", desc: "Members pay instantly via card. Money goes to your Stripe account." },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setPaymentCollection(opt.id)}
+                    className={cn(
+                      "text-left px-4 py-3 rounded-xl border transition-all",
+                      paymentCollection === opt.id
+                        ? "border-primary bg-primary/5 text-primary font-medium"
+                        : "border-border hover:border-primary/40 hover:bg-accent/40"
+                    )}
+                  >
+                    <p className="text-sm font-medium">{opt.label}</p>
+                    <p className="text-xs text-muted-foreground font-normal mt-0.5">{opt.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Prize structure */}
           <div className="space-y-1.5">
@@ -629,7 +659,7 @@ export default function NewCompetitionPage() {
               ] : []),
               ...(compType === "sweep" ? [{ icon: <Calendar size={15} />, label: "Dates", value: `${new Date(sweepStart).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – ${new Date(sweepEnd).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` }] : []),
               { icon: <Calendar size={15} />, label: "Entry deadline", value: displayDeadline },
-              { icon: <DollarSign size={15} />, label: "Entry fee", value: entryFee > 0 ? `${sym}${(entryFee / 100).toFixed(0)} + ${sym}${(platformFee / 100).toFixed(2)} fee = ${sym}${((entryFee + platformFee) / 100).toFixed(2)} members pay` : "Free" },
+              { icon: <DollarSign size={15} />, label: "Entry fee", value: entryFee > 0 ? `${sym}${(entryFee / 100).toFixed(0)} · ${paymentCollection === "cash" ? "cash collection" : `+ ${sym}${(platformFee / 100).toFixed(2)} fee online`}` : "Free" },
               { icon: <Users size={15} />, label: "Prize split", value: PRIZE_PRESETS[prizePreset].label },
               { icon: <Globe size={15} />, label: "URL", value: `/${club.slug}/${slug}` },
             ].map(row => (

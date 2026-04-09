@@ -187,6 +187,7 @@ export default function CompetitionManagePage({
   const upsertScore = useMutation(api.players.upsertScore);
   const updatePrizeMoney = useMutation(api.players.updatePrizeMoney);
   const refreshLeaderboard = useMutation(api.entries.refreshLeaderboard);
+  const markEntryPaid = useMutation(api.entries.markEntryPaidByAdmin);
   const syncESPN = useAction(api.competitions.syncESPNPrizeMoney);
 
   const [scoreEdits, setScoreEdits] = useState<Record<string, { r1?: string; r2?: string; r3?: string; r4?: string }>>({});
@@ -205,7 +206,9 @@ export default function CompetitionManagePage({
   }
 
   const paidEntries = entries.filter(e => e.paidAt);
+  const unpaidEntries = entries.filter(e => !e.paidAt);
   const pot = paidEntries.length * competition.entryFee;
+  const isCash = competition.paymentCollection === "cash";
   const isPlatformPool = competition.scope === "platform";
   const isPickFormat = competition.drawType === "pick";
   const publicUrl = isPlatformPool
@@ -322,7 +325,7 @@ export default function CompetitionManagePage({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Paid entries", value: paidEntries.length },
-          { label: "Pot", value: formatCurrency(pot, competition.currency) },
+          { label: isCash ? "Awaiting payment" : "Pot", value: isCash ? unpaidEntries.length : formatCurrency(pot, competition.currency) },
           { label: "Players", value: players.length },
           { label: "Status", value: competition.status.charAt(0).toUpperCase() + competition.status.slice(1) },
         ].map(s => (
@@ -455,7 +458,14 @@ export default function CompetitionManagePage({
       {entries.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Entries ({entries.length})</CardTitle>
+            <CardTitle className="text-base">
+              Entries ({entries.length})
+              {isCash && unpaidEntries.length > 0 && (
+                <span className="ml-2 text-xs font-normal text-amber-600">
+                  {paidEntries.length} paid · {unpaidEntries.length} awaiting cash
+                </span>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <table className="w-full text-sm">
@@ -482,6 +492,13 @@ export default function CompetitionManagePage({
                       <td className="px-5 py-3">
                         {entry.paidAt ? (
                           <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Paid</span>
+                        ) : isCash ? (
+                          <button
+                            onClick={() => markEntryPaid({ entryId: entry._id })}
+                            className="text-xs bg-amber-100 text-amber-700 hover:bg-amber-200 px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer"
+                          >
+                            Mark paid ✓
+                          </button>
                         ) : (
                           <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Unpaid</span>
                         )}
