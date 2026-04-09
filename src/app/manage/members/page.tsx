@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "convex/_generated/api";
 import { formatCurrency } from "@/lib/format";
 
@@ -18,6 +19,30 @@ export default function MembersPage() {
   const approveMember = useMutation(api.clubMembers.approveMember);
   const rejectMember = useMutation(api.clubMembers.rejectMember);
   const deleteMember = useMutation(api.clubMembers.deleteMember);
+  const addMemberByEmail = useAction(api.clubMembers.addMemberByEmail);
+
+  const [addEmail, setAddEmail] = useState("");
+  const [addRole, setAddRole] = useState<"member" | "admin">("member");
+  const [addLoading, setAddLoading] = useState(false);
+  const [addResult, setAddResult] = useState<string | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
+
+  async function handleAddMember(e: React.FormEvent) {
+    e.preventDefault();
+    if (!club || !addEmail.trim()) return;
+    setAddLoading(true);
+    setAddResult(null);
+    setAddError(null);
+    try {
+      const result = await addMemberByEmail({ email: addEmail.trim(), clubId: club._id, role: addRole });
+      setAddResult(`Added ${result.displayName} as ${addRole}`);
+      setAddEmail("");
+    } catch (err: unknown) {
+      setAddError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setAddLoading(false);
+    }
+  }
 
   if (!club || !members) {
     return (
@@ -64,6 +89,59 @@ export default function MembersPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* Super admin: add member by email */}
+      {superAdmin && (
+        <section>
+          <h2 className="text-base font-semibold text-gray-900 mb-3">Add member by email</h2>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <p className="text-sm text-gray-500 mb-4">
+              Look up a registered user by their email address and add them directly to this club.
+            </p>
+            <form onSubmit={handleAddMember} className="flex flex-wrap gap-2 items-end">
+              <div className="flex-1 min-w-[220px]">
+                <label className="text-xs text-gray-500 block mb-1">Email address</label>
+                <input
+                  type="email"
+                  value={addEmail}
+                  onChange={e => { setAddEmail(e.target.value); setAddResult(null); setAddError(null); }}
+                  placeholder="allan.yarish@gmail.com"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Role</label>
+                <select
+                  value={addRole}
+                  onChange={e => setAddRole(e.target.value as "member" | "admin")}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 h-[38px]"
+                >
+                  <option value="member">Member</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                disabled={addLoading || !addEmail.trim()}
+                className="px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors disabled:opacity-60"
+              >
+                {addLoading ? "Adding…" : "Add member"}
+              </button>
+            </form>
+            {addResult && (
+              <p className="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                ✓ {addResult}
+              </p>
+            )}
+            {addError && (
+              <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {addError}
+              </p>
+            )}
           </div>
         </section>
       )}

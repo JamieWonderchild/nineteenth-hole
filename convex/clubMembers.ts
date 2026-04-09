@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { action, mutation, query } from "./_generated/server";
+import { api } from "./_generated/api";
 
 export const listByUser = query({
   args: { userId: v.string() },
@@ -246,5 +247,54 @@ export const recordCompetitionResult = mutation({
         : Math.min(member.bestFinish, args.leaderboardPosition),
       updatedAt: new Date().toISOString(),
     });
+  },
+});
+
+export const setRole = mutation({
+  args: { memberId: v.id("clubMembers"), role: v.string() },
+  handler: async (ctx, { memberId, role }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    if (!identity?.email || !superAdminEmails.includes(identity.email)) throw new Error("Not authorised");
+    await ctx.db.patch(memberId, { role, updatedAt: new Date().toISOString() });
+  },
+});
+
+// Super admin: look up a Clerk user by email and add them to a club
+export const addMemberByEmail = action({
+  args: {
+    email: v.string(),
+    clubId: v.id("clubs"),
+    role: v.optional(v.string()), // 'member' | 'admin', default 'member'
+  },
+  handler: async (ctx, { email, clubId, role }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    if (!identity?.email || !superAdminEmails.includes(identity.email)) throw new Error("Not authorised");
+
+    // Look up user in Clerk by email
+    const res = await fetch(
+      `https://api.clerk.com/v1/users?email_address=${encodeURIComponent(email.trim())}`,
+      { headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` } }
+    );
+    if (!res.ok) throw new Error(`Clerk API error: ${res.status}`);
+    const users: Array<{ id: string; first_name?: string; last_name?: string; email_addresses: Array<{ email_address: string }> }> = await res.json();
+
+    if (!users.length) throw new Error(`No Clerk user found with email: ${email}`);
+    const clerkUser = users[0];
+    const displayName = [clerkUser.first_name, clerkUser.last_name].filter(Boolean).join(" ") || email;
+
+    const memberId = await ctx.runMutation(api.clubMembers.assignToClub, {
+      userId: clerkUser.id,
+      clubId,
+      displayName,
+    });
+
+    // Upgrade role to admin if requested
+    if (role === "admin") {
+      await ctx.runMutation(api.clubMembers.setRole, { memberId: memberId as never, role: "admin" });
+    }
+
+    return { userId: clerkUser.id, displayName };
   },
 });
