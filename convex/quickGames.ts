@@ -41,6 +41,7 @@ export const create = mutation({
     settlementType: v.string(), // 'cash' | 'stripe'
     scoringMode: v.optional(v.string()), // 'overall' | 'per_hole'
     courseId: v.optional(v.id("courses")),
+    teeColour: v.optional(v.string()),   // 'white' | 'yellow' | 'blue' | 'red'
     players: v.array(v.object({
       id: v.string(),
       name: v.string(),

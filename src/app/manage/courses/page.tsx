@@ -71,16 +71,37 @@ function parseScorecard(text: string): ParsedHole[] | null {
   return null;
 }
 
+const TEE_COLOURS = [
+  { key: "yardsWhite",  label: "White", bg: "bg-gray-100",   text: "text-gray-700" },
+  { key: "yardsYellow", label: "Yellow", bg: "bg-yellow-100", text: "text-yellow-800" },
+  { key: "yardsBlue",   label: "Blue",  bg: "bg-blue-100",   text: "text-blue-800" },
+  { key: "yardsRed",    label: "Red",   bg: "bg-red-100",    text: "text-red-700" },
+] as const;
+
+type TeeKey = "yardsWhite" | "yardsYellow" | "yardsBlue" | "yardsRed";
+
 function emptyHoles() {
   return Array.from({ length: 18 }, (_, i) => ({
     number: i + 1,
     par: DEFAULT_PARS[i],
     strokeIndex: DEFAULT_SI[i],
-    yards: undefined as number | undefined,
+    yardsWhite: undefined as number | undefined,
+    yardsYellow: undefined as number | undefined,
+    yardsBlue: undefined as number | undefined,
+    yardsRed: undefined as number | undefined,
   }));
 }
 
-type Hole = { number: number; par: number; strokeIndex: number; yards?: number };
+type Hole = {
+  number: number;
+  par: number;
+  strokeIndex: number;
+  yards?: number;        // legacy
+  yardsWhite?: number;
+  yardsYellow?: number;
+  yardsBlue?: number;
+  yardsRed?: number;
+};
 
 function CourseForm({
   clubId,
@@ -258,11 +279,15 @@ function CourseForm({
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
-              <th className="px-3 py-2.5 text-left font-medium">Hole</th>
-              <th className="px-3 py-2.5 font-medium text-center">Par</th>
-              <th className="px-3 py-2.5 font-medium text-center">SI</th>
-              <th className="px-3 py-2.5 font-medium text-center">Yards</th>
+            <tr className="border-b border-gray-100 text-xs uppercase tracking-wide">
+              <th className="px-3 py-2.5 text-left font-medium text-gray-500">Hole</th>
+              <th className="px-3 py-2.5 font-medium text-center text-gray-500">Par</th>
+              <th className="px-3 py-2.5 font-medium text-center text-gray-500">SI</th>
+              {TEE_COLOURS.map(t => (
+                <th key={t.key} className={`px-2 py-2.5 font-medium text-center min-w-[4.5rem] ${t.text}`}>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${t.bg}`}>{t.label}</span>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -297,16 +322,18 @@ function CourseForm({
                     className="w-16 text-center h-8 text-sm"
                   />
                 </td>
-                <td className="px-2 py-1.5">
-                  <Input
-                    type="number"
-                    min="0"
-                    value={hole.yards ?? ""}
-                    onChange={e => setHoleField(idx, "yards", e.target.value)}
-                    placeholder="—"
-                    className="w-20 text-center h-8 text-sm"
-                  />
-                </td>
+                {TEE_COLOURS.map(t => (
+                  <td key={t.key} className="px-1.5 py-1.5">
+                    <Input
+                      type="number"
+                      min="0"
+                      value={(hole[t.key as TeeKey] ?? hole.yards) ?? ""}
+                      onChange={e => setHoleField(idx, t.key as keyof Hole, e.target.value)}
+                      placeholder="—"
+                      className="w-[4rem] text-center h-8 text-sm"
+                    />
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
@@ -480,13 +507,32 @@ export default function CoursesPage() {
                             {course.holes.reduce((s, h) => s + h.par, 0)}
                           </td>
                         </tr>
-                        <tr className="text-center">
+                        <tr className="text-center border-b border-gray-50">
                           <td className="px-2 py-1.5 text-left text-gray-500 font-medium">SI</td>
                           {course.holes.map(h => (
                             <td key={h.number} className="px-1.5 py-1.5 text-gray-500">{h.strokeIndex}</td>
                           ))}
                           <td className="px-2 py-1.5" />
                         </tr>
+                        {TEE_COLOURS.map(t => {
+                          const hasData = course.holes.some(h => h[t.key as TeeKey] !== undefined);
+                          if (!hasData) return null;
+                          return (
+                            <tr key={t.key} className="text-center border-b border-gray-50 last:border-0">
+                              <td className={`px-2 py-1.5 text-left font-medium`}>
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${t.bg} ${t.text}`}>{t.label}</span>
+                              </td>
+                              {course.holes.map(h => (
+                                <td key={h.number} className="px-1.5 py-1.5 text-gray-500 text-[11px]">
+                                  {h[t.key as TeeKey] ?? "—"}
+                                </td>
+                              ))}
+                              <td className="px-2 py-1.5 text-gray-700 font-medium text-[11px]">
+                                {course.holes.reduce((s, h) => s + (h[t.key as TeeKey] ?? 0), 0) || "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

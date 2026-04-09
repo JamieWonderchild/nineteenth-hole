@@ -184,7 +184,11 @@ export default defineSchema({
       number: v.number(),       // 1–18
       par: v.number(),          // 3 | 4 | 5
       strokeIndex: v.number(),  // 1–18 (1 = hardest)
-      yards: v.optional(v.number()),
+      yards: v.optional(v.number()),        // legacy
+      yardsWhite: v.optional(v.number()),
+      yardsYellow: v.optional(v.number()),
+      yardsBlue: v.optional(v.number()),
+      yardsRed: v.optional(v.number()),
     })),
     createdAt: v.string(),
     updatedAt: v.string(),
@@ -205,6 +209,7 @@ export default defineSchema({
     // Scoring mode
     scoringMode: v.optional(v.string()),   // 'overall' | 'per_hole'
     courseId: v.optional(v.id("courses")), // linked course for auto-calc
+    teeColour: v.optional(v.string()),     // 'white' | 'yellow' | 'blue' | 'red'
     // Stake — how the money works
     stakePerPlayer: v.number(), // in pence/cents per player (0 = just for fun)
     settlementType: v.string(), // 'cash' | 'stripe'

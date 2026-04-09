@@ -26,6 +26,10 @@ export const upsert = mutation({
       par: v.number(),
       strokeIndex: v.number(),
       yards: v.optional(v.number()),
+      yardsWhite: v.optional(v.number()),
+      yardsYellow: v.optional(v.number()),
+      yardsBlue: v.optional(v.number()),
+      yardsRed: v.optional(v.number()),
     })),
   },
   handler: async (ctx, { courseId, clubId, name, holes }) => {

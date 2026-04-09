@@ -56,6 +56,7 @@ function NewGameModal({ open, onClose }: { open: boolean; onClose: () => void })
   const [type, setType] = useState("stableford");
   const [scoringMode, setScoringMode] = useState<"overall" | "per_hole">("overall");
   const [courseId, setCourseId] = useState<string>("");
+  const [teeColour, setTeeColour] = useState<string>("yellow");
   const [date, setDate] = useState(today);
   const [players, setPlayers] = useState([
     { id: generateId(), name: "", handicap: "" },
@@ -79,6 +80,7 @@ function NewGameModal({ open, onClose }: { open: boolean; onClose: () => void })
     setType("stableford");
     setScoringMode("overall");
     setCourseId("");
+    setTeeColour("yellow");
     setDate(today);
     setPlayers([
       { id: generateId(), name: "", handicap: "" },
@@ -133,6 +135,7 @@ function NewGameModal({ open, onClose }: { open: boolean; onClose: () => void })
         settlementType: "cash",
         scoringMode,
         courseId: (courseId || undefined) as never,
+        teeColour: courseId ? teeColour : undefined,
         players: filledPlayers.map(p => ({
           id: p.id,
           name: p.name.trim(),
@@ -222,18 +225,45 @@ function NewGameModal({ open, onClose }: { open: boolean; onClose: () => void })
                       No course card set up. Ask your club admin to add one under Course Card for auto-scoring.
                     </p>
                   ) : (
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Course (optional)</Label>
-                      <select
-                        value={courseId}
-                        onChange={e => setCourseId(e.target.value)}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        <option value="">No course (manual scores only)</option>
-                        {clubCourses.map(c => (
-                          <option key={c._id} value={c._id}>{c.name}</option>
-                        ))}
-                      </select>
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Course (optional)</Label>
+                        <select
+                          value={courseId}
+                          onChange={e => setCourseId(e.target.value)}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <option value="">No course (manual scores only)</option>
+                          {clubCourses.map(c => (
+                            <option key={c._id} value={c._id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {courseId && (
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Tees</Label>
+                          <div className="flex gap-2">
+                            {(["white", "yellow", "blue", "red"] as const).map(t => (
+                              <button
+                                key={t}
+                                type="button"
+                                onClick={() => setTeeColour(t)}
+                                className={cn(
+                                  "flex-1 py-1.5 rounded-lg border text-xs font-medium capitalize transition-all",
+                                  teeColour === t
+                                    ? t === "white" ? "border-gray-400 bg-gray-100 text-gray-800"
+                                      : t === "yellow" ? "border-yellow-400 bg-yellow-100 text-yellow-800"
+                                      : t === "blue" ? "border-blue-400 bg-blue-100 text-blue-800"
+                                      : "border-red-400 bg-red-100 text-red-700"
+                                    : "border-border hover:border-primary/40"
+                                )}
+                              >
+                                {t}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -35,16 +35,30 @@ function scoreHint(type: string) {
 
 // ── Per-hole scorecard ───────────────────────────────────────────────────────
 
-type CourseHole = { number: number; par: number; strokeIndex: number; yards?: number };
+type CourseHole = {
+  number: number; par: number; strokeIndex: number;
+  yards?: number;
+  yardsWhite?: number; yardsYellow?: number; yardsBlue?: number; yardsRed?: number;
+};
 type Player = { id: string; name: string; handicap?: number };
+
+function getYards(hole: CourseHole, tee?: string): number | undefined {
+  if (tee === "white")  return hole.yardsWhite  ?? hole.yards;
+  if (tee === "yellow") return hole.yardsYellow ?? hole.yards;
+  if (tee === "blue")   return hole.yardsBlue   ?? hole.yards;
+  if (tee === "red")    return hole.yardsRed    ?? hole.yards;
+  return hole.yardsYellow ?? hole.yardsWhite ?? hole.yards;
+}
 
 function PerHoleScorecard({
   game,
   course,
+  teeColour,
   onComplete,
 }: {
   game: { type: string; players: Player[] };
   course: { holes: CourseHole[] } | null;
+  teeColour?: string;
   onComplete: (scores: Array<{
     playerId: string;
     gross?: number;
@@ -133,6 +147,7 @@ function PerHoleScorecard({
               <th className="px-3 py-2.5 text-left font-medium sticky left-0 bg-white z-10 w-12">Hole</th>
               {course && <th className="px-2 py-2.5 font-medium text-center w-10">Par</th>}
               {course && <th className="px-2 py-2.5 font-medium text-center w-10">SI</th>}
+              {course && <th className="px-2 py-2.5 font-medium text-center w-14">Yds</th>}
               {game.players.map(p => (
                 <th key={p.id} className="px-2 py-2.5 font-medium text-center min-w-[5rem]">
                   <div className="truncate max-w-[5rem]">{p.name}</div>
@@ -154,6 +169,11 @@ function PerHoleScorecard({
                 )}
                 {course && (
                   <td className="px-2 py-1.5 text-center text-gray-400 text-xs">{hole.strokeIndex}</td>
+                )}
+                {course && (
+                  <td className="px-2 py-1.5 text-center text-gray-400 text-xs">
+                    {getYards(hole, teeColour) ?? "—"}
+                  </td>
                 )}
                 {game.players.map(p => {
                   const raw = holeInputs[p.id]?.[hole.number] ?? "";
@@ -190,6 +210,11 @@ function PerHoleScorecard({
               <td className="px-3 py-2.5 text-gray-700 sticky left-0 bg-gray-50">Total</td>
               {course && <td className="px-2 py-2.5 text-center text-gray-700">{holes.reduce((s, h) => s + h.par, 0)}</td>}
               {course && <td />}
+              {course && (
+                <td className="px-2 py-2.5 text-center text-gray-500 text-xs">
+                  {holes.reduce((s, h) => s + (getYards(h, teeColour) ?? 0), 0) || "—"}
+                </td>
+              )}
               {game.players.map(p => {
                 const t = totals.find(t => t.playerId === p.id)!;
                 return (
@@ -511,6 +536,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
                 <PerHoleScorecard
                   game={game}
                   course={course ?? null}
+                  teeColour={game.teeColour ?? undefined}
                   onComplete={handleCompletePerHole}
                 />
               )}
