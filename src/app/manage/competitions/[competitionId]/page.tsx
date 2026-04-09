@@ -194,6 +194,7 @@ export default function CompetitionManagePage({
   const [prizeEdits, setPrizeEdits] = useState<Record<string, string>>({}); // playerId → prize money string (in whole currency units)
   const [loading, setLoading] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   void user;
 
@@ -251,8 +252,6 @@ export default function CompetitionManagePage({
     await upsertScore({ playerId, r1, r2, r3, r4, totalScore, scoreToPar });
     setScoreEdits(prev => { const n = { ...prev }; delete n[playerId]; return n; });
   }
-
-  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   async function handleSyncESPN() {
     setLoading("sync");

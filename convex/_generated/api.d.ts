@@ -13,6 +13,7 @@ import type * as clubs from "../clubs.js";
 import type * as competitions from "../competitions.js";
 import type * as crons from "../crons.js";
 import type * as entries from "../entries.js";
+import type * as http from "../http.js";
 import type * as players from "../players.js";
 import type * as quickGames from "../quickGames.js";
 import type * as resultsImport from "../resultsImport.js";
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   competitions: typeof competitions;
   crons: typeof crons;
   entries: typeof entries;
+  http: typeof http;
   players: typeof players;
   quickGames: typeof quickGames;
   resultsImport: typeof resultsImport;
