@@ -7,7 +7,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, BookOpen, LogOut,
-  Globe, ChevronRight, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered, Clock
+  Globe, ChevronRight, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered, Clock, MapPin
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -141,6 +141,9 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               <NavItem href="/manage/tee-times" icon={<Clock size={16} />} label="Tee Times" active={pathname.startsWith("/manage/tee-times")} onClick={onNav} />
             ) : (
               <NavItem href={`/${club.slug}/tee-times`} icon={<Clock size={16} />} label="Tee Times" active={pathname.startsWith(`/${club.slug}/tee-times`)} onClick={onNav} />
+            )}
+            {isAdmin && (
+              <NavItem href="/manage/courses" icon={<MapPin size={16} />} label="Course Card" active={pathname.startsWith("/manage/courses")} onClick={onNav} />
             )}
             <div className="my-2 border-t border-border" />
             <NavItem href={`/${club.slug}`} icon={<ChevronRight size={16} />} label="View public page" active={false} onClick={onNav} />

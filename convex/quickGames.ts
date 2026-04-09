@@ -39,6 +39,8 @@ export const create = mutation({
     currency: v.string(),
     stakePerPlayer: v.number(), // pence/cents per player (0 = fun only)
     settlementType: v.string(), // 'cash' | 'stripe'
+    scoringMode: v.optional(v.string()), // 'overall' | 'per_hole'
+    courseId: v.optional(v.id("courses")),
     players: v.array(v.object({
       id: v.string(),
       name: v.string(),
@@ -64,15 +66,18 @@ export const create = mutation({
   },
 });
 
+const scoreArg = v.object({
+  playerId: v.string(),
+  gross: v.optional(v.number()),
+  net: v.optional(v.number()),
+  points: v.optional(v.number()),
+  holeScores: v.optional(v.array(v.object({ hole: v.number(), gross: v.number() }))),
+});
+
 export const updateScores = mutation({
   args: {
     gameId: v.id("quickGames"),
-    scores: v.array(v.object({
-      playerId: v.string(),
-      gross: v.optional(v.number()),
-      net: v.optional(v.number()),
-      points: v.optional(v.number()),
-    })),
+    scores: v.array(scoreArg),
   },
   handler: async (ctx, { gameId, scores }) => {
     await assertCreator(ctx, gameId);
@@ -83,18 +88,13 @@ export const updateScores = mutation({
 export const complete = mutation({
   args: {
     gameId: v.id("quickGames"),
-    scores: v.array(v.object({
-      playerId: v.string(),
-      gross: v.optional(v.number()),
-      net: v.optional(v.number()),
-      points: v.optional(v.number()),
-    })),
+    scores: v.array(scoreArg),
   },
   handler: async (ctx, { gameId, scores }) => {
     const game = await assertCreator(ctx, gameId);
 
     // Determine winner and settlement based on game type
-    type Score = { playerId: string; gross?: number; net?: number; points?: number };
+    type Score = { playerId: string; gross?: number; net?: number; points?: number; holeScores?: Array<{ hole: number; gross: number }> };
 
     let winnerIds: string[] = [];
     let summary = "";

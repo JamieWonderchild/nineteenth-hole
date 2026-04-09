@@ -11,6 +11,7 @@
 import type * as clubMembers from "../clubMembers.js";
 import type * as clubs from "../clubs.js";
 import type * as competitions from "../competitions.js";
+import type * as courses from "../courses.js";
 import type * as crons from "../crons.js";
 import type * as entries from "../entries.js";
 import type * as http from "../http.js";
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   clubMembers: typeof clubMembers;
   clubs: typeof clubs;
   competitions: typeof competitions;
+  courses: typeof courses;
   crons: typeof crons;
   entries: typeof entries;
   http: typeof http;

@@ -1,0 +1,75 @@
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
+
+export const listByClub = query({
+  args: { clubId: v.id("clubs") },
+  handler: async (ctx, { clubId }) => {
+    return ctx.db
+      .query("courses")
+      .withIndex("by_club", q => q.eq("clubId", clubId))
+      .collect();
+  },
+});
+
+export const get = query({
+  args: { courseId: v.id("courses") },
+  handler: async (ctx, { courseId }) => ctx.db.get(courseId),
+});
+
+export const upsert = mutation({
+  args: {
+    courseId: v.optional(v.id("courses")),
+    clubId: v.id("clubs"),
+    name: v.string(),
+    holes: v.array(v.object({
+      number: v.number(),
+      par: v.number(),
+      strokeIndex: v.number(),
+      yards: v.optional(v.number()),
+    })),
+  },
+  handler: async (ctx, { courseId, clubId, name, holes }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+    if (!isSuperAdmin) {
+      const member = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", clubId).eq("userId", identity.subject))
+        .unique();
+      if (!member || member.role !== "admin") throw new Error("Not authorised");
+    }
+
+    const now = new Date().toISOString();
+    if (courseId) {
+      await ctx.db.patch(courseId, { name, holes, updatedAt: now });
+      return courseId;
+    }
+    return ctx.db.insert("courses", { clubId, name, holes, createdAt: now, updatedAt: now });
+  },
+});
+
+export const remove = mutation({
+  args: { courseId: v.id("courses") },
+  handler: async (ctx, { courseId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const course = await ctx.db.get(courseId);
+    if (!course) throw new Error("Course not found");
+
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+    if (!isSuperAdmin) {
+      const member = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", course.clubId).eq("userId", identity.subject))
+        .unique();
+      if (!member || member.role !== "admin") throw new Error("Not authorised");
+    }
+
+    await ctx.db.delete(courseId);
+  },
+});

@@ -174,6 +174,24 @@ export default defineSchema({
     .index("by_stripe_session", ["stripeCheckoutSessionId"]),
 
   // ============================================================================
+  // Golf Courses (par + stroke index per hole — used for scoring calc)
+  // ============================================================================
+
+  courses: defineTable({
+    clubId: v.id("clubs"),
+    name: v.string(),           // "Main Course"
+    holes: v.array(v.object({
+      number: v.number(),       // 1–18
+      par: v.number(),          // 3 | 4 | 5
+      strokeIndex: v.number(),  // 1–18 (1 = hardest)
+      yards: v.optional(v.number()),
+    })),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_club", ["clubId"]),
+
+  // ============================================================================
   // Quick Games (informal rounds between friends)
   // ============================================================================
 
@@ -184,6 +202,9 @@ export default defineSchema({
     type: v.string(),
     status: v.string(),         // 'setup' | 'active' | 'complete'
     currency: v.string(),       // 'GBP' | 'EUR' | 'USD'
+    // Scoring mode
+    scoringMode: v.optional(v.string()),   // 'overall' | 'per_hole'
+    courseId: v.optional(v.id("courses")), // linked course for auto-calc
     // Stake — how the money works
     stakePerPlayer: v.number(), // in pence/cents per player (0 = just for fun)
     settlementType: v.string(), // 'cash' | 'stripe'
@@ -199,9 +220,14 @@ export default defineSchema({
     // Scores entered after the round
     scores: v.optional(v.array(v.object({
       playerId: v.string(),
-      gross: v.optional(v.number()),      // gross strokes
-      net: v.optional(v.number()),        // net (after handicap)
-      points: v.optional(v.number()),     // stableford points
+      gross: v.optional(v.number()),      // total gross strokes
+      net: v.optional(v.number()),        // total net (after handicap)
+      points: v.optional(v.number()),     // total stableford points
+      // Per-hole breakdown (populated when scoringMode === 'per_hole')
+      holeScores: v.optional(v.array(v.object({
+        hole: v.number(),
+        gross: v.number(),
+      }))),
     }))),
     // Result computed when completed
     result: v.optional(v.object({

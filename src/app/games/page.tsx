@@ -5,7 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import Link from "next/link";
-import { Plus, Zap, ChevronRight, X, Users } from "lucide-react";
+import { Plus, Zap, ChevronRight, X, Users, MapPin } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -42,10 +42,20 @@ function NewGameModal({ open, onClose }: { open: boolean; onClose: () => void })
   const router = useRouter();
   const createGame = useMutation(api.quickGames.create);
 
+  // Load user's club courses for course picker
+  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
+  const activeMembership = memberships?.find(m => m.status === "active");
+  const clubCourses = useQuery(
+    api.courses.listByClub,
+    activeMembership ? { clubId: activeMembership.clubId } : "skip"
+  );
+
   const today = new Date().toISOString().split("T")[0];
 
   const [step, setStep] = useState<1 | 2>(1);
   const [type, setType] = useState("stableford");
+  const [scoringMode, setScoringMode] = useState<"overall" | "per_hole">("overall");
+  const [courseId, setCourseId] = useState<string>("");
   const [date, setDate] = useState(today);
   const [players, setPlayers] = useState([
     { id: generateId(), name: "", handicap: "" },
@@ -67,6 +77,8 @@ function NewGameModal({ open, onClose }: { open: boolean; onClose: () => void })
   function resetAndClose() {
     setStep(1);
     setType("stableford");
+    setScoringMode("overall");
+    setCourseId("");
     setDate(today);
     setPlayers([
       { id: generateId(), name: "", handicap: "" },
@@ -119,6 +131,8 @@ function NewGameModal({ open, onClose }: { open: boolean; onClose: () => void })
         currency,
         stakePerPlayer,
         settlementType: "cash",
+        scoringMode,
+        courseId: (courseId || undefined) as never,
         players: filledPlayers.map(p => ({
           id: p.id,
           name: p.name.trim(),
@@ -172,6 +186,58 @@ function NewGameModal({ open, onClose }: { open: boolean; onClose: () => void })
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Scoring mode */}
+            <div className="space-y-2">
+              <Label>Scoring</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { id: "overall", label: "Overall", desc: "Enter final score after the round" },
+                  { id: "per_hole", label: "Per hole", desc: "Enter gross per hole — auto-calculates stableford / net" },
+                ] as const).map(m => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setScoringMode(m.id)}
+                    className={cn(
+                      "text-left px-4 py-3 rounded-lg border text-sm transition-all",
+                      scoringMode === m.id
+                        ? "border-primary bg-primary/5 text-primary font-medium"
+                        : "border-border hover:border-primary/40 hover:bg-accent/50"
+                    )}
+                  >
+                    {m.label}
+                    <span className="block text-xs text-muted-foreground font-normal mt-0.5">{m.desc}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Course picker — only shown for per-hole mode */}
+              {scoringMode === "per_hole" && (
+                <div className="mt-2">
+                  {(!clubCourses || clubCourses.length === 0) ? (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                      <MapPin size={12} />
+                      No course card set up. Ask your club admin to add one under Course Card for auto-scoring.
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Course (optional)</Label>
+                      <select
+                        value={courseId}
+                        onChange={e => setCourseId(e.target.value)}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <option value="">No course (manual scores only)</option>
+                        {clubCourses.map(c => (
+                          <option key={c._id} value={c._id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Players */}
