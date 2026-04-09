@@ -3,7 +3,8 @@
 import { useQuery, useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { useClerk } from "@clerk/nextjs";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import Link from "next/link";
@@ -62,6 +63,7 @@ export default function ClubPage({ params }: { params: Promise<{ clubSlug: strin
   const { clubSlug } = use(params);
   const { user } = useUser();
   const { openSignIn } = useClerk();
+  const router = useRouter();
   const [joining, setJoining] = useState(false);
   const [joined, setJoined] = useState(false);
 
@@ -86,6 +88,13 @@ export default function ClubPage({ params }: { params: Promise<{ clubSlug: strin
   );
 
   const activeSeries = seriesList?.find(s => s.status === "active");
+
+  // Active members get the full dashboard — no need to see the public page
+  useEffect(() => {
+    if (membership?.status === "active") {
+      router.replace("/manage");
+    }
+  }, [membership, router]);
 
   async function handleJoin() {
     if (!user) { openSignIn(); return; }
