@@ -102,6 +102,18 @@ export const enterFree = mutation({
     if (existing.length > 0) return existing[0]._id;
 
     const now = new Date().toISOString();
+
+    // Auto-approve pending club membership — entering a competition = accepting an invitation
+    if (args.clubId) {
+      const member = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", args.clubId!).eq("userId", args.userId))
+        .unique();
+      if (member && member.status === "pending") {
+        await ctx.db.patch(member._id, { status: "active", updatedAt: now });
+      }
+    }
+
     return ctx.db.insert("entries", {
       competitionId: args.competitionId,
       clubId: args.clubId,
