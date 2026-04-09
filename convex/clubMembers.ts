@@ -133,6 +133,79 @@ export const rejectMember = mutation({
   },
 });
 
+// Users who have entries but no club membership — for super admin assignment
+export const listOrphans = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    if (!identity?.email || !superAdminEmails.includes(identity.email)) return [];
+
+    const allEntries = await ctx.db.query("entries").collect();
+    const allMembers = await ctx.db.query("clubMembers").collect();
+    const memberUserIds = new Set(allMembers.map(m => m.userId));
+
+    // Collect unique orphan users by userId
+    const orphanMap = new Map<string, { userId: string; displayName: string; entryCount: number }>();
+    for (const entry of allEntries) {
+      if (!memberUserIds.has(entry.userId)) {
+        const existing = orphanMap.get(entry.userId);
+        if (existing) {
+          existing.entryCount++;
+        } else {
+          orphanMap.set(entry.userId, {
+            userId: entry.userId,
+            displayName: entry.displayName,
+            entryCount: 1,
+          });
+        }
+      }
+    }
+    return Array.from(orphanMap.values());
+  },
+});
+
+// Super admin assigns an orphan user to a club (creates active membership)
+export const assignToClub = mutation({
+  args: {
+    userId: v.string(),
+    clubId: v.id("clubs"),
+    displayName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    if (!identity?.email || !superAdminEmails.includes(identity.email)) throw new Error("Not authorised");
+
+    const existing = await ctx.db
+      .query("clubMembers")
+      .withIndex("by_club_and_user", q => q.eq("clubId", args.clubId).eq("userId", args.userId))
+      .unique();
+    if (existing) {
+      // Upgrade pending to active if needed
+      if (existing.status !== "active") {
+        await ctx.db.patch(existing._id, { status: "active", updatedAt: new Date().toISOString() });
+      }
+      return existing._id;
+    }
+
+    const now = new Date().toISOString();
+    return ctx.db.insert("clubMembers", {
+      clubId: args.clubId,
+      userId: args.userId,
+      role: "member",
+      status: "active",
+      displayName: args.displayName,
+      totalEntered: 0,
+      totalSpent: 0,
+      totalWon: 0,
+      totalProfit: 0,
+      joinedAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
 // Called when a competition resolves — update cumulative stats
 export const recordCompetitionResult = mutation({
   args: {
