@@ -3,7 +3,7 @@
 import { useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
@@ -187,6 +187,7 @@ export default function CompetitionManagePage({
   const upsertScore = useMutation(api.players.upsertScore);
   const updatePrizeMoney = useMutation(api.players.updatePrizeMoney);
   const refreshLeaderboard = useMutation(api.entries.refreshLeaderboard);
+  const syncESPN = useAction(api.competitions.syncESPNPrizeMoney);
 
   const [scoreEdits, setScoreEdits] = useState<Record<string, { r1?: string; r2?: string; r3?: string; r4?: string }>>({});
   const [prizeEdits, setPrizeEdits] = useState<Record<string, string>>({}); // playerId → prize money string (in whole currency units)
@@ -246,6 +247,20 @@ export default function CompetitionManagePage({
     const scoreToPar = totalScore !== undefined ? totalScore - par * rounds.length : undefined;
     await upsertScore({ playerId, r1, r2, r3, r4, totalScore, scoreToPar });
     setScoreEdits(prev => { const n = { ...prev }; delete n[playerId]; return n; });
+  }
+
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+
+  async function handleSyncESPN() {
+    setLoading("sync");
+    setSyncMsg(null);
+    try {
+      const result = await syncESPN({ competitionId: competitionId as Id<"competitions"> });
+      setSyncMsg(result.message);
+    } catch (err) {
+      setSyncMsg(err instanceof Error ? err.message : "Sync failed");
+    }
+    setLoading(null);
   }
 
   async function handleSavePrizeMoney(playerId: Id<"players">) {
@@ -337,6 +352,12 @@ export default function CompetitionManagePage({
             </div>
           )}
 
+          {syncMsg && (
+            <p className={`text-sm rounded-lg px-4 py-2.5 mb-2 ${syncMsg.includes("failed") || syncMsg.includes("error") ? "bg-red-50 text-red-700 border border-red-200" : "bg-blue-50 text-blue-800 border border-blue-200"}`}>
+              {syncMsg}
+            </p>
+          )}
+
           <div className="flex flex-wrap gap-2">
             {/* Load players */}
             {players.length === 0 && (competition.type === "major" || competition.type === "tour" || competition.scope === "platform") && (
@@ -383,6 +404,16 @@ export default function CompetitionManagePage({
 
             {competition.status === "live" && (
               <>
+                {isPickFormat && competition.tournamentRef && (
+                  <Button
+                    size="sm"
+                    onClick={handleSyncESPN}
+                    disabled={loading === "sync"}
+                    className="bg-blue-600 hover:bg-blue-500 text-white"
+                  >
+                    {loading === "sync" ? "Syncing…" : "⚡ Sync prize money from ESPN"}
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -399,6 +430,16 @@ export default function CompetitionManagePage({
                   Mark complete
                 </Button>
               </>
+            )}
+            {competition.status === "complete" && isPickFormat && competition.tournamentRef && (
+              <Button
+                size="sm"
+                onClick={handleSyncESPN}
+                disabled={loading === "sync"}
+                variant="outline"
+              >
+                {loading === "sync" ? "Syncing…" : "⚡ Re-sync prize money from ESPN"}
+              </Button>
             )}
 
             {nextStatus && !["draft", "open", "live"].includes(competition.status) && (

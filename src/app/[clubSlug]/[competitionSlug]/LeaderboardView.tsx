@@ -117,7 +117,7 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
                   </div>
                   {isPickFormat && myEntry.totalPrizeMoney !== undefined && (
                     <div className="text-sm font-bold text-green-800">
-                      £{(myEntry.totalPrizeMoney / 100).toLocaleString()} total
+                      ${(myEntry.totalPrizeMoney / 100).toLocaleString("en-US")} total
                     </div>
                   )}
                 </div>
@@ -141,7 +141,7 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
                         {isReserve && <div className="text-xs text-amber-600 font-medium mt-0.5">Reserve</div>}
                         {isPickFormat && player.prizeMoney !== undefined && (
                           <div className="text-xs font-bold text-green-700 mt-1">
-                            £{(player.prizeMoney / 100).toLocaleString()}
+                            ${(player.prizeMoney / 100).toLocaleString("en-US")}
                           </div>
                         )}
                         {!isPickFormat && player.scoreToPar !== undefined && (
@@ -207,7 +207,7 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
                         {isPickFormat ? (
                           entry.totalPrizeMoney !== undefined ? (
                             <div className="font-bold text-base text-green-700">
-                              £{(entry.totalPrizeMoney / 100).toLocaleString()}
+                              ${(entry.totalPrizeMoney / 100).toLocaleString("en-US")}
                             </div>
                           ) : (
                             <div className="text-gray-400 text-sm">picks in</div>
