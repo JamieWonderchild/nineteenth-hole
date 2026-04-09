@@ -3,6 +3,7 @@
 import { useQuery } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "convex/_generated/api";
+import type { Id } from "convex/_generated/dataModel";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/format";
 import { use } from "react";
@@ -21,6 +22,40 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
+function SeriesStandingsWidget({ seriesId }: { seriesId: Id<"series"> }) {
+  const standings = useQuery(api.series.computeStandings, { seriesId });
+
+  if (!standings || standings.length === 0) return null;
+
+  const top5 = standings.slice(0, 5);
+
+  return (
+    <section>
+      <h2 className="text-base font-semibold text-gray-900 mb-3">Series Standings</h2>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 text-left text-gray-500">
+              <th className="px-4 py-2.5 font-medium">#</th>
+              <th className="px-4 py-2.5 font-medium">Member</th>
+              <th className="px-4 py-2.5 font-medium text-right">Points</th>
+            </tr>
+          </thead>
+          <tbody>
+            {top5.map((row, i) => (
+              <tr key={i} className="border-b border-gray-50 last:border-0">
+                <td className="px-4 py-2.5 text-gray-400 font-mono text-xs">{i + 1}</td>
+                <td className="px-4 py-2.5 font-medium text-gray-900">{row.displayName}</td>
+                <td className="px-4 py-2.5 text-right font-semibold text-green-700">{row.total}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export default function ClubPage({ params }: { params: Promise<{ clubSlug: string }> }) {
   const { clubSlug } = use(params);
   const { user } = useUser();
@@ -34,9 +69,16 @@ export default function ClubPage({ params }: { params: Promise<{ clubSlug: strin
     api.clubMembers.getByClubAndUser,
     club && user ? { clubId: club._id, userId: user.id } : "skip"
   );
-  const ensureMember = null; // not imported — member joins via competition entry
+  const membersList = useQuery(
+    api.clubMembers.listByClub,
+    club ? { clubId: club._id } : "skip"
+  );
+  const seriesList = useQuery(
+    api.series.listByClub,
+    club ? { clubId: club._id } : "skip"
+  );
 
-  void ensureMember;
+  const activeSeries = seriesList?.find(s => s.status === "active");
 
   if (club === undefined) {
     return (
@@ -58,7 +100,6 @@ export default function ClubPage({ params }: { params: Promise<{ clubSlug: strin
     );
   }
 
-  const sym = club.currency === "GBP" ? "£" : club.currency === "EUR" ? "€" : "$";
   const activeComps = (competitions ?? []).filter(c => c.status !== "complete");
   const pastComps = (competitions ?? []).filter(c => c.status === "complete");
 
@@ -78,6 +119,9 @@ export default function ClubPage({ params }: { params: Promise<{ clubSlug: strin
                 {activeComps.length > 0
                   ? `${activeComps.length} active competition${activeComps.length !== 1 ? "s" : ""}`
                   : "No active competitions right now"}
+                {membersList && membersList.length > 0 && (
+                  <span> · {membersList.length} member{membersList.length !== 1 ? "s" : ""}</span>
+                )}
               </p>
             </div>
             {membership?.status === "active" && membership.role === "admin" && (
@@ -114,7 +158,7 @@ export default function ClubPage({ params }: { params: Promise<{ clubSlug: strin
                       {new Date(comp.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                       {" – "}
                       {new Date(comp.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                      {comp.entryFee > 0 && ` · ${sym}${(comp.entryFee / 100).toFixed(0)} entry`}
+                      {comp.entryFee > 0 && ` · ${formatCurrency(comp.entryFee, comp.currency)} entry`}
                     </p>
                     {comp.status === "open" && new Date(comp.entryDeadline) > new Date() && (
                       <p className="text-xs text-amber-600 mt-0.5">
@@ -125,7 +169,7 @@ export default function ClubPage({ params }: { params: Promise<{ clubSlug: strin
                   <div className="flex items-center gap-2">
                     {comp.status === "open" && (
                       <span className="px-3 py-1.5 bg-green-700 text-white text-xs font-medium rounded-lg group-hover:bg-green-600 transition-colors">
-                        Enter {formatCurrency(comp.entryFee + Math.round(comp.entryFee * 0.1), comp.currency)}
+                        Enter {formatCurrency(comp.entryFee, comp.currency)}
                       </span>
                     )}
                     {comp.status === "live" && (
@@ -145,6 +189,11 @@ export default function ClubPage({ params }: { params: Promise<{ clubSlug: strin
             <p className="text-gray-500">No active competitions right now.</p>
             <p className="text-gray-400 text-sm mt-1">Check back soon — new pools are added before each major.</p>
           </div>
+        )}
+
+        {/* Series standings */}
+        {activeSeries && (
+          <SeriesStandingsWidget seriesId={activeSeries._id} />
         )}
 
         {/* Past competitions */}

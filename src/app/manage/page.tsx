@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
@@ -36,6 +37,8 @@ export default function ManagePage() {
   );
   const approveMember = useMutation(api.clubMembers.approveMember);
   const rejectMember = useMutation(api.clubMembers.rejectMember);
+
+  const [copied, setCopied] = useState(false);
 
   // Super admin with no club → redirect to platform overview
   useEffect(() => {
@@ -74,6 +77,17 @@ export default function ManagePage() {
   const openCount = competitions.filter(c => c.status === "open").length;
   const activeComps = competitions.filter(c => c.status !== "complete");
 
+  const inviteUrl = typeof window !== "undefined"
+    ? `https://${window.location.hostname}/${club.slug}`
+    : `https://playthepool.golf/${club.slug}`;
+
+  function handleCopyLink() {
+    navigator.clipboard.writeText(inviteUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
       {/* Page title */}
@@ -104,6 +118,27 @@ export default function ManagePage() {
           </div>
         ))}
       </div>
+
+      {/* Invite members */}
+      <section>
+        <h2 className="text-base font-semibold text-gray-900 mb-3">Invite members</h2>
+        <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
+          <p className="text-sm text-gray-500 mb-3">
+            Share this link with your members so they can find and enter your competitions.
+          </p>
+          <div className="flex items-center gap-3">
+            <code className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-700 font-mono overflow-x-auto whitespace-nowrap">
+              {inviteUrl}
+            </code>
+            <button
+              onClick={handleCopyLink}
+              className="shrink-0 px-4 py-2.5 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors"
+            >
+              {copied ? "Copied!" : "Copy link"}
+            </button>
+          </div>
+        </div>
+      </section>
 
       {/* Pending membership requests */}
       {pendingMembers && pendingMembers.length > 0 && (
