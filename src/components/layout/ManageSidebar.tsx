@@ -7,7 +7,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, BookOpen, LogOut,
-  Globe, ChevronRight, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered, Clock, MapPin
+  Globe, ChevronRight, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered, Clock, MapPin,
+  MessageSquare, BookUser
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -65,6 +66,10 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
   const platformPools = useQuery(
     api.competitions.listPlatform,
     superAdmin === true ? {} : "skip"
+  );
+  const unreadCount = useQuery(
+    api.messaging.totalUnread,
+    user ? { userId: user.id } : "skip"
   );
 
   const is = (path: string) => pathname === path;
@@ -145,6 +150,14 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
             {isAdmin && (
               <NavItem href="/manage/courses" icon={<MapPin size={16} />} label="Course Card" active={pathname.startsWith("/manage/courses")} onClick={onNav} />
             )}
+            <NavItem href="/manage/directory" icon={<BookUser size={16} />} label="Member Directory" active={pathname.startsWith("/manage/directory")} onClick={onNav} />
+            <NavItem
+              href="/messages"
+              icon={<MessageSquare size={16} />}
+              label={unreadCount ? `Messages (${unreadCount})` : "Messages"}
+              active={pathname.startsWith("/messages")}
+              onClick={onNav}
+            />
             <div className="my-2 border-t border-border" />
             <NavItem href={`/${club.slug}`} icon={<ChevronRight size={16} />} label="View public page" active={false} onClick={onNav} />
           </>

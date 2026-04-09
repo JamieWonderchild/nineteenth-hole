@@ -261,6 +261,64 @@ export const recordCompetitionResult = mutation({
   },
 });
 
+// Update a member's own directory profile
+export const updateProfile = mutation({
+  args: {
+    clubId: v.id("clubs"),
+    userId: v.string(),
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    bio: v.optional(v.string()),
+    directoryVisible: v.optional(v.boolean()),
+    showPhone: v.optional(v.boolean()),
+    showEmail: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity || identity.subject !== args.userId) throw new Error("Unauthorised");
+
+    const member = await ctx.db
+      .query("clubMembers")
+      .withIndex("by_club_and_user", q => q.eq("clubId", args.clubId).eq("userId", args.userId))
+      .unique();
+    if (!member) throw new Error("Member not found");
+
+    await ctx.db.patch(member._id, {
+      phone: args.phone,
+      email: args.email,
+      bio: args.bio,
+      directoryVisible: args.directoryVisible,
+      showPhone: args.showPhone,
+      showEmail: args.showEmail,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+// Admin sets a member's membership category
+export const setMembershipCategory = mutation({
+  args: { memberId: v.id("clubMembers"), membershipCategory: v.string() },
+  handler: async (ctx, { memberId, membershipCategory }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const member = await ctx.db.get(memberId);
+    if (!member) throw new Error("Member not found");
+
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+    if (!isSuperAdmin) {
+      const caller = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", member.clubId).eq("userId", identity.subject))
+        .unique();
+      if (!caller || caller.role !== "admin") throw new Error("Not authorised");
+    }
+
+    await ctx.db.patch(memberId, { membershipCategory, updatedAt: new Date().toISOString() });
+  },
+});
+
 export const setRole = mutation({
   args: { memberId: v.id("clubMembers"), role: v.string() },
   handler: async (ctx, { memberId, role }) => {

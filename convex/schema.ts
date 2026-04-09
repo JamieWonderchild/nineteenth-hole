@@ -53,6 +53,14 @@ export default defineSchema({
     // Timestamps
     joinedAt: v.string(),
     updatedAt: v.string(),
+    // Member directory profile (optional, member-controlled)
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    bio: v.optional(v.string()),
+    membershipCategory: v.optional(v.string()), // e.g. "Full Member", "Social", "Junior"
+    directoryVisible: v.optional(v.boolean()),  // default true when absent
+    showPhone: v.optional(v.boolean()),
+    showEmail: v.optional(v.boolean()),
   })
     .index("by_club", ["clubId"])
     .index("by_club_and_user", ["clubId", "userId"])
@@ -360,4 +368,40 @@ export default defineSchema({
     processedAt: v.string(),
   })
     .index("by_event_id", ["eventId"]),
+
+  // ============================================================================
+  // Messaging
+  // ============================================================================
+
+  conversations: defineTable({
+    type: v.string(),                       // 'direct' | 'group'
+    clubId: v.optional(v.id("clubs")),      // set for club group chats
+    name: v.optional(v.string()),           // group chat name
+    createdBy: v.string(),                  // userId
+    lastMessageAt: v.optional(v.string()),  // ISO — for sorting
+    createdAt: v.string(),
+  })
+    .index("by_club", ["clubId"]),
+
+  conversationMembers: defineTable({
+    conversationId: v.id("conversations"),
+    userId: v.string(),
+    displayName: v.string(),               // denormalised for display
+    avatarUrl: v.optional(v.string()),
+    lastReadAt: v.optional(v.string()),    // ISO — for unread count
+    joinedAt: v.string(),
+  })
+    .index("by_conversation", ["conversationId"])
+    .index("by_user", ["userId"])
+    .index("by_conversation_and_user", ["conversationId", "userId"]),
+
+  messages: defineTable({
+    conversationId: v.id("conversations"),
+    senderId: v.string(),
+    senderName: v.string(),
+    senderAvatar: v.optional(v.string()),
+    body: v.string(),
+    createdAt: v.string(),
+  })
+    .index("by_conversation", ["conversationId"]),
 });
