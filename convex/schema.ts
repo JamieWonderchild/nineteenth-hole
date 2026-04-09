@@ -22,13 +22,16 @@ export default defineSchema({
     // Settings
     currency: v.string(),       // 'GBP' | 'EUR' | 'USD'
     defaultEntryFee: v.optional(v.number()), // in pence/cents
+    // Data import — scoped token for Alan's results scraper (not a global secret)
+    importToken: v.optional(v.string()),
     // Timestamps
     createdAt: v.string(),
     updatedAt: v.string(),
   })
     .index("by_slug", ["slug"])
     .index("by_clerk_org", ["clerkOrgId"])
-    .index("by_stripe_customer", ["stripeCustomerId"]),
+    .index("by_stripe_customer", ["stripeCustomerId"])
+    .index("by_import_token", ["importToken"]),
 
   // Club members — one row per (club, user) pair
   // Accumulates stats across all competitions at this club

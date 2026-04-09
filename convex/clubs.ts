@@ -96,6 +96,35 @@ export const create = mutation({
   },
 });
 
+// Generate (or rotate) the club's import token — club admin only
+export const generateImportToken = mutation({
+  args: { clubId: v.id("clubs") },
+  handler: async (ctx, { clubId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    // Allow club admin or super admin
+    const superAdminEmails = getSuperAdminEmails();
+    const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+    if (!isSuperAdmin) {
+      const member = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", clubId).eq("userId", identity.subject))
+        .unique();
+      if (!member || member.role !== "admin") throw new Error("Not authorised");
+    }
+
+    // Generate a URL-safe random token prefixed so it's recognisable
+    const bytes = Array.from({ length: 24 }, () =>
+      Math.floor(Math.random() * 36).toString(36)
+    ).join("");
+    const token = `ptp_${bytes}`;
+
+    await ctx.db.patch(clubId, { importToken: token, updatedAt: new Date().toISOString() });
+    return token;
+  },
+});
+
 export const updateStripeCustomer = mutation({
   args: {
     clubId: v.id("clubs"),

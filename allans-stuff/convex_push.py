@@ -20,10 +20,14 @@ Usage (from Finchley_Results.py):
 
 Configuration:
     Set the following as Windows environment variables (same approach as FGC credentials):
-        CONVEX_URL      — your Convex HTTP URL, e.g. https://happy-animal-123.convex.site
-        CONVEX_API_KEY  — the IMPORT_API_KEY value set in your Convex dashboard env vars
+        CONVEX_URL        — Convex HTTP URL, e.g. https://happy-animal-123.convex.site
+        FGC_IMPORT_TOKEN  — the club import token shown in the Play The Pool admin panel
+                            (Manage → scroll to "Data Import" → copy the ptp_... token)
 
     Or pass them directly to push_competition() as keyword args.
+
+    The import token is club-scoped — it can only push results for Finchley GC.
+    If it ever needs to be changed, the admin regenerates it from the dashboard.
 
 Category mapping (matches Finchley RTSF weights):
     "stableford" — Walk On, Midweek Stableford, etc.          (weight 1, best 4 count)
@@ -43,7 +47,7 @@ import requests
 # Default config from environment (same pattern as FGC credentials)
 # ---------------------------------------------------------------------------
 CONVEX_URL    = os.environ.get("CONVEX_URL", "")
-CONVEX_API_KEY = os.environ.get("CONVEX_API_KEY", "")
+IMPORT_TOKEN  = os.environ.get("FGC_IMPORT_TOKEN", "")
 CLUB_SLUG     = os.environ.get("FGC_CLUB_SLUG", "finchley-golf-club")
 
 # Competition name → RTSF category

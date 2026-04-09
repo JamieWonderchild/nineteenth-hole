@@ -37,8 +37,11 @@ export default function ManagePage() {
   );
   const approveMember = useMutation(api.clubMembers.approveMember);
   const rejectMember = useMutation(api.clubMembers.rejectMember);
+  const generateImportToken = useMutation(api.clubs.generateImportToken);
 
   const [copied, setCopied] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
+  const [generatingToken, setGeneratingToken] = useState(false);
 
   // Super admin with no club → redirect to platform overview
   useEffect(() => {
@@ -86,6 +89,24 @@ export default function ManagePage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  }
+
+  function handleCopyToken() {
+    if (!club?.importToken) return;
+    navigator.clipboard.writeText(club.importToken).then(() => {
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 2000);
+    });
+  }
+
+  async function handleGenerateToken() {
+    if (!club) return;
+    setGeneratingToken(true);
+    try {
+      await generateImportToken({ clubId: club._id });
+    } finally {
+      setGeneratingToken(false);
+    }
   }
 
   return (
@@ -204,6 +225,46 @@ export default function ManagePage() {
             ))}
           </div>
         )}
+      </section>
+
+      {/* Data Import */}
+      <section>
+        <h2 className="text-base font-semibold text-gray-900 mb-3">Data import</h2>
+        <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-3">
+          <p className="text-sm text-gray-500">
+            Give this token to your results scraper. It can only push results for{" "}
+            <span className="font-medium text-gray-700">{club.name}</span> — it cannot
+            access any other data. Regenerate it at any time to revoke the old one.
+          </p>
+          {club.importToken ? (
+            <div className="flex items-center gap-3">
+              <code className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-700 font-mono overflow-x-auto whitespace-nowrap">
+                {club.importToken}
+              </code>
+              <button
+                onClick={handleCopyToken}
+                className="shrink-0 px-4 py-2.5 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors"
+              >
+                {tokenCopied ? "Copied!" : "Copy"}
+              </button>
+              <button
+                onClick={handleGenerateToken}
+                disabled={generatingToken}
+                className="shrink-0 px-4 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                Regenerate
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleGenerateToken}
+              disabled={generatingToken}
+              className="px-4 py-2.5 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
+            >
+              {generatingToken ? "Generating…" : "Generate import token"}
+            </button>
+          )}
+        </div>
       </section>
 
       {/* Club leaderboard */}
