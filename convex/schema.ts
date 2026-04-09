@@ -76,9 +76,13 @@ export default defineSchema({
     endDate: v.string(),        // ISO date of final round
     entryDeadline: v.string(),  // ISO datetime — draw runs after this
     // Draw config
-    drawType: v.string(),       // 'tiered' | 'random' | 'draft'
-    tierCount: v.number(),      // how many tiers (usually 3)
-    playersPerTier: v.number(), // how many players each entrant draws per tier
+    // 'tiered' | 'random' | 'draft' | 'pick' (pick = members choose their own players)
+    drawType: v.string(),
+    tierCount: v.number(),      // how many tiers (usually 3; 0 for pick format)
+    playersPerTier: v.number(), // how many players per tier (0 for pick format)
+    // Pick-format config (drawType === 'pick')
+    pickCount: v.optional(v.number()),   // how many players each entrant picks (default 5)
+    reserveCount: v.optional(v.number()), // how many reserves (default 1)
     // Financials
     entryFee: v.number(),       // in pence/cents
     currency: v.string(),
@@ -119,6 +123,8 @@ export default defineSchema({
     position: v.optional(v.number()),    // current leaderboard position
     madeCut: v.optional(v.boolean()),
     withdrawn: v.optional(v.boolean()),
+    // Prize money (for pick-format competitions scored by prize money)
+    prizeMoney: v.optional(v.number()), // in pence/cents
     // External IDs for score feed matching
     espnPlayerId: v.optional(v.string()),
   })
@@ -138,12 +144,16 @@ export default defineSchema({
     paidAt: v.optional(v.string()),
     stripePaymentIntentId: v.optional(v.string()),
     stripeCheckoutSessionId: v.optional(v.string()),
-    // Drawn players — populated after draw ceremony
-    drawnPlayerIds: v.optional(v.array(v.id("players"))), // one per tier
+    // Drawn players — populated after draw ceremony (or chosen players for pick format)
+    drawnPlayerIds: v.optional(v.array(v.id("players"))), // one per tier, or N for pick
+    // Reserve picks (pick format only) — activated if two entries share same 5 picks
+    reservePlayerIds: v.optional(v.array(v.id("players"))),
     // Computed standings — updated as scores come in
     bestPlayerScore: v.optional(v.number()), // scoreToPar of their best player
     bestPlayerPosition: v.optional(v.number()),
     leaderboardPosition: v.optional(v.number()),
+    // Prize money total (pick format — sum of picked players' prizeMoney)
+    totalPrizeMoney: v.optional(v.number()), // pence/cents
     // Prize
     prizeWon: v.optional(v.number()), // pence/cents, set on competition complete
     createdAt: v.string(),

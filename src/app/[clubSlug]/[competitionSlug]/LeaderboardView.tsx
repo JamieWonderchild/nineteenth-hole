@@ -29,12 +29,12 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
     api.players.listByCompetition,
     competition ? { competitionId: competition._id } : "skip"
   );
-  const myEntry = useQuery(
-    api.entries.getByCompetitionAndUser,
+  const myEntries = useQuery(
+    api.entries.listByCompetitionAndUser,
     competition && user ? { competitionId: competition._id, userId: user.id } : "skip"
   );
 
-  if (!club || !competition || !entries || !players) {
+  if (!club || !competition || !entries || !players || myEntries === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
@@ -48,6 +48,8 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
   const sortedEntries = [...paidEntries].sort((a, b) =>
     (a.leaderboardPosition ?? 999) - (b.leaderboardPosition ?? 999)
   );
+  const isPickFormat = competition.drawType === "pick";
+  const myPaidEntries = (myEntries ?? []).filter(e => e.paidAt);
 
   const prizeAmounts = competition.prizeStructure.map(p => ({
     position: p.position,
@@ -104,40 +106,70 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
           </div>
         </div>
 
-        {/* My entry card */}
-        {myEntry && myEntry.paidAt && myEntry.drawnPlayerIds && (
-          <div className="bg-green-50 border border-green-200 rounded-xl p-5">
-            <div className="text-xs text-green-700 font-medium uppercase tracking-wide mb-3">Your entry</div>
-            <div className="grid grid-cols-3 gap-3">
-              {myEntry.drawnPlayerIds.map((pid, i) => {
-                const player = playerMap.get(pid);
-                if (!player) return null;
-                return (
-                  <div key={pid} className="bg-white rounded-lg p-3 text-center border border-green-100">
-                    <div className={`text-xs font-medium mb-1 ${
-                      player.tier === 1 ? "text-amber-600" :
-                      player.tier === 2 ? "text-blue-600" : "text-gray-500"
-                    }`}>
-                      Tier {player.tier}
-                    </div>
-                    <div className="font-semibold text-gray-900 text-sm leading-tight">{player.name}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">{player.country}</div>
-                    {player.scoreToPar !== undefined && (
-                      <div className={`text-sm font-bold mt-1 ${player.scoreToPar < 0 ? "text-green-700" : player.scoreToPar > 0 ? "text-red-600" : "text-gray-700"}`}>
-                        {scoreLabel(player.scoreToPar)}
-                      </div>
-                    )}
-                    {player.position && (
-                      <div className="text-xs text-gray-500">T{player.position}</div>
-                    )}
+        {/* My entries card */}
+        {myPaidEntries.length > 0 && (
+          <div className="space-y-3">
+            {myPaidEntries.map((myEntry, teamIdx) => (
+              <div key={myEntry._id} className="bg-green-50 border border-green-200 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-xs text-green-700 font-medium uppercase tracking-wide">
+                    {isPickFormat && myPaidEntries.length > 1 ? `Your team ${teamIdx + 1}` : "Your entry"}
                   </div>
-                );
-              })}
-            </div>
-            {myEntry.leaderboardPosition && (
-              <div className="mt-3 text-center text-sm text-green-800 font-medium">
-                You're currently {ordinal(myEntry.leaderboardPosition)} in the pool
+                  {isPickFormat && myEntry.totalPrizeMoney !== undefined && (
+                    <div className="text-sm font-bold text-green-800">
+                      £{(myEntry.totalPrizeMoney / 100).toLocaleString()} total
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  {(myEntry.drawnPlayerIds ?? []).map(pid => {
+                    const player = playerMap.get(pid);
+                    if (!player) return null;
+                    const isReserve = myEntry.reservePlayerIds?.includes(pid);
+                    return (
+                      <div key={pid} className="bg-white rounded-lg p-3 text-center border border-green-100">
+                        {isPickFormat ? (
+                          <div className="text-xs font-medium mb-1 text-gray-400">#{player.worldRanking}</div>
+                        ) : (
+                          <div className={`text-xs font-medium mb-1 ${
+                            player.tier === 1 ? "text-amber-600" :
+                            player.tier === 2 ? "text-blue-600" : "text-gray-500"
+                          }`}>Tier {player.tier}</div>
+                        )}
+                        <div className="font-semibold text-gray-900 text-sm leading-tight">{player.name}</div>
+                        <div className="text-xs text-gray-400 mt-0.5">{player.country}</div>
+                        {isReserve && <div className="text-xs text-amber-600 font-medium mt-0.5">Reserve</div>}
+                        {isPickFormat && player.prizeMoney !== undefined && (
+                          <div className="text-xs font-bold text-green-700 mt-1">
+                            £{(player.prizeMoney / 100).toLocaleString()}
+                          </div>
+                        )}
+                        {!isPickFormat && player.scoreToPar !== undefined && (
+                          <div className={`text-sm font-bold mt-1 ${player.scoreToPar < 0 ? "text-green-700" : player.scoreToPar > 0 ? "text-red-600" : "text-gray-700"}`}>
+                            {scoreLabel(player.scoreToPar)}
+                          </div>
+                        )}
+                        {!isPickFormat && player.position && (
+                          <div className="text-xs text-gray-500">T{player.position}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {myEntry.leaderboardPosition && (
+                  <div className="mt-3 text-center text-sm text-green-800 font-medium">
+                    Currently {ordinal(myEntry.leaderboardPosition)} in the pool
+                  </div>
+                )}
               </div>
+            ))}
+            {isPickFormat && competition.status === "open" && (
+              <Link
+                href={`/${clubSlug}/${competitionSlug}/enter`}
+                className="block text-center text-sm font-medium text-green-700 hover:underline"
+              >
+                + Add another team ({formatCurrency(competition.entryFee, competition.currency)})
+              </Link>
             )}
           </div>
         )}
@@ -149,7 +181,7 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
             <div className="space-y-2">
               {sortedEntries.map((entry, i) => {
                 const isMe = entry.userId === user?.id;
-                const myPlayers = entry.drawnPlayerIds?.map(pid => playerMap.get(pid)).filter(Boolean) ?? [];
+                const entryPlayers = (entry.drawnPlayerIds ?? []).map(pid => playerMap.get(pid)).filter(Boolean);
 
                 return (
                   <div
@@ -165,14 +197,22 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
                           <span className="font-semibold text-gray-900">{entry.displayName}</span>
                           {isMe && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">You</span>}
                         </div>
-                        {myPlayers.length > 0 && (
+                        {entryPlayers.length > 0 && (
                           <div className="text-xs text-gray-400 mt-0.5 truncate">
-                            {myPlayers.map(p => p!.name).join(", ")}
+                            {entryPlayers.map(p => p!.name).join(", ")}
                           </div>
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        {entry.bestPlayerScore !== undefined ? (
+                        {isPickFormat ? (
+                          entry.totalPrizeMoney !== undefined ? (
+                            <div className="font-bold text-base text-green-700">
+                              £{(entry.totalPrizeMoney / 100).toLocaleString()}
+                            </div>
+                          ) : (
+                            <div className="text-gray-400 text-sm">picks in</div>
+                          )
+                        ) : entry.bestPlayerScore !== undefined ? (
                           <div className={`font-bold text-base ${entry.bestPlayerScore < 0 ? "text-green-700" : entry.bestPlayerScore > 0 ? "text-red-600" : "text-gray-700"}`}>
                             {scoreLabel(entry.bestPlayerScore)}
                           </div>
@@ -201,12 +241,12 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
           </div>
         ) : (
           <div className="text-center py-12 text-gray-400">
-            <p>Draw hasn't happened yet. Check back soon.</p>
+            <p>{isPickFormat ? "No entries yet. Be the first to pick your team!" : "Draw hasn't happened yet. Check back soon."}</p>
           </div>
         )}
 
-        {/* Golf leaderboard (player scores) */}
-        {players.some(p => p.scoreToPar !== undefined) && (
+        {/* Golf leaderboard (player scores, sweep format only) */}
+        {!isPickFormat && players.some(p => p.scoreToPar !== undefined) && (
           <section>
             <h2 className="text-base font-semibold text-gray-900 mb-3">Tournament leaderboard</h2>
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">

@@ -14,6 +14,77 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 const PRIZE_STRUCTURE_PRESETS: Record<string, Array<{ name: string; tier: number; worldRanking: number; country: string }>> = {
+  "masters-2026": [
+    // Tier 1 — World #1-15
+    { name: "Scottie Scheffler", tier: 1, worldRanking: 1, country: "USA" },
+    { name: "Rory McIlroy", tier: 1, worldRanking: 2, country: "NIR" },
+    { name: "Jon Rahm", tier: 1, worldRanking: 3, country: "ESP" },
+    { name: "Xander Schauffele", tier: 1, worldRanking: 4, country: "USA" },
+    { name: "Collin Morikawa", tier: 1, worldRanking: 5, country: "USA" },
+    { name: "Bryson DeChambeau", tier: 1, worldRanking: 6, country: "USA" },
+    { name: "Ludvig Åberg", tier: 1, worldRanking: 7, country: "SWE" },
+    { name: "Viktor Hovland", tier: 1, worldRanking: 8, country: "NOR" },
+    { name: "Tommy Fleetwood", tier: 1, worldRanking: 9, country: "ENG" },
+    { name: "Patrick Cantlay", tier: 1, worldRanking: 10, country: "USA" },
+    { name: "Russell Henley", tier: 1, worldRanking: 11, country: "USA" },
+    { name: "Shane Lowry", tier: 1, worldRanking: 12, country: "IRL" },
+    { name: "Justin Thomas", tier: 1, worldRanking: 13, country: "USA" },
+    { name: "Tony Finau", tier: 1, worldRanking: 14, country: "USA" },
+    { name: "Brian Harman", tier: 1, worldRanking: 15, country: "USA" },
+    // Tier 2 — World #16-40
+    { name: "Hideki Matsuyama", tier: 2, worldRanking: 16, country: "JPN" },
+    { name: "Cameron Smith", tier: 2, worldRanking: 17, country: "AUS" },
+    { name: "Tyrrell Hatton", tier: 2, worldRanking: 18, country: "ENG" },
+    { name: "Max Homa", tier: 2, worldRanking: 19, country: "USA" },
+    { name: "Wyndham Clark", tier: 2, worldRanking: 20, country: "USA" },
+    { name: "Matt Fitzpatrick", tier: 2, worldRanking: 21, country: "ENG" },
+    { name: "Sepp Straka", tier: 2, worldRanking: 22, country: "AUT" },
+    { name: "Will Zalatoris", tier: 2, worldRanking: 23, country: "USA" },
+    { name: "Min Woo Lee", tier: 2, worldRanking: 24, country: "AUS" },
+    { name: "Keegan Bradley", tier: 2, worldRanking: 25, country: "USA" },
+    { name: "Tom Kim", tier: 2, worldRanking: 26, country: "KOR" },
+    { name: "Si Woo Kim", tier: 2, worldRanking: 27, country: "KOR" },
+    { name: "Sungjae Im", tier: 2, worldRanking: 28, country: "KOR" },
+    { name: "Adam Scott", tier: 2, worldRanking: 29, country: "AUS" },
+    { name: "Robert MacIntyre", tier: 2, worldRanking: 30, country: "SCO" },
+    { name: "Jordan Spieth", tier: 2, worldRanking: 31, country: "USA" },
+    { name: "Sahith Theegala", tier: 2, worldRanking: 32, country: "USA" },
+    { name: "Rickie Fowler", tier: 2, worldRanking: 33, country: "USA" },
+    { name: "Corey Conners", tier: 2, worldRanking: 34, country: "CAN" },
+    { name: "Ryan Fox", tier: 2, worldRanking: 35, country: "NZL" },
+    { name: "Brooks Koepka", tier: 2, worldRanking: 36, country: "USA" },
+    { name: "Cameron Davis", tier: 2, worldRanking: 37, country: "AUS" },
+    { name: "Akshay Bhatia", tier: 2, worldRanking: 38, country: "USA" },
+    { name: "Denny McCarthy", tier: 2, worldRanking: 39, country: "USA" },
+    { name: "Tom Hoge", tier: 2, worldRanking: 40, country: "USA" },
+    // Tier 3 — past champions & qualifiers
+    { name: "Justin Rose", tier: 3, worldRanking: 41, country: "ENG" },
+    { name: "Sergio Garcia", tier: 3, worldRanking: 42, country: "ESP" },
+    { name: "Patrick Reed", tier: 3, worldRanking: 43, country: "USA" },
+    { name: "Dustin Johnson", tier: 3, worldRanking: 44, country: "USA" },
+    { name: "Phil Mickelson", tier: 3, worldRanking: 45, country: "USA" },
+    { name: "Bubba Watson", tier: 3, worldRanking: 46, country: "USA" },
+    { name: "Danny Willett", tier: 3, worldRanking: 47, country: "ENG" },
+    { name: "Tiger Woods", tier: 3, worldRanking: 48, country: "USA" },
+    { name: "Jason Day", tier: 3, worldRanking: 49, country: "AUS" },
+    { name: "Adam Hadwin", tier: 3, worldRanking: 50, country: "CAN" },
+    { name: "Nick Taylor", tier: 3, worldRanking: 51, country: "CAN" },
+    { name: "Joaquin Niemann", tier: 3, worldRanking: 52, country: "CHI" },
+    { name: "Nicolai Hojgaard", tier: 3, worldRanking: 53, country: "DEN" },
+    { name: "Rasmus Hojgaard", tier: 3, worldRanking: 54, country: "DEN" },
+    { name: "Thomas Detry", tier: 3, worldRanking: 55, country: "BEL" },
+    { name: "Victor Perez", tier: 3, worldRanking: 56, country: "FRA" },
+    { name: "Taylor Moore", tier: 3, worldRanking: 57, country: "USA" },
+    { name: "Davis Riley", tier: 3, worldRanking: 58, country: "USA" },
+    { name: "Harris English", tier: 3, worldRanking: 59, country: "USA" },
+    { name: "J.J. Spaun", tier: 3, worldRanking: 60, country: "USA" },
+    { name: "Jake Knapp", tier: 3, worldRanking: 61, country: "USA" },
+    { name: "Chris Kirk", tier: 3, worldRanking: 62, country: "USA" },
+    { name: "Beau Hossler", tier: 3, worldRanking: 63, country: "USA" },
+    { name: "Louis Oosthuizen", tier: 3, worldRanking: 64, country: "RSA" },
+    { name: "Abraham Ancer", tier: 3, worldRanking: 65, country: "MEX" },
+    { name: "Fred Couples", tier: 3, worldRanking: 99, country: "USA" },
+  ],
   "pga-championship-2026": [
     { name: "Scottie Scheffler", tier: 1, worldRanking: 1, country: "USA" },
     { name: "Rory McIlroy", tier: 1, worldRanking: 2, country: "NIR" },
@@ -114,9 +185,11 @@ export default function CompetitionManagePage({
   const updateStatus = useMutation(api.competitions.updateStatus);
   const runDraw = useMutation(api.entries.runDraw);
   const upsertScore = useMutation(api.players.upsertScore);
+  const updatePrizeMoney = useMutation(api.players.updatePrizeMoney);
   const refreshLeaderboard = useMutation(api.entries.refreshLeaderboard);
 
   const [scoreEdits, setScoreEdits] = useState<Record<string, { r1?: string; r2?: string; r3?: string; r4?: string }>>({});
+  const [prizeEdits, setPrizeEdits] = useState<Record<string, string>>({}); // playerId → prize money string (in whole currency units)
   const [loading, setLoading] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -133,6 +206,7 @@ export default function CompetitionManagePage({
   const paidEntries = entries.filter(e => e.paidAt);
   const pot = paidEntries.length * competition.entryFee;
   const isPlatformPool = competition.scope === "platform";
+  const isPickFormat = competition.drawType === "pick";
   const publicUrl = isPlatformPool
     ? `/pools/${competition.slug}`
     : club ? `/${club.slug}/${competition.slug}` : "";
@@ -172,6 +246,14 @@ export default function CompetitionManagePage({
     const scoreToPar = totalScore !== undefined ? totalScore - par * rounds.length : undefined;
     await upsertScore({ playerId, r1, r2, r3, r4, totalScore, scoreToPar });
     setScoreEdits(prev => { const n = { ...prev }; delete n[playerId]; return n; });
+  }
+
+  async function handleSavePrizeMoney(playerId: Id<"players">) {
+    const val = prizeEdits[playerId];
+    if (!val) return;
+    const prizeMoney = Math.round(parseFloat(val) * 100); // convert from whole units to pence
+    await updatePrizeMoney({ playerId, prizeMoney });
+    setPrizeEdits(prev => { const n = { ...prev }; delete n[playerId]; return n; });
   }
 
   async function handleRefreshLeaderboard() {
@@ -275,7 +357,7 @@ export default function CompetitionManagePage({
               </Button>
             )}
 
-            {competition.status === "open" && (
+            {competition.status === "open" && !isPickFormat && (
               <>
                 <Button
                   size="sm"
@@ -291,6 +373,12 @@ export default function CompetitionManagePage({
                   </p>
                 )}
               </>
+            )}
+            {competition.status === "open" && isPickFormat && (
+              <p className="text-xs text-muted-foreground self-center">
+                {paidEntries.length === 0 ? "No paid entries yet — " : `${paidEntries.length} paid entr${paidEntries.length === 1 ? "y" : "ies"} · `}
+                {players.length === 0 ? "Load player field to open for picks" : "Members pick their team from the competition page"}
+              </p>
             )}
 
             {competition.status === "live" && (
@@ -334,37 +422,118 @@ export default function CompetitionManagePage({
                 <tr className="border-b border-gray-100 text-left text-xs text-gray-500 uppercase tracking-wide">
                   <th className="px-5 py-3">Name</th>
                   <th className="px-5 py-3">Payment</th>
-                  <th className="px-5 py-3 hidden sm:table-cell">Players drawn</th>
-                  <th className="px-5 py-3 text-right">Position</th>
+                  <th className="px-5 py-3 hidden sm:table-cell">
+                    {isPickFormat ? "Picks" : "Players drawn"}
+                  </th>
+                  <th className="px-5 py-3 text-right">
+                    {isPickFormat ? "Prize $" : "Position"}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {entries.map(entry => (
-                  <tr key={entry._id} className="border-b border-gray-50 last:border-0">
-                    <td className="px-5 py-3 font-medium text-gray-900">{entry.displayName}</td>
-                    <td className="px-5 py-3">
-                      {entry.paidAt ? (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Paid</span>
-                      ) : (
-                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Unpaid</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-xs text-gray-500 hidden sm:table-cell">
-                      {entry.drawnPlayerIds?.length ? `${entry.drawnPlayerIds.length} drawn` : "—"}
-                    </td>
-                    <td className="px-5 py-3 text-right text-gray-600">
-                      {entry.leaderboardPosition ?? "—"}
-                    </td>
-                  </tr>
-                ))}
+                {entries.map(entry => {
+                  const pickedNames = isPickFormat
+                    ? (entry.drawnPlayerIds ?? []).map(pid => players.find(p => p._id === pid)?.name).filter(Boolean)
+                    : [];
+                  return (
+                    <tr key={entry._id} className="border-b border-gray-50 last:border-0">
+                      <td className="px-5 py-3 font-medium text-gray-900">{entry.displayName}</td>
+                      <td className="px-5 py-3">
+                        {entry.paidAt ? (
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Paid</span>
+                        ) : (
+                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Unpaid</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3 text-xs text-gray-500 hidden sm:table-cell">
+                        {isPickFormat
+                          ? (pickedNames.length ? pickedNames.join(", ") : "—")
+                          : (entry.drawnPlayerIds?.length ? `${entry.drawnPlayerIds.length} drawn` : "—")}
+                      </td>
+                      <td className="px-5 py-3 text-right text-gray-600">
+                        {isPickFormat
+                          ? (entry.totalPrizeMoney ? `£${(entry.totalPrizeMoney / 100).toLocaleString()}` : "—")
+                          : (entry.leaderboardPosition ?? "—")}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </CardContent>
         </Card>
       )}
 
-      {/* Player scores */}
-      {players.length > 0 && (
+      {/* Player field */}
+      {players.length > 0 && isPickFormat && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Prize money — enter after tournament</CardTitle>
+              <p className="text-xs text-muted-foreground">Enter whole {competition.currency} amounts (e.g. 1440000 for £1.44M)</p>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left text-xs text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-3">Player</th>
+                    <th className="px-4 py-3 text-center">Rank</th>
+                    <th className="px-4 py-3 text-center">Prize won ({competition.currency})</th>
+                    <th className="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...players]
+                    .sort((a, b) => (b.prizeMoney ?? 0) - (a.prizeMoney ?? 0) || (a.worldRanking ?? 99) - (b.worldRanking ?? 99))
+                    .map(player => {
+                      const editVal = prizeEdits[player._id];
+                      const hasEdit = editVal !== undefined;
+                      return (
+                        <tr key={player._id} className={cn(
+                          "border-b border-gray-50 last:border-0",
+                          hasEdit && "bg-amber-50/50"
+                        )}>
+                          <td className="px-4 py-2.5">
+                            <div className="font-medium text-gray-900 leading-tight">{player.name}</div>
+                            <div className="text-xs text-gray-400">{player.country}</div>
+                          </td>
+                          <td className="px-4 py-2.5 text-center text-gray-500">#{player.worldRanking ?? "—"}</td>
+                          <td className="px-4 py-2.5">
+                            <input
+                              type="number"
+                              value={editVal ?? (player.prizeMoney !== undefined ? String(player.prizeMoney / 100) : "")}
+                              onChange={e => setPrizeEdits(prev => ({ ...prev, [player._id]: e.target.value }))}
+                              className="w-32 text-right border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                              placeholder="0"
+                              min="0"
+                            />
+                          </td>
+                          <td className="px-4 py-2.5">
+                            {hasEdit && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleSavePrizeMoney(player._id as Id<"players">)}
+                                className="text-xs h-7 px-2 text-green-700 hover:bg-green-50"
+                              >
+                                Save
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Player scores (sweep / draw format) */}
+      {players.length > 0 && !isPickFormat && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Player scores — manual entry</CardTitle>

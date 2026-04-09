@@ -20,10 +20,16 @@ function slugify(str: string) {
 
 const COMP_TYPES = [
   {
+    id: "pick",
+    icon: "🏌️",
+    label: "Pick Your Team",
+    desc: "Each person picks 5 golfers + 1 reserve. Scored by accumulated prize money. Perfect for the Masters.",
+  },
+  {
     id: "sweep",
     icon: "🎰",
     label: "Club Sweep",
-    desc: "Members draw a professional golfer. Best player wins the pot. Works great for the majors.",
+    desc: "Members draw a professional golfer randomly. Best player wins the pot. Works great for any major.",
   },
   {
     id: "event",
@@ -34,6 +40,7 @@ const COMP_TYPES = [
 ];
 
 const SWEEP_TOURNAMENTS = [
+  { label: "The Masters", ref: "masters-2026", start: "2026-04-10", end: "2026-04-13" },
   { label: "PGA Championship", ref: "pga-championship-2026", start: "2026-05-21", end: "2026-05-24" },
   { label: "US Open", ref: "us-open-2026", start: "2026-06-18", end: "2026-06-21" },
   { label: "The Open", ref: "the-open-2026", start: "2026-07-16", end: "2026-07-19" },
@@ -82,7 +89,7 @@ export default function NewCompetitionPage() {
 
   // ── Form state ──────────────────────────────────────────────────────────────
   const [step, setStep] = useState(0);
-  const [compType, setCompType] = useState<"sweep" | "event">("sweep");
+  const [compType, setCompType] = useState<"pick" | "sweep" | "event">("pick");
 
   // Step 2 — Sweep
   const [tournamentRef, setTournamentRef] = useState("pga-championship-2026");
@@ -108,10 +115,12 @@ export default function NewCompetitionPage() {
   const entryFee = Math.round(parseFloat(entryFeeStr || "0") * 100);
   const platformFee = Math.round(entryFee * 0.1);
 
-  const name = compType === "sweep" ? (sweepName || (SWEEP_TOURNAMENTS.find(t => t.ref === tournamentRef)?.label ?? "")) : eventName;
+  const name = compType === "event"
+    ? eventName
+    : (sweepName || (SWEEP_TOURNAMENTS.find(t => t.ref === tournamentRef)?.label ?? ""));
   const slug = slugify(name);
-  const startDate = compType === "sweep" ? sweepStart : "";
-  const endDate = compType === "sweep" ? sweepEnd : "";
+  const startDate = compType === "event" ? "" : sweepStart;
+  const endDate = compType === "event" ? "" : sweepEnd;
   const displayDeadline = entryDeadline
     ? new Date(entryDeadline).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : "—";
@@ -145,10 +154,11 @@ export default function NewCompetitionPage() {
   function canAdvance(): boolean {
     if (step === 0) return true;
     if (step === 1) {
-      if (compType === "sweep") return (sweepName.trim().length > 0 || !!SWEEP_TOURNAMENTS.find(t => t.ref === tournamentRef)?.label) && sweepStart.length > 0 && sweepEnd.length > 0;
-      return eventName.trim().length > 0;
+      if (compType === "event") return eventName.trim().length > 0;
+      // sweep or pick — need tournament dates + a name source
+      return (sweepName.trim().length > 0 || !!SWEEP_TOURNAMENTS.find(t => t.ref === tournamentRef)?.label) && sweepStart.length > 0 && sweepEnd.length > 0;
     }
-    if (step === 2) return entryFee >= 0 && !!entryDeadline && (compType !== "sweep" || (sweepStart.length > 0));
+    if (step === 2) return entryFee >= 0 && !!entryDeadline && (compType === "event" || sweepStart.length > 0);
     return true;
   }
 
@@ -157,20 +167,22 @@ export default function NewCompetitionPage() {
     setLoading(true);
     setError("");
     try {
-      const isSweep = compType === "sweep";
-      const isMajor = ["pga-championship-2026", "us-open-2026", "the-open-2026", "ryder-cup-2026"].includes(tournamentRef);
+      const isMajorRef = ["masters-2026", "pga-championship-2026", "us-open-2026", "the-open-2026", "ryder-cup-2026"].includes(tournamentRef);
+      const today = new Date().toISOString().split("T")[0];
       const compId = await createCompetition({
         clubId: club._id,
         name,
         slug,
-        type: isSweep ? (isMajor ? "major" : "tour") : "club_comp",
-        tournamentRef: isSweep ? tournamentRef : undefined,
-        startDate: isSweep ? sweepStart : new Date().toISOString().split("T")[0],
-        endDate: isSweep ? sweepEnd : new Date().toISOString().split("T")[0],
+        type: compType === "event" ? "club_comp" : (isMajorRef ? "major" : "tour"),
+        tournamentRef: compType !== "event" ? tournamentRef : undefined,
+        startDate: compType === "event" ? today : sweepStart,
+        endDate: compType === "event" ? today : sweepEnd,
         entryDeadline: new Date(entryDeadline).toISOString(),
-        drawType: isSweep ? "tiered" : "random",
-        tierCount: isSweep ? 3 : 0,
-        playersPerTier: isSweep ? 1 : 0,
+        drawType: compType === "pick" ? "pick" : compType === "sweep" ? "tiered" : "random",
+        tierCount: compType === "sweep" ? 3 : 0,
+        playersPerTier: compType === "sweep" ? 1 : 0,
+        pickCount: compType === "pick" ? 5 : undefined,
+        reserveCount: compType === "pick" ? 1 : undefined,
         entryFee,
         currency: club.currency,
         prizeStructure: PRIZE_PRESETS[prizePreset].structure,
@@ -253,7 +265,7 @@ export default function NewCompetitionPage() {
               <button
                 key={ct.id}
                 type="button"
-                onClick={() => setCompType(ct.id as "sweep" | "event")}
+                onClick={() => setCompType(ct.id as "pick" | "sweep" | "event")}
                 className={cn(
                   "w-full text-left px-5 py-4 rounded-xl border-2 transition-all",
                   compType === ct.id
@@ -280,6 +292,11 @@ export default function NewCompetitionPage() {
             ))}
           </div>
 
+          {compType === "pick" && (
+            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-800">
+              <strong>Pick Your Team:</strong> each member picks 5 golfers + 1 reserve. Most accumulated prize money on Sunday night wins the pot. Multiple teams per person allowed — £20 a team.
+            </div>
+          )}
           {compType === "sweep" && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800">
               <strong>Club sweep:</strong> members draw a pro golfer, ESPN scores update automatically. Works for any tour event your club wants to pool on.
@@ -294,6 +311,80 @@ export default function NewCompetitionPage() {
           <Button className="w-full" size="lg" onClick={() => setStep(1)}>
             Continue <ArrowRight size={16} className="ml-1.5" />
           </Button>
+        </div>
+      )}
+
+      {/* ── Step 2: Details — Pick Your Team ── */}
+      {step === 1 && compType === "pick" && (
+        <div className="space-y-5">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground mb-1">Which tournament?</h2>
+            <p className="text-sm text-muted-foreground">
+              Members will pick 5 golfers from this field. Scored by prize money earned on Sunday.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {SWEEP_TOURNAMENTS.map(t => (
+              <button
+                key={t.ref}
+                type="button"
+                onClick={() => {
+                  setTournamentRef(t.ref);
+                  if (t.start) { setSweepStart(t.start); setSweepEnd(t.end); }
+                }}
+                className={cn(
+                  "text-left px-4 py-3 rounded-xl border transition-all",
+                  tournamentRef === t.ref
+                    ? "border-primary bg-primary/5 text-primary font-medium"
+                    : "border-border hover:border-primary/40 hover:bg-accent/40"
+                )}
+              >
+                <p className="text-sm font-medium">{t.label}</p>
+                {t.start && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {new Date(t.start).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    {" – "}
+                    {new Date(t.end).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="space-y-4 pt-2 border-t border-border">
+            <div className="space-y-1.5">
+              <Label>Pool name</Label>
+              <Input
+                value={sweepName}
+                onChange={e => setSweepName(e.target.value)}
+                placeholder={SWEEP_TOURNAMENTS.find(t => t.ref === tournamentRef)?.label ?? "Pool name"}
+              />
+            </div>
+            {(!["masters-2026", "pga-championship-2026", "us-open-2026", "the-open-2026", "ryder-cup-2026"].includes(tournamentRef)) && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Start date</Label>
+                  <Input type="date" value={sweepStart} onChange={e => setSweepStart(e.target.value)} required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>End date</Label>
+                  <Input type="date" value={sweepEnd} onChange={e => setSweepEnd(e.target.value)} required />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-800">
+            You&apos;ll load the player field from the manage page after creating. Members pick their team when entries open.
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setStep(0)}>Back</Button>
+            <Button className="flex-1" onClick={() => setStep(2)} disabled={!canAdvance()}>
+              Continue <ArrowRight size={16} className="ml-1.5" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -531,7 +622,11 @@ export default function NewCompetitionPage() {
           <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
             {[
               { icon: <Trophy size={15} />, label: "Competition", value: name || "—" },
-              { icon: <Trophy size={15} />, label: "Type", value: compType === "sweep" ? `Club Sweep · ${SWEEP_TOURNAMENTS.find(t => t.ref === tournamentRef)?.label ?? tournamentRef}` : `Club Event · ${EVENT_FORMATS.find(f => f.id === eventFormat)?.label ?? eventFormat}` },
+              { icon: <Trophy size={15} />, label: "Type", value: compType === "pick" ? `Pick Your Team · ${SWEEP_TOURNAMENTS.find(t => t.ref === tournamentRef)?.label ?? tournamentRef}` : compType === "sweep" ? `Club Sweep · ${SWEEP_TOURNAMENTS.find(t => t.ref === tournamentRef)?.label ?? tournamentRef}` : `Club Event · ${EVENT_FORMATS.find(f => f.id === eventFormat)?.label ?? eventFormat}` },
+              ...(compType === "pick" ? [
+                { icon: <Trophy size={15} />, label: "Format", value: "5 picks + 1 reserve · most prize money wins" },
+                { icon: <Calendar size={15} />, label: "Dates", value: `${new Date(sweepStart).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – ${new Date(sweepEnd).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` },
+              ] : []),
               ...(compType === "sweep" ? [{ icon: <Calendar size={15} />, label: "Dates", value: `${new Date(sweepStart).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – ${new Date(sweepEnd).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` }] : []),
               { icon: <Calendar size={15} />, label: "Entry deadline", value: displayDeadline },
               { icon: <DollarSign size={15} />, label: "Entry fee", value: entryFee > 0 ? `${sym}${(entryFee / 100).toFixed(0)} + ${sym}${(platformFee / 100).toFixed(2)} fee = ${sym}${((entryFee + platformFee) / 100).toFixed(2)} members pay` : "Free" },

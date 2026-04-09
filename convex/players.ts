@@ -94,6 +94,32 @@ export const bulkUpdateScores = mutation({
   },
 });
 
+// Update prize money for a single player (used in pick-format competitions)
+export const updatePrizeMoney = mutation({
+  args: {
+    playerId: v.id("players"),
+    prizeMoney: v.number(), // in pence/cents
+  },
+  handler: async (ctx, { playerId, prizeMoney }) => {
+    await ctx.db.patch(playerId, { prizeMoney });
+  },
+});
+
+// Bulk update prize money
+export const bulkUpdatePrizeMoney = mutation({
+  args: {
+    updates: v.array(v.object({
+      playerId: v.id("players"),
+      prizeMoney: v.number(),
+    })),
+  },
+  handler: async (ctx, { updates }) => {
+    for (const { playerId, prizeMoney } of updates) {
+      await ctx.db.patch(playerId, { prizeMoney });
+    }
+  },
+});
+
 export const deleteByCompetition = mutation({
   args: { competitionId: v.id("competitions") },
   handler: async (ctx, { competitionId }) => {

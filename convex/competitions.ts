@@ -118,6 +118,8 @@ export const create = mutation({
     drawType: v.string(),
     tierCount: v.number(),
     playersPerTier: v.number(),
+    pickCount: v.optional(v.number()),
+    reserveCount: v.optional(v.number()),
     entryFee: v.number(),
     currency: v.string(),
     prizeStructure: v.array(v.object({
