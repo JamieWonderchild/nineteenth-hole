@@ -10,54 +10,58 @@ function getConvex() {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json();
-  const { competitionId, entryId, isPlatformPool, poolSlug, clubSlug, competitionSlug } = body;
+    const body = await req.json();
+    const { competitionId, entryId, isPlatformPool, poolSlug, clubSlug, competitionSlug } = body;
 
-  if (!competitionId || !entryId) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (!competitionId || !entryId) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const convex = getConvex();
+    const competition = await convex.query(api.competitions.get, {
+      competitionId: competitionId as Id<"competitions">,
+    });
+    if (!competition) return NextResponse.json({ error: "Competition not found" }, { status: 404 });
+
+    const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+    let successUrl: string;
+    let cancelUrl: string;
+
+    if (isPlatformPool && poolSlug) {
+      successUrl = `${origin}/pools/${poolSlug}?success=1&session_id={CHECKOUT_SESSION_ID}`;
+      cancelUrl = `${origin}/pools/${poolSlug}/enter`;
+    } else if (clubSlug && competitionSlug) {
+      successUrl = `${origin}/${clubSlug}/${competitionSlug}?success=1&session_id={CHECKOUT_SESSION_ID}`;
+      cancelUrl = `${origin}/${clubSlug}/${competitionSlug}/enter`;
+    } else {
+      return NextResponse.json({ error: "Missing URL routing info" }, { status: 400 });
+    }
+
+    const session = await createEntryCheckoutSession({
+      entryId,
+      competitionId,
+      entryFee: competition.entryFee,
+      currency: competition.currency,
+      competitionName: competition.name,
+      userId,
+      successUrl,
+      cancelUrl,
+    });
+
+    await convex.mutation(api.entries.linkStripeSession, {
+      entryId: entryId as Id<"entries">,
+      stripeCheckoutSessionId: session.id,
+    });
+
+    return NextResponse.json({ url: session.url });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Internal server error";
+    console.error("[stripe/checkout]", err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const convex = getConvex();
-  const competition = await convex.query(api.competitions.get, {
-    competitionId: competitionId as Id<"competitions">,
-  });
-  if (!competition) return NextResponse.json({ error: "Competition not found" }, { status: 404 });
-
-  const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-
-  let successUrl: string;
-  let cancelUrl: string;
-
-  if (isPlatformPool && poolSlug) {
-    // Platform pool — redirect to /pools/[slug]
-    successUrl = `${origin}/pools/${poolSlug}?success=1&session_id={CHECKOUT_SESSION_ID}`;
-    cancelUrl = `${origin}/pools/${poolSlug}/enter`;
-  } else if (clubSlug && competitionSlug) {
-    // Club competition
-    successUrl = `${origin}/${clubSlug}/${competitionSlug}?success=1&session_id={CHECKOUT_SESSION_ID}`;
-    cancelUrl = `${origin}/${clubSlug}/${competitionSlug}/enter`;
-  } else {
-    return NextResponse.json({ error: "Missing URL routing info" }, { status: 400 });
-  }
-
-  const session = await createEntryCheckoutSession({
-    entryId,
-    competitionId,
-    entryFee: competition.entryFee,
-    currency: competition.currency,
-    competitionName: competition.name,
-    userId,
-    successUrl,
-    cancelUrl,
-  });
-
-  await convex.mutation(api.entries.linkStripeSession, {
-    entryId: entryId as Id<"entries">,
-    stripeCheckoutSessionId: session.id,
-  });
-
-  return NextResponse.json({ url: session.url });
 }

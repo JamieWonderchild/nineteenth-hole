@@ -198,6 +198,7 @@ export default function CompetitionManagePage({
   const [loading, setLoading] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   void user;
 
@@ -292,11 +293,12 @@ export default function CompetitionManagePage({
   async function handleDelete() {
     if (!confirm(`Permanently delete "${competition?.name}"? This will also delete all entries, players, and series links. This cannot be undone.`)) return;
     setLoading("delete");
+    setDeleteError(null);
     try {
       await deleteCompetition({ competitionId: competitionId as Id<"competitions"> });
       router.push("/manage");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Delete failed");
+      setDeleteError(err instanceof Error ? err.message : "Delete failed");
       setLoading(null);
     }
   }
@@ -467,7 +469,10 @@ export default function CompetitionManagePage({
           </div>
 
           {superAdmin && (
-            <div className="pt-3 border-t border-gray-100 mt-1">
+            <div className="pt-3 border-t border-gray-100 mt-1 space-y-2">
+              {deleteError && (
+                <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{deleteError}</p>
+              )}
               <button
                 onClick={handleDelete}
                 disabled={loading === "delete"}

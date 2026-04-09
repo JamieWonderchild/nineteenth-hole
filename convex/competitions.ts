@@ -22,9 +22,10 @@ async function assertClubAdminOrSuperAdmin(
 
 async function assertSuperAdmin(ctx: MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new Error("Unauthenticated");
   const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
-  if (!identity.email || !superAdminEmails.includes(identity.email)) throw new Error("Not authorised");
+  if (!identity?.email || !superAdminEmails.includes(identity.email)) {
+    throw new Error("Not authorised");
+  }
 }
 
 // ── Queries ─────────────────────────────────────────────────────────────────
