@@ -17,6 +17,7 @@ export default function MembersPage() {
   const pending = useQuery(api.clubMembers.listPending, (club && isAdmin) ? { clubId: club._id } : "skip");
   const approveMember = useMutation(api.clubMembers.approveMember);
   const rejectMember = useMutation(api.clubMembers.rejectMember);
+  const deleteMember = useMutation(api.clubMembers.deleteMember);
 
   if (!club || !members) {
     return (
@@ -85,6 +86,7 @@ export default function MembersPage() {
                   <th className="px-5 py-3 font-medium text-right">Won</th>
                   <th className="px-5 py-3 font-medium text-right">P/L</th>
                   <th className="px-5 py-3 font-medium text-right">Role</th>
+                  {superAdmin && <th className="px-5 py-3" />}
                 </tr>
               </thead>
               <tbody>
@@ -102,6 +104,21 @@ export default function MembersPage() {
                         {m.role}
                       </span>
                     </td>
+                    {superAdmin && (
+                      <td className="px-5 py-3.5 text-right">
+                        <button
+                          onClick={() => {
+                            if (confirm(`Remove ${m.displayName} from the club? This cannot be undone.`)) {
+                              deleteMember({ memberId: m._id });
+                            }
+                          }}
+                          className="text-gray-300 hover:text-red-500 transition-colors text-xs font-medium"
+                          title="Delete member"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

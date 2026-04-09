@@ -133,6 +133,17 @@ export const rejectMember = mutation({
   },
 });
 
+// Super admin hard-deletes a member record
+export const deleteMember = mutation({
+  args: { memberId: v.id("clubMembers") },
+  handler: async (ctx, { memberId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    if (!identity?.email || !superAdminEmails.includes(identity.email)) throw new Error("Not authorised");
+    await ctx.db.delete(memberId);
+  },
+});
+
 // Users who have entries but no club membership — for super admin assignment
 export const listOrphans = query({
   args: {},
