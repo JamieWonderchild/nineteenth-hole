@@ -3,7 +3,6 @@
 import { useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
 import Link from "next/link";
-import { Trophy } from "lucide-react";
 
 function StatusPill({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -27,66 +26,65 @@ export default function PoolsPage() {
   const draft = pools?.filter(p => p.status === "draft") ?? [];
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2.5">
-          <Trophy size={22} className="text-green-700" />
-          Tour Pools
-        </h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Platform-wide sweepstakes for professional golf tournaments. Draw a player — best player wins the pot.
-        </p>
-      </div>
-
-      {pools === undefined ? (
-        <div className="space-y-2">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-24 rounded-xl bg-gray-100 animate-pulse" />
-          ))}
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-green-900 text-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-lg">🏆</div>
+            <span className="text-green-300 text-sm font-medium">Play The Pool</span>
+          </div>
+          <h1 className="text-2xl font-bold mt-2">Tour Pools</h1>
+          <p className="text-green-300 text-sm mt-1">
+            Platform-wide sweepstakes for professional golf tournaments.
+          </p>
         </div>
-      ) : (
-        <>
-          {active.length > 0 && (
-            <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-3">
-                Open & Live
-              </h2>
-              <div className="space-y-2">
-                {active.map(pool => <PoolCard key={pool._id} pool={pool} />)}
-              </div>
-            </section>
-          )}
+      </header>
 
-          {draft.length > 0 && (
-            <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-3">
-                Coming soon
-              </h2>
-              <div className="space-y-2">
-                {draft.map(pool => <PoolCard key={pool._id} pool={pool} />)}
-              </div>
-            </section>
-          )}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+        {pools === undefined ? (
+          <div className="space-y-2">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-24 rounded-xl bg-gray-100 animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <>
+            {active.length > 0 && (
+              <section>
+                <h2 className="text-base font-semibold text-gray-900 mb-3">Open &amp; Live</h2>
+                <div className="space-y-2">
+                  {active.map(pool => <PoolCard key={pool._id} pool={pool} />)}
+                </div>
+              </section>
+            )}
 
-          {completed.length > 0 && (
-            <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-3">
-                Completed
-              </h2>
-              <div className="space-y-2">
-                {completed.map(pool => <PoolCard key={pool._id} pool={pool} />)}
-              </div>
-            </section>
-          )}
+            {draft.length > 0 && (
+              <section>
+                <h2 className="text-base font-semibold text-gray-900 mb-3">Coming Soon</h2>
+                <div className="space-y-2">
+                  {draft.map(pool => <PoolCard key={pool._id} pool={pool} />)}
+                </div>
+              </section>
+            )}
 
-          {pools.length === 0 && (
-            <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
-              <div className="text-4xl mb-3">🏌️</div>
-              <p className="text-gray-500">No pools yet — check back before the next major.</p>
-            </div>
-          )}
-        </>
-      )}
+            {completed.length > 0 && (
+              <section>
+                <h2 className="text-base font-semibold text-gray-900 mb-3">Completed</h2>
+                <div className="space-y-2">
+                  {completed.map(pool => <PoolCard key={pool._id} pool={pool} />)}
+                </div>
+              </section>
+            )}
+
+            {pools.length === 0 && (
+              <div className="text-center py-16 bg-white rounded-xl border border-dashed border-gray-200">
+                <div className="text-4xl mb-3">🏌️</div>
+                <p className="text-gray-500">No pools yet — check back before the next major.</p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

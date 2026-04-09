@@ -19,15 +19,18 @@ function ordinal(n: number) {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    draft: { label: "Draft", cls: "bg-gray-700 text-gray-200" },
-    open: { label: "Open", cls: "bg-blue-700 text-blue-100" },
-    live: { label: "Live ●", cls: "bg-green-700 text-green-100" },
-    complete: { label: "Complete", cls: "bg-purple-700 text-purple-100" },
+function StatusPill({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    open: "bg-blue-100 text-blue-700",
+    live: "bg-green-100 text-green-700",
+    draft: "bg-gray-100 text-gray-400",
+    complete: "bg-purple-100 text-purple-700",
   };
-  const s = map[status] ?? { label: status, cls: "bg-gray-700 text-gray-200" };
-  return <span className={`px-3 py-1 rounded-full text-xs font-medium ${s.cls}`}>{s.label}</span>;
+  return (
+    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${map[status] ?? "bg-gray-100 text-gray-500"}`}>
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </span>
+  );
 }
 
 export default function PoolPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -50,7 +53,7 @@ export default function PoolPage({ params }: { params: Promise<{ slug: string }>
 
   if (pool === undefined) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
       </div>
     );
@@ -58,10 +61,12 @@ export default function PoolPage({ params }: { params: Promise<{ slug: string }>
 
   if (pool === null) {
     return (
-      <div className="text-center py-16">
-        <div className="text-4xl mb-3">⛳</div>
-        <h1 className="text-xl font-semibold text-gray-900 mb-2">Pool not found</h1>
-        <Link href="/pools" className="text-green-700 hover:underline">← Back to pools</Link>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="text-4xl mb-3">⛳</div>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Pool not found</h1>
+          <p className="text-gray-500 text-sm">This pool doesn&apos;t exist or may have moved.</p>
+        </div>
       </div>
     );
   }
@@ -81,30 +86,32 @@ export default function PoolPage({ params }: { params: Promise<{ slug: string }>
   const totalWithFee = pool.entryFee + Math.round(pool.entryFee * 0.1);
 
   return (
-    <div>
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-green-900 text-white px-4 py-5 rounded-xl mb-6 -mx-4 sm:mx-0">
-        <div className="flex items-start justify-between">
-          <div>
-            <Link href="/pools" className="text-green-400 text-xs hover:text-green-300 mb-1.5 block">
-              ← All pools
-            </Link>
-            <h1 className="font-bold text-2xl">{pool.name}</h1>
-            <div className="text-green-300 text-sm mt-1">
-              {new Date(pool.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}
-              {" – "}
-              {new Date(pool.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+      <header className="bg-green-900 text-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-lg">🏆</div>
+                <span className="text-green-300 text-sm font-medium">Play The Pool · Tour Pool</span>
+              </div>
+              <h1 className="text-2xl font-bold mt-2">{pool.name}</h1>
+              <p className="text-green-300 text-sm mt-1">
+                {new Date(pool.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                {" – "}
+                {new Date(pool.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                {pool.description && ` · ${pool.description}`}
+              </p>
             </div>
-            {pool.description && (
-              <p className="text-green-300 text-sm mt-1.5">{pool.description}</p>
-            )}
+            <StatusPill status={pool.status} />
           </div>
-          <StatusBadge status={pool.status} />
         </div>
       </header>
 
-      <div className="space-y-6">
-        {/* Pot + prize breakdown */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+
+        {/* Pot + entry CTA */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -112,7 +119,7 @@ export default function PoolPage({ params }: { params: Promise<{ slug: string }>
               <div className="text-3xl font-bold text-green-800 mt-0.5">
                 {formatCurrency(pot, pool.currency)}
               </div>
-              <div className="text-xs text-gray-400 mt-0.5">{paidEntries.length} paid entries</div>
+              <div className="text-xs text-gray-400 mt-0.5">{paidEntries.length} paid {paidEntries.length === 1 ? "entry" : "entries"}</div>
             </div>
             {pool.status === "open" && !myEntry?.paidAt && (
               <Link
@@ -242,7 +249,7 @@ export default function PoolPage({ params }: { params: Promise<{ slug: string }>
             </div>
           </section>
         ) : pool.status === "open" ? (
-          <div className="text-center py-12 text-gray-400 bg-white rounded-xl border border-gray-200">
+          <div className="text-center py-12 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
             <p className="text-4xl mb-3">🏌️</p>
             <p className="mb-3">No entries yet — be the first!</p>
             <Link href={`/pools/${slug}/enter`} className="text-green-700 font-medium hover:underline">
