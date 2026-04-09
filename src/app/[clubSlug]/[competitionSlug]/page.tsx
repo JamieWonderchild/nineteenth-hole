@@ -1,16 +1,17 @@
 import { ClubContextProvider } from "@/app/providers/club-context-provider";
 import { LeaderboardView } from "./LeaderboardView";
 
-export default function CompetitionPage({
+export default async function CompetitionPage({
   params,
 }: {
-  params: { clubSlug: string; competitionSlug: string };
+  params: Promise<{ clubSlug: string; competitionSlug: string }>;
 }) {
+  const { clubSlug, competitionSlug } = await params;
   return (
-    <ClubContextProvider clubSlug={params.clubSlug}>
+    <ClubContextProvider clubSlug={clubSlug}>
       <LeaderboardView
-        clubSlug={params.clubSlug}
-        competitionSlug={params.competitionSlug}
+        clubSlug={clubSlug}
+        competitionSlug={competitionSlug}
       />
     </ClubContextProvider>
   );

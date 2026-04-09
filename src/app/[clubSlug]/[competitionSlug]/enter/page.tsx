@@ -1,14 +1,15 @@
 import { ClubContextProvider } from "@/app/providers/club-context-provider";
 import { EntryForm } from "./EntryForm";
 
-export default function EnterPage({
+export default async function EnterPage({
   params,
 }: {
-  params: { clubSlug: string; competitionSlug: string };
+  params: Promise<{ clubSlug: string; competitionSlug: string }>;
 }) {
+  const { clubSlug, competitionSlug } = await params;
   return (
-    <ClubContextProvider clubSlug={params.clubSlug}>
-      <EntryForm clubSlug={params.clubSlug} competitionSlug={params.competitionSlug} />
+    <ClubContextProvider clubSlug={clubSlug}>
+      <EntryForm clubSlug={clubSlug} competitionSlug={competitionSlug} />
     </ClubContextProvider>
   );
 }

@@ -28,6 +28,8 @@ function UnauthenticatedRedirect() {
 
 // Routes accessible without auth
 const PUBLIC_PREFIXES = ["/", "/sign-in", "/sign-up", "/terms", "/privacy"];
+// App routes that look like /:slug but require auth
+const AUTH_ONLY_PATHS = new Set(["/manage", "/pools", "/games", "/onboarding", "/home"]);
 
 export function ConvexClientProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -39,7 +41,9 @@ export function ConvexClientProvider({ children }: { children: React.ReactNode }
   const isPublic =
     pathname === "/" ||
     PUBLIC_PREFIXES.some(p => p !== "/" && pathname.startsWith(p)) ||
-    // Club pool pages are public (read-only leaderboard)
+    // Club landing pages are public — /finchley-golf-club etc.
+    (/^\/[^/]+$/.test(pathname) && !AUTH_ONLY_PATHS.has(pathname)) ||
+    // Club competition pages are public (read-only leaderboard)
     /^\/[^/]+\/[^/]+$/.test(pathname) ||
     /^\/[^/]+\/[^/]+\/enter/.test(pathname);
 
