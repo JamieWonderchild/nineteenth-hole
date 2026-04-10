@@ -2,10 +2,10 @@
 
 import { useState, use } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
-import { ArrowLeft, Plus, Pencil, X, Trophy, Medal } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, X, Trophy, Medal, Sparkles, Copy, Check } from "lucide-react";
 import Link from "next/link";
 
 const FORMAT_LABELS: Record<string, string> = {
@@ -274,8 +274,33 @@ export default function CompetitionScoresPage({
   ) as Member[] | undefined;
   const deleteScore = useMutation(api.scoring.deleteScore);
 
+  const generateSummary = useAction(api.corti.generateCompetitionSummary);
   const [showModal, setShowModal] = useState(false);
   const [editScore, setEditScore] = useState<Score | undefined>();
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function handleGenerateSummary() {
+    setGeneratingSummary(true);
+    setAiSummary(null);
+    try {
+      const result = await generateSummary({ competitionId: competitionId as Id<"competitions"> });
+      setAiSummary(result);
+    } catch (e) {
+      setAiSummary("Failed to generate summary. Please try again.");
+      console.error(e);
+    } finally {
+      setGeneratingSummary(false);
+    }
+  }
+
+  async function handleCopy() {
+    if (!aiSummary) return;
+    await navigator.clipboard.writeText(aiSummary);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   if (!competition || !leaderboard || !club) {
     return (
@@ -400,6 +425,51 @@ export default function CompetitionScoresPage({
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* AI results summary */}
+      {leaderboard.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles size={15} className="text-purple-500" />
+              <h3 className="text-sm font-semibold text-gray-900">Results summary</h3>
+              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">AI</span>
+            </div>
+            <button
+              onClick={handleGenerateSummary}
+              disabled={generatingSummary}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors"
+            >
+              <Sparkles size={12} />
+              {generatingSummary ? "Generating…" : aiSummary ? "Regenerate" : "Generate"}
+            </button>
+          </div>
+
+          {generatingSummary && (
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <div className="animate-spin h-4 w-4 border-2 border-purple-400 border-t-transparent rounded-full" />
+              Writing summary…
+            </div>
+          )}
+
+          {aiSummary && !generatingSummary && (
+            <div className="space-y-2">
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{aiSummary}</p>
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                {copied ? "Copied!" : "Copy to clipboard"}
+              </button>
+            </div>
+          )}
+
+          {!aiSummary && !generatingSummary && (
+            <p className="text-xs text-gray-400">Generate a ready-to-share summary for WhatsApp, email, or the noticeboard.</p>
+          )}
         </div>
       )}
 

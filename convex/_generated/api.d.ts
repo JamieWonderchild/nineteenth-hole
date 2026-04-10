@@ -9,6 +9,7 @@
  */
 
 import type * as clubMembers from "../clubMembers.js";
+import type * as corti from "../corti.js";
 import type * as clubs from "../clubs.js";
 import type * as communications from "../communications.js";
 import type * as competitions from "../competitions.js";
@@ -38,6 +39,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   clubMembers: typeof clubMembers;
+  corti: typeof corti;
   clubs: typeof clubs;
   communications: typeof communications;
   competitions: typeof competitions;
