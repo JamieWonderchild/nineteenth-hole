@@ -10,11 +10,13 @@
 
 import type * as clubMembers from "../clubMembers.js";
 import type * as clubs from "../clubs.js";
+import type * as communications from "../communications.js";
 import type * as competitions from "../competitions.js";
 import type * as courses from "../courses.js";
 import type * as crons from "../crons.js";
 import type * as entries from "../entries.js";
 import type * as http from "../http.js";
+import type * as knockouts from "../knockouts.js";
 import type * as messaging from "../messaging.js";
 import type * as players from "../players.js";
 import type * as quickGames from "../quickGames.js";
@@ -22,6 +24,7 @@ import type * as resultsImport from "../resultsImport.js";
 import type * as scores from "../scores.js";
 import type * as series from "../series.js";
 import type * as teeTimes from "../teeTimes.js";
+import type * as visitors from "../visitors.js";
 import type * as webhookEvents from "../webhookEvents.js";
 
 import type {
@@ -33,11 +36,13 @@ import type {
 declare const fullApi: ApiFromModules<{
   clubMembers: typeof clubMembers;
   clubs: typeof clubs;
+  communications: typeof communications;
   competitions: typeof competitions;
   courses: typeof courses;
   crons: typeof crons;
   entries: typeof entries;
   http: typeof http;
+  knockouts: typeof knockouts;
   messaging: typeof messaging;
   players: typeof players;
   quickGames: typeof quickGames;
@@ -45,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   scores: typeof scores;
   series: typeof series;
   teeTimes: typeof teeTimes;
+  visitors: typeof visitors;
   webhookEvents: typeof webhookEvents;
 }>;
 

@@ -484,4 +484,59 @@ export default defineSchema({
     createdAt: v.string(),
   })
     .index("by_conversation", ["conversationId"]),
+
+  // ============================================================================
+  // Point of Sale — Pro Shop & Bar
+  // ============================================================================
+
+  posCategories: defineTable({
+    clubId: v.id("clubs"),
+    name: v.string(),                     // "Bar", "Pro Shop", "Food"
+    icon: v.optional(v.string()),         // emoji e.g. "🍺"
+    sortOrder: v.number(),
+    createdAt: v.string(),
+  })
+    .index("by_club", ["clubId"]),
+
+  posProducts: defineTable({
+    clubId: v.id("clubs"),
+    categoryId: v.optional(v.id("posCategories")),
+    name: v.string(),
+    sku: v.optional(v.string()),
+    description: v.optional(v.string()),
+    pricePence: v.number(),               // always stored in smallest currency unit
+    currency: v.string(),
+    imageUrl: v.optional(v.string()),
+    trackStock: v.optional(v.boolean()),  // if true, stockCount is maintained
+    stockCount: v.optional(v.number()),
+    isActive: v.boolean(),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_club", ["clubId"])
+    .index("by_club_and_category", ["clubId", "categoryId"]),
+
+  posSales: defineTable({
+    clubId: v.id("clubs"),
+    memberId: v.optional(v.string()),     // Clerk userId if sold to a member
+    memberName: v.optional(v.string()),
+    items: v.array(v.object({
+      productId: v.optional(v.id("posProducts")),
+      productName: v.string(),           // denormalised in case product deleted
+      quantity: v.number(),
+      unitPricePence: v.number(),
+      subtotalPence: v.number(),
+    })),
+    subtotalPence: v.number(),           // sum of line items
+    totalPence: v.number(),              // subtotal (no tax split yet)
+    currency: v.string(),
+    // 'cash' | 'card' | 'tab' | 'terminal' | 'complimentary'
+    paymentMethod: v.string(),
+    notes: v.optional(v.string()),
+    voidedAt: v.optional(v.string()),
+    servedBy: v.string(),               // userId
+    createdAt: v.string(),
+  })
+    .index("by_club", ["clubId"])
+    .index("by_club_and_date", ["clubId", "createdAt"]),
 });
