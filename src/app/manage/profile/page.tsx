@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
-import { Check } from "lucide-react";
+import { Check, Wallet, TrendingUp, TrendingDown } from "lucide-react";
+import { formatCurrency } from "@/lib/format";
 
 export default function ProfilePage() {
   const { user } = useUser();
@@ -13,6 +14,10 @@ export default function ProfilePage() {
   const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
 
   const updateProfile = useMutation(api.clubMembers.updateProfile);
+  const recentTransactions = useQuery(
+    api.memberAccounts.listTransactions,
+    activeMembership ? { memberId: activeMembership._id, limit: 8 } : "skip"
+  );
 
   const [bio, setBio] = useState("");
   const [phone, setPhone] = useState("");
@@ -102,6 +107,45 @@ export default function ProfilePage() {
           Name and profile photo are managed through your account settings.
         </p>
       </div>
+
+      {/* Bar account balance */}
+      {activeMembership.accountBalance != null && (
+        <div className="bg-white border border-gray-200 rounded-xl px-6 py-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Wallet size={16} className="text-green-600" />
+              <h2 className="text-sm font-semibold text-gray-700">Bar Account</h2>
+            </div>
+            <span className={`text-xl font-bold ${activeMembership.accountBalance < 0 ? "text-red-500" : "text-gray-900"}`}>
+              {formatCurrency(activeMembership.accountBalance, club.currency)}
+            </span>
+          </div>
+          {recentTransactions && recentTransactions.length > 0 && (
+            <div className="space-y-0 border-t border-gray-100 pt-3">
+              {recentTransactions.map(tx => {
+                const isCredit = tx.amount > 0;
+                return (
+                  <div key={tx._id} className="flex items-center gap-3 py-2">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${isCredit ? "bg-green-100" : "bg-red-50"}`}>
+                      {isCredit
+                        ? <TrendingUp size={11} className="text-green-600" />
+                        : <TrendingDown size={11} className="text-red-400" />
+                      }
+                    </div>
+                    <p className="flex-1 text-sm text-gray-700 truncate">{tx.description}</p>
+                    <span className={`text-sm font-semibold shrink-0 ${isCredit ? "text-green-600" : "text-red-500"}`}>
+                      {isCredit ? "+" : ""}{formatCurrency(tx.amount, club.currency)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {(!recentTransactions || recentTransactions.length === 0) && (
+            <p className="text-xs text-gray-400">No transactions yet</p>
+          )}
+        </div>
+      )}
 
       {/* Stats snapshot */}
       {activeMembership.totalEntered > 0 && (

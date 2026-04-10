@@ -85,6 +85,7 @@ export default function NewCompetitionPage() {
   const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
   const adminMembership = memberships?.find(m => m.role === "admin");
   const club = useQuery(api.clubs.get, adminMembership ? { clubId: adminMembership.clubId } : "skip");
+  const courses = useQuery(api.courses.listByClub, club ? { clubId: club._id } : "skip");
   const createCompetition = useMutation(api.competitions.create);
 
   // ── Form state ──────────────────────────────────────────────────────────────
@@ -100,6 +101,10 @@ export default function NewCompetitionPage() {
   // Step 2 — Event
   const [eventName, setEventName] = useState("");
   const [eventFormat, setEventFormat] = useState("stableford");
+  const [eventStartDate, setEventStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [eventEndDate, setEventEndDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedCourseId, setSelectedCourseId] = useState<string>("");
+  const [roundHoles, setRoundHoles] = useState<9 | 18>(18);
 
   // Step 3 — Money & dates
   const [entryFeeStr, setEntryFeeStr] = useState("10");
@@ -120,8 +125,8 @@ export default function NewCompetitionPage() {
     ? eventName
     : (sweepName || (SWEEP_TOURNAMENTS.find(t => t.ref === tournamentRef)?.label ?? ""));
   const slug = slugify(name);
-  const startDate = compType === "event" ? "" : sweepStart;
-  const endDate = compType === "event" ? "" : sweepEnd;
+  const startDate = compType === "event" ? eventStartDate : sweepStart;
+  const endDate = compType === "event" ? eventEndDate : sweepEnd;
   const displayDeadline = entryDeadline
     ? new Date(entryDeadline).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : "—";
@@ -155,7 +160,7 @@ export default function NewCompetitionPage() {
   function canAdvance(): boolean {
     if (step === 0) return true;
     if (step === 1) {
-      if (compType === "event") return eventName.trim().length > 0;
+      if (compType === "event") return eventName.trim().length > 0 && !!eventStartDate && !!eventEndDate;
       // sweep or pick — need tournament dates + a name source
       return (sweepName.trim().length > 0 || !!SWEEP_TOURNAMENTS.find(t => t.ref === tournamentRef)?.label) && sweepStart.length > 0 && sweepEnd.length > 0;
     }
@@ -176,9 +181,9 @@ export default function NewCompetitionPage() {
         slug,
         type: compType === "event" ? "club_comp" : (isMajorRef ? "major" : "tour"),
         tournamentRef: compType !== "event" ? tournamentRef : undefined,
-        startDate: compType === "event" ? today : sweepStart,
-        endDate: compType === "event" ? today : sweepEnd,
-        entryDeadline: new Date(entryDeadline).toISOString(),
+        startDate: compType === "event" ? eventStartDate : sweepStart,
+        endDate: compType === "event" ? eventEndDate : sweepEnd,
+        entryDeadline: new Date(entryDeadline || (compType === "event" ? eventStartDate : sweepStart)).toISOString(),
         drawType: compType === "pick" ? "pick" : compType === "sweep" ? "tiered" : "random",
         tierCount: compType === "sweep" ? 3 : 0,
         playersPerTier: compType === "sweep" ? 1 : 0,
@@ -189,6 +194,8 @@ export default function NewCompetitionPage() {
         prizeStructure: PRIZE_PRESETS[prizePreset].structure,
         paymentCollection,
         scoringFormat: compType === "event" ? eventFormat : undefined,
+        courseId: (compType === "event" && selectedCourseId) ? selectedCourseId as any : undefined,
+        roundHoles: compType === "event" ? roundHoles : undefined,
         createdBy: user.id,
       });
       router.push(`/manage/competitions/${compId}`);
@@ -465,7 +472,7 @@ export default function NewCompetitionPage() {
         <div className="space-y-5">
           <div>
             <h2 className="text-lg font-semibold text-foreground mb-1">Competition details</h2>
-            <p className="text-sm text-muted-foreground">Name it and choose the scoring format.</p>
+            <p className="text-sm text-muted-foreground">Name it, pick the date, and choose the scoring format.</p>
           </div>
 
           <div className="space-y-1.5">
@@ -476,6 +483,17 @@ export default function NewCompetitionPage() {
               placeholder="e.g. The Ward 2026, April Medal, Club Championship"
               autoFocus
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Date of round</Label>
+              <Input type="date" value={eventStartDate} onChange={e => { setEventStartDate(e.target.value); setEventEndDate(e.target.value); }} required />
+            </div>
+            <div className="space-y-1.5">
+              <Label>End date</Label>
+              <Input type="date" value={eventEndDate} min={eventStartDate} onChange={e => setEventEndDate(e.target.value)} required />
+            </div>
           </div>
 
           <div>
@@ -506,6 +524,49 @@ export default function NewCompetitionPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Course selection */}
+          {courses && courses.length > 0 && (
+            <div className="space-y-2">
+              <Label>Course <span className="text-muted-foreground font-normal">(optional — enables auto stableford calc)</span></Label>
+              <div className="grid gap-2">
+                {[{ _id: "", name: "None" }, ...courses].map(c => (
+                  <button
+                    key={c._id}
+                    type="button"
+                    onClick={() => setSelectedCourseId(c._id)}
+                    className={cn(
+                      "text-left flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm transition-all",
+                      selectedCourseId === c._id
+                        ? "border-primary bg-primary/5 text-primary font-medium"
+                        : "border-border hover:border-primary/30"
+                    )}
+                  >
+                    {c.name}
+                    {selectedCourseId === c._id && <div className="w-3 h-3 rounded-full bg-primary" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Round holes */}
+          <div className="flex items-center gap-3">
+            <Label className="shrink-0">Round</Label>
+            {([18, 9] as const).map(h => (
+              <button
+                key={h}
+                type="button"
+                onClick={() => setRoundHoles(h)}
+                className={cn(
+                  "px-4 py-1.5 rounded-lg border text-sm font-medium transition-colors",
+                  roundHoles === h ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/30"
+                )}
+              >
+                {h} holes
+              </button>
+            ))}
           </div>
 
           <div className="flex gap-3">

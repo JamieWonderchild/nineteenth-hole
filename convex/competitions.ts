@@ -150,6 +150,8 @@ export const create = mutation({
     })),
     paymentCollection: v.optional(v.string()),
     scoringFormat: v.optional(v.string()),
+    courseId: v.optional(v.id("courses")),
+    roundHoles: v.optional(v.number()),
     createdBy: v.string(),
   },
   handler: async (ctx, args) => {
