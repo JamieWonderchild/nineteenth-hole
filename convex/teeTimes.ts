@@ -1,6 +1,19 @@
 import { v } from "convex/values";
-import { mutation, query, MutationCtx } from "./_generated/server";
+import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
+
+function isWeekend(dateStr: string): boolean {
+  const day = new Date(dateStr + "T00:00:00").getDay();
+  return day === 0 || day === 6;
+}
 
 // ── Auth helpers ─────────────────────────────────────────────────────────────
 
@@ -179,6 +192,14 @@ export const bookSlot = mutation({
     if (!slot) throw new Error("Slot not found");
     if (slot.isBlocked) throw new Error("This slot is not available");
 
+    // Advance booking window
+    const club = await ctx.db.get(args.clubId);
+    const today = new Date().toISOString().split("T")[0];
+    const maxDate = addDays(today, club?.advanceBookingDays ?? 7);
+    if (slot.date > maxDate) {
+      throw new Error(`Bookings open up to ${club?.advanceBookingDays ?? 7} days in advance`);
+    }
+
     // Check capacity
     const existing = await ctx.db
       .query("teeTimeBookings")
@@ -204,9 +225,92 @@ export const bookSlot = mutation({
       displayName: args.displayName,
       playerCount: args.playerCount,
       notes: args.notes,
+      bookingType: "member",
       status: "confirmed",
       createdAt: now,
       updatedAt: now,
+    });
+  },
+});
+
+// Visitor: book a slot without club membership
+export const bookAsVisitor = mutation({
+  args: {
+    slotId: v.id("teeTimeSlots"),
+    clubId: v.id("clubs"),
+    displayName: v.string(),
+    playerCount: v.number(),
+    visitorEmail: v.string(),
+    visitorPhone: v.optional(v.string()),
+    visitorHomeClub: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const slot = await ctx.db.get(args.slotId);
+    if (!slot) throw new Error("Slot not found");
+    if (slot.isBlocked) throw new Error("This slot is not available");
+
+    const club = await ctx.db.get(args.clubId);
+
+    // Weekend visitor restriction
+    if (isWeekend(slot.date)) {
+      const visitorStart = club?.weekendVisitorStartTime ?? "11:00";
+      if (slot.time < visitorStart) {
+        throw new Error(`Visitor bookings on weekends are only available from ${visitorStart}`);
+      }
+    }
+
+    // Advance booking window (same as members)
+    const today = new Date().toISOString().split("T")[0];
+    const maxDate = addDays(today, club?.advanceBookingDays ?? 7);
+    if (slot.date > maxDate) {
+      throw new Error(`Bookings open up to ${club?.advanceBookingDays ?? 7} days in advance`);
+    }
+
+    // Check capacity
+    const existing = await ctx.db
+      .query("teeTimeBookings")
+      .withIndex("by_slot", q => q.eq("slotId", args.slotId))
+      .filter(q => q.eq(q.field("status"), "confirmed"))
+      .collect();
+    const takenPlayers = existing.reduce((sum, b) => sum + b.playerCount, 0);
+    if (takenPlayers + args.playerCount > slot.maxPlayers) {
+      throw new Error(`Only ${slot.maxPlayers - takenPlayers} player spot${slot.maxPlayers - takenPlayers === 1 ? "" : "s"} remaining`);
+    }
+
+    const now = new Date().toISOString();
+    return ctx.db.insert("teeTimeBookings", {
+      clubId: args.clubId,
+      slotId: args.slotId,
+      date: slot.date,
+      time: slot.time,
+      displayName: args.displayName,
+      playerCount: args.playerCount,
+      notes: args.notes,
+      bookingType: "visitor",
+      visitorEmail: args.visitorEmail,
+      visitorPhone: args.visitorPhone,
+      visitorHomeClub: args.visitorHomeClub,
+      status: "confirmed",
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+// Admin: update tee time policy settings
+export const updatePolicy = mutation({
+  args: {
+    clubId: v.id("clubs"),
+    advanceBookingDays: v.number(),
+    weekendVisitorStartTime: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await assertClubAdmin(ctx, args.clubId);
+    await ctx.db.patch(args.clubId, {
+      advanceBookingDays: args.advanceBookingDays,
+      weekendVisitorStartTime: args.weekendVisitorStartTime,
+      updatedAt: new Date().toISOString(),
     });
   },
 });

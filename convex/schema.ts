@@ -53,6 +53,11 @@ export default defineSchema({
     // Settings
     currency: v.string(),       // 'GBP' | 'EUR' | 'USD'
     defaultEntryFee: v.optional(v.number()), // in pence/cents
+    // Tee time policy
+    advanceBookingDays: v.optional(v.number()),       // how far ahead members can book (default 7)
+    weekendVisitorStartTime: v.optional(v.string()),  // e.g. "11:00" — visitors blocked before this on weekends
+    latitude: v.optional(v.number()),                 // for sunset calculation
+    longitude: v.optional(v.number()),
     // Data import — scoped token for Alan's results scraper (not a global secret)
     importToken: v.optional(v.string()),
     // Timestamps
@@ -381,11 +386,16 @@ export default defineSchema({
     slotId: v.id("teeTimeSlots"),
     date: v.string(),           // denormalised for easy querying
     time: v.string(),           // denormalised
-    userId: v.string(),
+    userId: v.optional(v.string()),   // undefined for visitor bookings
     displayName: v.string(),
     playerCount: v.number(),    // 1–4
     notes: v.optional(v.string()),
     status: v.string(),         // "confirmed" | "cancelled"
+    // Visitor fields
+    bookingType: v.optional(v.string()),      // "member" | "visitor"
+    visitorEmail: v.optional(v.string()),
+    visitorPhone: v.optional(v.string()),
+    visitorHomeClub: v.optional(v.string()),
     createdAt: v.string(),
     updatedAt: v.string(),
   })
