@@ -15,6 +15,7 @@ import type * as courses from "../courses.js";
 import type * as crons from "../crons.js";
 import type * as entries from "../entries.js";
 import type * as http from "../http.js";
+import type * as messaging from "../messaging.js";
 import type * as players from "../players.js";
 import type * as quickGames from "../quickGames.js";
 import type * as resultsImport from "../resultsImport.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   entries: typeof entries;
   http: typeof http;
+  messaging: typeof messaging;
   players: typeof players;
   quickGames: typeof quickGames;
   resultsImport: typeof resultsImport;

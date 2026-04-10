@@ -370,6 +370,86 @@ export default defineSchema({
     .index("by_event_id", ["eventId"]),
 
   // ============================================================================
+  // Visitors
+  // ============================================================================
+
+  visitors: defineTable({
+    clubId: v.id("clubs"),
+    name: v.string(),
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    homeClub: v.optional(v.string()),
+    date: v.string(),                          // ISO date of visit
+    greenFee: v.optional(v.number()),          // pence/cents
+    currency: v.string(),
+    paidAt: v.optional(v.string()),
+    slotId: v.optional(v.id("teeTimeSlots")),
+    notes: v.optional(v.string()),
+    loggedBy: v.string(),                      // userId
+    createdAt: v.string(),
+  })
+    .index("by_club", ["clubId"])
+    .index("by_club_and_date", ["clubId", "date"]),
+
+  // ============================================================================
+  // Knockout Competitions
+  // ============================================================================
+
+  knockoutTournaments: defineTable({
+    clubId: v.id("clubs"),
+    name: v.string(),
+    status: v.string(),            // 'draft' | 'active' | 'complete'
+    format: v.string(),            // 'single_elimination'
+    seeded: v.optional(v.boolean()),
+    currentRound: v.number(),      // 1-based
+    totalRounds: v.number(),
+    createdBy: v.string(),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_club", ["clubId"]),
+
+  knockoutEntrants: defineTable({
+    tournamentId: v.id("knockoutTournaments"),
+    userId: v.optional(v.string()),   // null for byes
+    displayName: v.string(),
+    seed: v.optional(v.number()),
+    eliminated: v.optional(v.boolean()),
+    eliminatedRound: v.optional(v.number()),
+  })
+    .index("by_tournament", ["tournamentId"]),
+
+  knockoutMatches: defineTable({
+    tournamentId: v.id("knockoutTournaments"),
+    round: v.number(),             // 1 = first round
+    matchNumber: v.number(),       // position in bracket
+    playerAId: v.optional(v.id("knockoutEntrants")),
+    playerBId: v.optional(v.id("knockoutEntrants")),
+    winnerId: v.optional(v.id("knockoutEntrants")),
+    scoreA: v.optional(v.string()), // e.g. "2&1" or "3/2"
+    scoreB: v.optional(v.string()),
+    scheduledDate: v.optional(v.string()),
+    completedAt: v.optional(v.string()),
+  })
+    .index("by_tournament", ["tournamentId"])
+    .index("by_tournament_and_round", ["tournamentId", "round"]),
+
+  // ============================================================================
+  // Communications (bulk emails sent to members)
+  // ============================================================================
+
+  communications: defineTable({
+    clubId: v.id("clubs"),
+    sentBy: v.string(),              // userId
+    subject: v.string(),
+    body: v.string(),                // plain text / markdown
+    recipientFilter: v.string(),     // 'all' | 'active' | 'admins'
+    recipientCount: v.number(),
+    sentAt: v.string(),
+  })
+    .index("by_club", ["clubId"]),
+
+  // ============================================================================
   // Messaging
   // ============================================================================
 

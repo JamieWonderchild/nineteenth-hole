@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Globe, ChevronRight, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered, Clock, MapPin,
-  MessageSquare, BookUser
+  MessageSquare, BookUser, Mail, Swords, UserCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -151,6 +151,13 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               <NavItem href="/manage/courses" icon={<MapPin size={16} />} label="Course Card" active={pathname.startsWith("/manage/courses")} onClick={onNav} />
             )}
             <NavItem href="/manage/directory" icon={<BookUser size={16} />} label="Member Directory" active={pathname.startsWith("/manage/directory")} onClick={onNav} />
+            <NavItem href="/manage/knockouts" icon={<Swords size={16} />} label="Knockouts" active={pathname.startsWith("/manage/knockouts")} onClick={onNav} />
+            {isAdmin && (
+              <NavItem href="/manage/visitors" icon={<UserCheck size={16} />} label="Visitors" active={pathname.startsWith("/manage/visitors")} onClick={onNav} />
+            )}
+            {isAdmin && (
+              <NavItem href="/manage/comms" icon={<Mail size={16} />} label="Communications" active={pathname.startsWith("/manage/comms")} onClick={onNav} />
+            )}
             <NavItem
               href="/messages"
               icon={<MessageSquare size={16} />}

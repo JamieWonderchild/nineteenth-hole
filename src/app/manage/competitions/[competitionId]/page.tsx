@@ -329,12 +329,20 @@ export default function CompetitionManagePage({
             {club && ` · ${club.name}`}
           </p>
         </div>
-        {publicUrl && (
-          <Link href={publicUrl} target="_blank"
-            className="flex items-center gap-1.5 text-sm text-green-700 hover:underline shrink-0">
-            Public page <ExternalLink size={13} />
-          </Link>
-        )}
+        <div className="flex items-center gap-4 shrink-0">
+          {publicUrl && !isPlatformPool && club && (
+            <Link href={`/${club.slug}/${competition.slug}/live`} target="_blank"
+              className="flex items-center gap-1.5 text-sm text-green-700 hover:underline">
+              TV Display <ExternalLink size={13} />
+            </Link>
+          )}
+          {publicUrl && (
+            <Link href={publicUrl} target="_blank"
+              className="flex items-center gap-1.5 text-sm text-green-700 hover:underline">
+              Public page <ExternalLink size={13} />
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
