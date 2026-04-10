@@ -99,6 +99,8 @@ export default defineSchema({
     showEmail: v.optional(v.boolean()),
     // Handicap — manually set by admin until WHS API integration
     handicap: v.optional(v.number()),           // e.g. 14.2
+    // Member account (pre-paid credit for bar/pro shop)
+    accountBalance: v.optional(v.number()),     // pence — undefined treated as 0
   })
     .index("by_club", ["clubId"])
     .index("by_club_and_user", ["clubId", "userId"])
@@ -404,6 +406,26 @@ export default defineSchema({
     .index("by_club_and_date", ["clubId", "date"])
     .index("by_user", ["userId"])
     .index("by_club_and_user", ["clubId", "userId"]),
+
+  // ============================================================================
+  // Member account transactions (pre-paid bar/pro shop credit)
+  // ============================================================================
+
+  memberAccountTransactions: defineTable({
+    clubId: v.id("clubs"),
+    memberId: v.id("clubMembers"),
+    userId: v.string(),                        // Clerk ID — denormalised
+    type: v.string(),                          // "topup" | "charge" | "refund" | "adjustment"
+    amount: v.number(),                        // pence — positive = credit, negative = debit
+    balanceAfter: v.number(),                  // pence — running balance after this tx
+    description: v.string(),                   // "Bar purchase" | "Account top-up"
+    saleId: v.optional(v.id("posSales")),      // linked POS sale when type = "charge"
+    processedBy: v.string(),                   // userId of staff/admin
+    createdAt: v.string(),
+  })
+    .index("by_club", ["clubId"])
+    .index("by_member", ["memberId"])
+    .index("by_club_and_member", ["clubId", "memberId"]),
 
   // Webhook idempotency
   // ============================================================================

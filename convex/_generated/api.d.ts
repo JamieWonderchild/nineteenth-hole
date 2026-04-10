@@ -21,6 +21,7 @@ import type * as golferProfiles from "../golferProfiles.js";
 import type * as http from "../http.js";
 import type * as interclub from "../interclub.js";
 import type * as knockouts from "../knockouts.js";
+import type * as memberAccounts from "../memberAccounts.js";
 import type * as messaging from "../messaging.js";
 import type * as players from "../players.js";
 import type * as pos from "../pos.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   interclub: typeof interclub;
   knockouts: typeof knockouts;
+  memberAccounts: typeof memberAccounts;
   messaging: typeof messaging;
   players: typeof players;
   pos: typeof pos;
