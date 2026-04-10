@@ -195,7 +195,7 @@ export default function MembersPage() {
                     </td>
                     {isAdmin && (
                       <td className="px-5 py-3.5 text-right">
-                        {handicapEdit?.id === m._id ? (
+                        {handicapEdit !== null && handicapEdit.id === m._id ? (
                           <div className="flex items-center justify-end gap-1">
                             <input
                               type="number"

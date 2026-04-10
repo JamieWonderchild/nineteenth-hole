@@ -514,6 +514,68 @@ export default defineSchema({
     .index("by_club", ["clubId"]),
 
   // ============================================================================
+  // Interclub Competitions (County League / Matchplay)
+  // ============================================================================
+
+  interclubLeagues: defineTable({
+    name: v.string(),               // "Middlesex County League"
+    county: v.optional(v.string()), // "Middlesex"
+    season: v.string(),             // "2025-26"
+    format: v.string(),             // 'matchplay' | 'stableford' | 'strokeplay'
+    description: v.optional(v.string()),
+    createdBy: v.string(),          // userId
+    createdAt: v.string(),
+  }),
+
+  interclubTeams: defineTable({
+    leagueId: v.id("interclubLeagues"),
+    clubId: v.id("clubs"),
+    clubName: v.string(),           // denormalised
+    teamName: v.string(),           // "Sabres", "Tigers", "Foxes"
+    handicapMin: v.optional(v.number()), // lower bound of handicap band
+    handicapMax: v.optional(v.number()), // upper bound
+    captainUserId: v.optional(v.string()), // the league rep / team captain
+    createdAt: v.string(),
+  })
+    .index("by_league", ["leagueId"])
+    .index("by_club", ["clubId"])
+    .index("by_league_and_club", ["leagueId", "clubId"]),
+
+  interclubFixtures: defineTable({
+    leagueId: v.id("interclubLeagues"),
+    homeTeamId: v.id("interclubTeams"),
+    awayTeamId: v.id("interclubTeams"),
+    date: v.optional(v.string()),   // ISO date
+    venue: v.optional(v.string()),  // "Finchley Golf Club" or "away"
+    status: v.string(),             // 'scheduled' | 'in_progress' | 'complete' | 'postponed'
+    homePoints: v.optional(v.number()),
+    awayPoints: v.optional(v.number()),
+    notes: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_league", ["leagueId"])
+    .index("by_home_team", ["homeTeamId"])
+    .index("by_away_team", ["awayTeamId"]),
+
+  interclubMatches: defineTable({
+    fixtureId: v.id("interclubFixtures"),
+    leagueId: v.id("interclubLeagues"),
+    matchNumber: v.number(),        // 1–8 (singles) or 1–4 (foursomes)
+    homePlayer: v.string(),         // display name
+    homeUserId: v.optional(v.string()),
+    awayPlayer: v.string(),
+    awayUserId: v.optional(v.string()),
+    result: v.optional(v.string()), // e.g. "3&2", "1 up", "halved", "conceded"
+    // 'home' | 'away' | 'halved' | null
+    winner: v.optional(v.string()),
+    homePoints: v.optional(v.number()), // 1 for win, 0.5 for half, 0
+    awayPoints: v.optional(v.number()),
+  })
+    .index("by_fixture", ["fixtureId"])
+    .index("by_league", ["leagueId"]),
+
+  // ============================================================================
   // Point of Sale — Pro Shop & Bar
   // ============================================================================
 
