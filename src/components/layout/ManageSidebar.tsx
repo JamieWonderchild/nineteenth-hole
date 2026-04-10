@@ -6,8 +6,8 @@ import { api } from "convex/_generated/api";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Users, BookOpen, LogOut,
-  Globe, ChevronRight, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered, Clock, MapPin,
+  LayoutDashboard, Users, LogOut,
+  Globe, ChevronRight, Menu, X, Flag, Trophy, Zap, ListOrdered, Clock, MapPin,
   MessageSquare, BookUser, Mail, Swords, UserCheck, ShoppingCart, Shield, CreditCard, UserCircle, BarChart2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -124,48 +124,52 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
                 {club.name}
               </p>
             )}
+
             <NavItem href="/manage" icon={<LayoutDashboard size={16} />} label="Dashboard" active={is("/manage")} onClick={onNav} />
+
+            {/* Competitions */}
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-3 pt-4 pb-1">Competitions</p>
+            <NavItem href="/manage/results" icon={<Trophy size={16} />} label="Competitions" active={pathname.startsWith("/manage/results") || pathname.startsWith("/manage/competitions")} onClick={onNav} />
+            <NavItem href="/manage/series" icon={<ListOrdered size={16} />} label="Season Series" active={pathname.startsWith("/manage/series")} onClick={onNav} />
+            <NavItem href="/manage/knockouts" icon={<Swords size={16} />} label="Knockouts" active={pathname.startsWith("/manage/knockouts")} onClick={onNav} />
+            <NavItem href="/manage/interclub" icon={<Shield size={16} />} label="Interclub" active={pathname.startsWith("/manage/interclub")} onClick={onNav} />
+
+            {/* Club */}
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-3 pt-4 pb-1">Club</p>
             {isAdmin && (
               <NavItem
-                href="/manage/competitions/new"
-                icon={<Trophy size={16} />}
-                label="New Competition"
-                active={is("/manage/competitions/new")}
+                href="/manage/members"
+                icon={<Users size={16} />}
+                label={pending?.length ? `Members (${pending.length})` : "Members"}
+                active={is("/manage/members")}
                 onClick={onNav}
               />
             )}
-            <NavItem
-              href="/manage/members"
-              icon={<Users size={16} />}
-              label={(isAdmin && pending?.length) ? `Members (${pending.length})` : "Members"}
-              active={is("/manage/members")}
-              onClick={onNav}
-            />
-            <NavItem href="/manage/results" icon={<BookOpen size={16} />} label="Game Book" active={is("/manage/results")} onClick={onNav} />
-            <NavItem href="/manage/series" icon={<ListOrdered size={16} />} label="Season Series" active={pathname.startsWith("/manage/series")} onClick={onNav} />
+            <NavItem href="/manage/directory" icon={<BookUser size={16} />} label="Member Directory" active={pathname.startsWith("/manage/directory")} onClick={onNav} />
             {isAdmin ? (
               <NavItem href="/manage/tee-times" icon={<Clock size={16} />} label="Tee Times" active={pathname.startsWith("/manage/tee-times")} onClick={onNav} />
             ) : (
               <NavItem href={`/${club.slug}/tee-times`} icon={<Clock size={16} />} label="Tee Times" active={pathname.startsWith(`/${club.slug}/tee-times`)} onClick={onNav} />
             )}
-            {isAdmin && (
-              <NavItem href="/manage/courses" icon={<MapPin size={16} />} label="Course Card" active={pathname.startsWith("/manage/courses")} onClick={onNav} />
-            )}
-            <NavItem href="/manage/directory" icon={<BookUser size={16} />} label="Member Directory" active={pathname.startsWith("/manage/directory")} onClick={onNav} />
-            <NavItem href="/manage/knockouts" icon={<Swords size={16} />} label="Knockouts" active={pathname.startsWith("/manage/knockouts")} onClick={onNav} />
-            <NavItem href="/manage/interclub" icon={<Shield size={16} />} label="Interclub" active={pathname.startsWith("/manage/interclub")} onClick={onNav} />
             {isStaff && (
               <NavItem href="/manage/visitors" icon={<UserCheck size={16} />} label="Visitors" active={pathname.startsWith("/manage/visitors")} onClick={onNav} />
             )}
             {isStaff && (
               <NavItem href="/manage/pos" icon={<ShoppingCart size={16} />} label="Point of Sale" active={pathname.startsWith("/manage/pos")} onClick={onNav} />
             )}
+
+            {/* Admin tools */}
             {isAdmin && (
-              <NavItem href="/manage/analytics" icon={<BarChart2 size={16} />} label="Analytics" active={pathname.startsWith("/manage/analytics")} onClick={onNav} />
+              <>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-3 pt-4 pb-1">Admin</p>
+                <NavItem href="/manage/analytics" icon={<BarChart2 size={16} />} label="Analytics" active={pathname.startsWith("/manage/analytics")} onClick={onNav} />
+                <NavItem href="/manage/comms" icon={<Mail size={16} />} label="Communications" active={pathname.startsWith("/manage/comms")} onClick={onNav} />
+                <NavItem href="/manage/courses" icon={<MapPin size={16} />} label="Course Card" active={pathname.startsWith("/manage/courses")} onClick={onNav} />
+              </>
             )}
-            {isAdmin && (
-              <NavItem href="/manage/comms" icon={<Mail size={16} />} label="Communications" active={pathname.startsWith("/manage/comms")} onClick={onNav} />
-            )}
+
+            {/* Account */}
+            <div className="my-2 border-t border-border" />
             <NavItem
               href="/messages"
               icon={<MessageSquare size={16} />}
@@ -173,7 +177,6 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               active={pathname.startsWith("/messages")}
               onClick={onNav}
             />
-            <div className="my-2 border-t border-border" />
             <NavItem href="/manage/profile" icon={<UserCircle size={16} />} label="My Profile" active={is("/manage/profile")} onClick={onNav} />
             {isAdmin && (
               <NavItem href="/manage/billing" icon={<CreditCard size={16} />} label="Billing" active={is("/manage/billing")} onClick={onNav} />

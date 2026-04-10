@@ -4,7 +4,10 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
 import Link from "next/link";
+import { Plus, Trophy } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
+
+const STATUS_ORDER: Record<string, number> = { live: 0, open: 1, draft: 2, complete: 3 };
 
 export default function ResultsPage() {
   const { user } = useUser();
@@ -14,6 +17,7 @@ export default function ResultsPage() {
     user ? { userId: user.id } : "skip"
   );
   const activeMembership = memberships?.find(m => m.status === "active");
+  const isAdmin = activeMembership?.role === "admin";
   const club = useQuery(
     api.clubs.get,
     activeMembership ? { clubId: activeMembership.clubId } : "skip"
@@ -23,9 +27,9 @@ export default function ResultsPage() {
     club ? { clubId: club._id } : "skip"
   );
 
-  const completed = competitions?.filter(c => c.status === "complete") ?? [];
-  const live = competitions?.filter(c => c.status === "live") ?? [];
-  const all = [...live, ...completed];
+  const sorted = [...(competitions ?? [])].sort(
+    (a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)
+  );
 
   if (!club || !competitions) {
     return (
@@ -37,19 +41,35 @@ export default function ResultsPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Game Book</h1>
-        <p className="text-gray-500 text-sm mt-0.5">Record of all competitions at {club.name}</p>
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Competitions</h1>
+          <p className="text-gray-500 text-sm mt-0.5">All competitions at {club.name}</p>
+        </div>
+        {isAdmin && (
+          <Link
+            href="/manage/competitions/new"
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            <Plus size={15} />
+            New competition
+          </Link>
+        )}
       </div>
 
-      {all.length === 0 ? (
+      {sorted.length === 0 ? (
         <div className="bg-white border border-dashed border-gray-300 rounded-xl p-12 text-center">
-          <p className="text-gray-400 mb-3">No completed competitions yet</p>
-          <p className="text-gray-400 text-sm">Results will appear here once competitions are marked complete.</p>
+          <Trophy size={32} className="text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-400 mb-3">No competitions yet</p>
+          {isAdmin && (
+            <Link href="/manage/competitions/new" className="text-green-700 font-medium text-sm hover:underline">
+              Create your first competition →
+            </Link>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
-          {all.map(comp => (
+          {sorted.map(comp => (
             <CompetitionResult
               key={comp._id}
               competition={comp}
@@ -89,8 +109,16 @@ function CompetitionResult({
   const topPrize = Math.round(pot * topPrizePercent / 100);
 
   const statusColors: Record<string, string> = {
+    draft: "bg-gray-100 text-gray-500",
+    open: "bg-blue-100 text-blue-700",
     live: "bg-green-100 text-green-700",
     complete: "bg-purple-100 text-purple-700",
+  };
+  const statusLabel: Record<string, string> = {
+    draft: "Draft",
+    open: "Open",
+    live: "In progress",
+    complete: "Complete",
   };
 
   return (
@@ -100,7 +128,7 @@ function CompetitionResult({
           <div className="flex items-center gap-2 mb-1">
             <h3 className="font-semibold text-gray-900">{competition.name}</h3>
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[competition.status] ?? "bg-gray-100 text-gray-600"}`}>
-              {competition.status === "live" ? "In progress" : "Complete"}
+              {statusLabel[competition.status] ?? competition.status}
             </span>
           </div>
           <p className="text-sm text-gray-500">
