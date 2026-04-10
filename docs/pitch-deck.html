@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The 19th Hole — Board Presentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green-900: #0a1f10;
+    --green-800: #0f2a16;
+    --green-700: #14381e;
+    --green-600: #1a4a28;
+    --green-500: #166534;
+    --green-400: #16a34a;
+    --green-300: #22c55e;
+    --green-100: #dcfce7;
+    --green-50:  #f0fdf4;
+    --cream: #fafaf7;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-400: #9ca3af;
+    --gray-600: #4b5563;
+    --gray-800: #1f2937;
+    --white: #ffffff;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #000;
+    overflow: hidden;
+  }
+
+  /* ── Slide engine ── */
+  .deck { width: 100vw; height: 100vh; position: relative; }
+
+  .slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.4s ease;
+  }
+  .slide.active { opacity: 1; pointer-events: all; }
+
+  /* ── Progress bar ── */
+  #progress {
+    position: fixed; bottom: 0; left: 0;
+    height: 3px; background: var(--green-300);
+    transition: width 0.4s ease; z-index: 100;
+  }
+
+  /* ── Slide counter ── */
+  #counter {
+    position: fixed; bottom: 16px; right: 20px;
+    font-size: 11px; font-weight: 500; letter-spacing: 0.05em;
+    color: rgba(255,255,255,0.3); z-index: 100;
+  }
+
+  /* ── Nav hints ── */
+  #nav-hint {
+    position: fixed; bottom: 16px; left: 20px;
+    font-size: 11px; color: rgba(255,255,255,0.2);
+    z-index: 100; letter-spacing: 0.04em;
+  }
+
+  /* ══════════════════════════════════════════
+     SLIDE TYPES
+  ══════════════════════════════════════════ */
+
+  /* Cover */
+  .slide-cover {
+    background: var(--green-900);
+    justify-content: center; align-items: flex-start;
+    padding: 80px 100px;
+  }
+  .slide-cover .eyebrow {
+    font-size: 12px; font-weight: 600; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--green-300);
+    margin-bottom: 28px;
+  }
+  .slide-cover h1 {
+    font-size: 88px; font-weight: 900; line-height: 0.95;
+    color: var(--white); letter-spacing: -0.03em;
+    margin-bottom: 32px;
+  }
+  .slide-cover h1 span { color: var(--green-300); }
+  .slide-cover .tagline {
+    font-size: 22px; font-weight: 300; color: rgba(255,255,255,0.55);
+    max-width: 480px; line-height: 1.5;
+  }
+  .slide-cover .meta {
+    position: absolute; bottom: 60px; left: 100px;
+    font-size: 13px; color: rgba(255,255,255,0.25);
+    font-weight: 400; letter-spacing: 0.02em;
+  }
+  .slide-cover .flag {
+    position: absolute; right: 100px; top: 50%;
+    transform: translateY(-50%);
+    width: 260px; height: 260px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--green-700) 0%, var(--green-600) 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 120px;
+  }
+
+  /* Dark section */
+  .slide-dark {
+    background: var(--green-900);
+    padding: 70px 100px;
+    justify-content: center;
+  }
+  .slide-dark .label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--green-300); margin-bottom: 20px;
+  }
+  .slide-dark h2 {
+    font-size: 52px; font-weight: 800; color: var(--white);
+    line-height: 1.05; letter-spacing: -0.025em; margin-bottom: 48px;
+  }
+
+  /* Light section */
+  .slide-light {
+    background: var(--cream);
+    padding: 70px 100px;
+    justify-content: center;
+  }
+  .slide-light .label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--green-500); margin-bottom: 20px;
+  }
+  .slide-light h2 {
+    font-size: 48px; font-weight: 800; color: var(--gray-800);
+    line-height: 1.05; letter-spacing: -0.025em; margin-bottom: 40px;
+  }
+
+  /* Split layout */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: start; }
+  .split-wide { display: grid; grid-template-columns: 1.2fr 1fr; gap: 60px; align-items: center; }
+
+  /* ── Problem slide items ── */
+  .problem-list { display: flex; flex-direction: column; gap: 16px; }
+  .problem-item {
+    display: flex; align-items: flex-start; gap: 16px;
+    padding: 18px 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+  }
+  .problem-item .icon {
+    font-size: 20px; flex-shrink: 0; margin-top: 1px;
+  }
+  .problem-item .text { font-size: 15px; color: rgba(255,255,255,0.75); line-height: 1.5; }
+  .problem-item .text strong { color: var(--white); font-weight: 600; }
+  .problem-punchline {
+    margin-top: 28px; font-size: 18px; font-weight: 600;
+    color: var(--green-300); line-height: 1.4;
+  }
+
+  /* ── Product grid ── */
+  .product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .product-card {
+    padding: 18px 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+  }
+  .product-card .icon { font-size: 22px; margin-bottom: 10px; }
+  .product-card h3 { font-size: 14px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+  .product-card p { font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.4; }
+  .product-live {
+    display: inline-flex; align-items: center; gap: 5px;
+    margin-top: 8px; font-size: 11px; font-weight: 600;
+    color: var(--green-300); letter-spacing: 0.05em;
+  }
+  .product-live::before {
+    content: ''; display: block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--green-300);
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; } 50% { opacity: 0.4; }
+  }
+
+  /* ── Money cards ── */
+  .money-cards { display: flex; flex-direction: column; gap: 16px; }
+  .money-card {
+    padding: 22px 24px; border-radius: 12px;
+  }
+  .money-card.saving { background: #fef3c7; border: 1px solid #fde68a; }
+  .money-card.revenue { background: var(--green-50); border: 1px solid #bbf7d0; }
+  .money-card .mc-label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gray-600); margin-bottom: 6px; }
+  .money-card .mc-amount { font-size: 38px; font-weight: 900; letter-spacing: -0.03em; line-height: 1; margin-bottom: 6px; }
+  .money-card.saving .mc-amount { color: #92400e; }
+  .money-card.revenue .mc-amount { color: var(--green-500); }
+  .money-card .mc-desc { font-size: 14px; color: var(--gray-600); line-height: 1.5; }
+  .money-total {
+    margin-top: 20px; padding: 20px 24px;
+    background: var(--green-800); border-radius: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .money-total .mt-label { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.6); }
+  .money-total .mt-amount { font-size: 32px; font-weight: 900; color: var(--green-300); letter-spacing: -0.02em; }
+
+  /* ── Member experience ── */
+  .experience-items { display: flex; flex-direction: column; gap: 14px; }
+  .exp-item { display: flex; align-items: flex-start; gap: 14px; }
+  .exp-item .exp-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: var(--green-100); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+  }
+  .exp-item .exp-text h4 { font-size: 15px; font-weight: 700; color: var(--gray-800); margin-bottom: 2px; }
+  .exp-item .exp-text p { font-size: 13px; color: var(--gray-600); line-height: 1.45; }
+  .vs-box {
+    background: var(--gray-100); border-radius: 14px; padding: 28px;
+  }
+  .vs-box h3 { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-400); margin-bottom: 16px; }
+  .vs-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+  .vs-row:last-child { margin-bottom: 0; }
+  .vs-row .cross { color: #dc2626; font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .vs-row .tick { color: var(--green-500); font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .vs-row p { font-size: 14px; color: var(--gray-700); line-height: 1.4; }
+
+  /* ── Market / numbers ── */
+  .big-stat { margin-bottom: 40px; }
+  .big-stat .bs-num { font-size: 80px; font-weight: 900; color: var(--white); letter-spacing: -0.04em; line-height: 1; }
+  .big-stat .bs-num span { color: var(--green-300); }
+  .big-stat .bs-label { font-size: 16px; color: rgba(255,255,255,0.5); margin-top: 8px; }
+  .arr-bars { display: flex; flex-direction: column; gap: 10px; }
+  .arr-row { display: flex; align-items: center; gap: 14px; }
+  .arr-row .yr { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.4); width: 28px; flex-shrink: 0; }
+  .arr-row .bar-wrap { flex: 1; background: rgba(255,255,255,0.06); border-radius: 4px; height: 28px; overflow: hidden; }
+  .arr-row .bar { height: 100%; background: linear-gradient(90deg, var(--green-600), var(--green-400)); border-radius: 4px; display: flex; align-items: center; padding-left: 10px; transition: width 0.8s ease; }
+  .arr-row .bar-val { font-size: 12px; font-weight: 700; color: white; white-space: nowrap; }
+  .arr-row .bar.target { background: linear-gradient(90deg, #166534, #22c55e); }
+
+  /* ── Team ── */
+  .team-cards { display: flex; flex-direction: column; gap: 20px; }
+  .team-card {
+    display: flex; align-items: flex-start; gap: 20px;
+    padding: 24px; border-radius: 14px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+  .team-avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 22px;
+    background: var(--green-700);
+  }
+  .team-card h3 { font-size: 16px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+  .team-card .role { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--green-300); margin-bottom: 10px; }
+  .team-card p { font-size: 14px; color: rgba(255,255,255,0.6); line-height: 1.55; }
+  .team-card .highlight { color: var(--white); font-weight: 600; }
+
+  /* ── Milestones ── */
+  .milestone-grid { display: flex; flex-direction: column; gap: 8px; }
+  .milestone-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-radius: 8px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  }
+  .milestone-row.live { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.2); }
+  .milestone-row span { font-size: 14px; color: rgba(255,255,255,0.7); }
+  .milestone-row .badge {
+    font-size: 11px; font-weight: 700; padding: 3px 10px;
+    border-radius: 20px; letter-spacing: 0.05em;
+  }
+  .badge-live { background: rgba(34,197,94,0.15); color: var(--green-300); }
+  .badge-pending { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4); }
+  .badge-progress { background: rgba(251,191,36,0.15); color: #fbbf24; }
+
+  /* ── Ask ── */
+  .ask-items { display: flex; flex-direction: column; gap: 20px; }
+  .ask-item {
+    display: flex; align-items: flex-start; gap: 20px;
+    padding: 24px; border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .ask-num {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--green-600); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 900; color: var(--white);
+  }
+  .ask-item h3 { font-size: 16px; font-weight: 700; color: var(--white); margin-bottom: 6px; }
+  .ask-item p { font-size: 14px; color: rgba(255,255,255,0.55); line-height: 1.55; }
+  .ask-footer {
+    margin-top: 28px; text-align: center;
+    font-size: 20px; font-weight: 700; color: var(--white);
+    padding: 20px; border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .ask-footer span { color: var(--green-300); }
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+  <!-- ─── 1. COVER ─── -->
+  <section class="slide slide-cover active" data-index="0">
+    <div class="eyebrow">Finchley Golf Club · April 2026 · Confidential</div>
+    <h1>The<br/><span>19th</span><br/>Hole</h1>
+    <p class="tagline">Golf club management software — built by a member of this club, running at this club, right now.</p>
+    <div class="meta">Board Presentation · For discussion only · Not for distribution</div>
+    <div class="flag">⛳</div>
+  </section>
+
+  <!-- ─── 2. THE PROBLEM ─── -->
+  <section class="slide slide-dark" data-index="1">
+    <div class="label">The problem</div>
+    <h2>FGC deserves<br/>better software.</h2>
+    <div class="problem-list">
+      <div class="problem-item">
+        <div class="icon">🐍</div>
+        <div class="text"><strong>Competition results</strong> require a Python script to bypass Cloudflare security on our own website — maintained by one volunteer. If he stops, results stop.</div>
+      </div>
+      <div class="problem-item">
+        <div class="icon">📊</div>
+        <div class="text"><strong>RTSF tracking</strong> lives in an Excel workbook with VBA macros. It breaks. It requires manual merging, renaming, and re-importing every week.</div>
+      </div>
+      <div class="problem-item">
+        <div class="icon">📋</div>
+        <div class="text"><strong>Interclub results</strong> for Sabres, Tigers, and Foxes are tracked on paper. There is no live standings view. Captains email each other.</div>
+      </div>
+      <div class="problem-item">
+        <div class="icon">🍺</div>
+        <div class="text"><strong>Bar and pro shop</strong> have no integrated sales data. Stock variances are invisible. Revenue tracking is manual.</div>
+      </div>
+    </div>
+    <p class="problem-punchline">The tools clubs pay for — BRS, ClubV1, Intelligentgolf — haven't improved in a decade. None use AI. None talk to each other.</p>
+  </section>
+
+  <!-- ─── 3. THE PLATFORM ─── -->
+  <section class="slide slide-dark" data-index="2">
+    <div class="label">What we've built</div>
+    <h2>One platform.<br/>Everything replaced.</h2>
+    <div class="product-grid">
+      <div class="product-card">
+        <div class="icon">🏆</div>
+        <h3>Competitions</h3>
+        <p>Entries, draws, live scoring, RTSF leaderboard. No Excel. No scraping.</p>
+        <div class="product-live">Live at FGC</div>
+      </div>
+      <div class="product-card">
+        <div class="icon">🕐</div>
+        <h3>Tee Times</h3>
+        <p>Member and visitor bookings with utilisation tracking and revenue data.</p>
+        <div class="product-live">Live at FGC</div>
+      </div>
+      <div class="product-card">
+        <div class="icon">🛡️</div>
+        <h3>Interclub</h3>
+        <p>Middlesex county league — Sabres, Tigers, Foxes. Live fixtures and standings.</p>
+        <div class="product-live">Live at FGC</div>
+      </div>
+      <div class="product-card">
+        <div class="icon">🛒</div>
+        <h3>Bar & Pro Shop POS</h3>
+        <p>Full point-of-sale, stock management, daily sales reports.</p>
+        <div class="product-live">Live at FGC</div>
+      </div>
+      <div class="product-card">
+        <div class="icon">📱</div>
+        <h3>Member App</h3>
+        <p>Handicap tracking, results history, directory, messaging, bookings.</p>
+        <div class="product-live">Live at FGC</div>
+      </div>
+      <div class="product-card">
+        <div class="icon">✨</div>
+        <h3>AI Tools</h3>
+        <p>Auto-generated results summaries, engagement analysis, team selection.</p>
+        <div class="product-live">Live at FGC</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── 4. SAVE MONEY ─── -->
+  <section class="slide slide-light" data-index="3">
+    <div class="label">Value for FGC — 1 of 3</div>
+    <h2>It saves the<br/>club money.</h2>
+    <div class="split">
+      <div class="money-cards">
+        <div class="money-card saving">
+          <div class="mc-label">Current annual spend</div>
+          <div class="mc-amount">£6–10k</div>
+          <div class="mc-desc">Software licences + the volunteer administration time required to compensate for what those tools don't do.</div>
+        </div>
+        <div class="money-card revenue">
+          <div class="mc-label">With this platform</div>
+          <div class="mc-amount">&lt; £1k</div>
+          <div class="mc-desc">One subscription. One system. Everything covered. No more workarounds, no more fragility.</div>
+        </div>
+      </div>
+      <div>
+        <p style="font-size: 16px; color: #374151; line-height: 1.7; margin-bottom: 24px;">The Excel workbooks, the Python script, the VBA macros — all of it replaced by a single platform that runs itself.</p>
+        <p style="font-size: 16px; color: #374151; line-height: 1.7; margin-bottom: 24px;">No more single points of failure. No more praying the scraper still works on a Tuesday night before results go up.</p>
+        <div style="padding: 20px; background: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;">
+          <p style="font-size: 22px; font-weight: 800; color: #166534;">Saving: £5–9k/year</p>
+          <p style="font-size: 13px; color: #4b5563; margin-top: 4px;">Conservative estimate, year one.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── 5. MAKE MONEY ─── -->
+  <section class="slide slide-light" data-index="4">
+    <div class="label">Value for FGC — 2 of 3</div>
+    <h2>It generates<br/>new revenue.</h2>
+    <div class="split">
+      <div>
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div style="padding: 20px 22px; background: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;">
+            <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #16a34a; margin-bottom: 6px;">Tee time utilisation</div>
+            <div style="font-size: 28px; font-weight: 900; color: #166534; letter-spacing: -0.02em;">£15–20k</div>
+            <div style="font-size: 13px; color: #4b5563; margin-top: 4px;">Filling 10% more visitor slots at FGC's green fee. The platform shows you exactly which slots are being left empty.</div>
+          </div>
+          <div style="padding: 20px 22px; background: #fef3c7; border-radius: 12px; border: 1px solid #fde68a;">
+            <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #d97706; margin-bottom: 6px;">Bar revenue recovery</div>
+            <div style="font-size: 28px; font-weight: 900; color: #92400e; letter-spacing: -0.02em;">15–20%</div>
+            <div style="font-size: 13px; color: #4b5563; margin-top: 4px;">Clubs using our POS system typically find this in previously invisible stock variances, tab discrepancies, and untracked sales.</div>
+          </div>
+          <div style="padding: 20px 22px; background: #ede9fe; border-radius: 12px; border: 1px solid #ddd6fe;">
+            <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #7c3aed; margin-bottom: 6px;">Competition platform fees</div>
+            <div style="font-size: 28px; font-weight: 900; color: #5b21b6; letter-spacing: -0.02em;">Stay at FGC</div>
+            <div style="font-size: 13px; color: #4b5563; margin-top: 4px;">Currently flow to third-party providers. Under this model, entry fees and processing margin stay in the club's account.</div>
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; justify-content: center;">
+        <div style="padding: 40px; background: #0f2a16; border-radius: 16px; text-align: center;">
+          <p style="font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 16px;">Total estimated annual<br/>benefit to FGC</p>
+          <p style="font-size: 64px; font-weight: 900; color: #22c55e; letter-spacing: -0.04em; line-height: 1;">£25–40k</p>
+          <p style="font-size: 14px; color: rgba(255,255,255,0.4); margin-top: 12px;">per year, conservatively</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── 6. MEMBER EXPERIENCE ─── -->
+  <section class="slide slide-light" data-index="5">
+    <div class="label">Value for FGC — 3 of 3</div>
+    <h2>Members get what<br/>they actually want.</h2>
+    <div class="split-wide">
+      <div class="experience-items">
+        <div class="exp-item">
+          <div class="exp-icon">📊</div>
+          <div class="exp-text">
+            <h4>Handicap & results, from their phone</h4>
+            <p>Every competition result, their handicap trend, RTSF position — instantly visible. No logging in to a website built in 2011.</p>
+          </div>
+        </div>
+        <div class="exp-item">
+          <div class="exp-icon">🏆</div>
+          <div class="exp-text">
+            <h4>Competition entry in 30 seconds</h4>
+            <p>Find the competition, tap enter, done. No PDF forms. No phoning the pro shop.</p>
+          </div>
+        </div>
+        <div class="exp-item">
+          <div class="exp-icon">🛡️</div>
+          <div class="exp-text">
+            <h4>Live interclub results</h4>
+            <p>The Sabres beat Enfield 4–0 last week. Members found out three days later via email. That changes.</p>
+          </div>
+        </div>
+        <div class="exp-item">
+          <div class="exp-icon">✨</div>
+          <div class="exp-text">
+            <h4>AI-written results summaries</h4>
+            <p>After every competition, a WhatsApp-ready results post is generated automatically. One click to share.</p>
+          </div>
+        </div>
+        <div class="exp-item">
+          <div class="exp-icon">🤝</div>
+          <div class="exp-text">
+            <h4>A club that feels alive</h4>
+            <p>Member directory, messaging, announcements. A digital experience that reflects how active FGC actually is.</p>
+          </div>
+        </div>
+      </div>
+      <div class="vs-box">
+        <h3>Today vs Tomorrow</h3>
+        <div class="vs-row">
+          <span class="cross">✗</span>
+          <p>Python script to get your own results</p>
+        </div>
+        <div class="vs-row">
+          <span class="cross">✗</span>
+          <p>VBA macros that break in Excel</p>
+        </div>
+        <div class="vs-row">
+          <span class="cross">✗</span>
+          <p>Interclub on paper and email</p>
+        </div>
+        <div class="vs-row">
+          <span class="cross">✗</span>
+          <p>Bar data you can't see or trust</p>
+        </div>
+        <div class="vs-row">
+          <span class="cross">✗</span>
+          <p>A website that hasn't changed since 2011</p>
+        </div>
+        <div style="border-top: 1px solid #e5e7eb; margin: 16px 0;"></div>
+        <div class="vs-row">
+          <span class="tick">✓</span>
+          <p>Live results, leaderboards, on any device</p>
+        </div>
+        <div class="vs-row">
+          <span class="tick">✓</span>
+          <p>RTSF, draws, and entries — automated</p>
+        </div>
+        <div class="vs-row">
+          <span class="tick">✓</span>
+          <p>Interclub live scores and standings</p>
+        </div>
+        <div class="vs-row">
+          <span class="tick">✓</span>
+          <p>Full bar and pro shop POS with reporting</p>
+        </div>
+        <div class="vs-row">
+          <span class="tick">✓</span>
+          <p>A club experience members are proud of</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── 7. THE BUSINESS ─── -->
+  <section class="slide slide-dark" data-index="6">
+    <div class="label">The business</div>
+    <div class="split-wide">
+      <div>
+        <h2>A £22M market<br/>with no worthy<br/>competition.</h2>
+        <div class="big-stat" style="margin-top: 32px;">
+          <div class="bs-num"><span>2,500</span></div>
+          <div class="bs-label">golf clubs in the UK, paying for software that hasn't improved in a decade</div>
+        </div>
+        <div style="margin-top: 8px; padding: 20px; background: rgba(34,197,94,0.1); border-radius: 10px; border: 1px solid rgba(34,197,94,0.2);">
+          <p style="font-size: 14px; color: rgba(255,255,255,0.7); line-height: 1.6;"><strong style="color: #22c55e;">Our distribution advantage:</strong> Our sales lead currently visits 80+ golf clubs across Middlesex and Hertfordshire every single month — in his current job. He has personal relationships with club managers and PGA professionals at every one of them. He is not a hire. He is already doing the job.</p>
+        </div>
+      </div>
+      <div>
+        <p style="font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 18px;">Projected ARR</p>
+        <div class="arr-bars">
+          <div class="arr-row">
+            <span class="yr">Y1</span>
+            <div class="bar-wrap"><div class="bar" style="width: 5%"><span class="bar-val">£5k</span></div></div>
+          </div>
+          <div class="arr-row">
+            <span class="yr">Y2</span>
+            <div class="bar-wrap"><div class="bar" style="width: 15%"><span class="bar-val">£31k</span></div></div>
+          </div>
+          <div class="arr-row">
+            <span class="yr">Y3</span>
+            <div class="bar-wrap"><div class="bar" style="width: 42%"><span class="bar-val">£135k</span></div></div>
+          </div>
+          <div class="arr-row">
+            <span class="yr">Y4</span>
+            <div class="bar-wrap"><div class="bar" style="width: 68%"><span class="bar-val">£408k</span></div></div>
+          </div>
+          <div class="arr-row">
+            <span class="yr">Y5</span>
+            <div class="bar-wrap"><div class="bar target" style="width: 100%"><span class="bar-val">£972k → £1M+</span></div></div>
+          </div>
+        </div>
+        <div style="margin-top: 28px; padding: 20px; background: rgba(255,255,255,0.04); border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+          <p style="font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.6;">Raising <strong style="color: white;">£500,000</strong> at a <strong style="color: white;">£1.5M pre-money valuation</strong> (25% equity) to fund the founding team. SEIS-eligible — a <strong style="color: #22c55e;">£10k investment costs £5k net</strong> after 50% income tax relief.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── 8. THE TEAM ─── -->
+  <section class="slide slide-dark" data-index="7">
+    <div class="label">The team</div>
+    <h2>The right people,<br/>already in position.</h2>
+    <div class="team-cards">
+      <div class="team-card">
+        <div class="team-avatar">👨‍💻</div>
+        <div>
+          <h3>Founder — Engineer & CEO</h3>
+          <div class="role">Technology · Product</div>
+          <p>An FGC member who has built the entire platform in his spare time while employed at a <span class="highlight">leading European AI company</span>. That's why the product has genuine AI capability built in from day one. Would leave that role to pursue this full-time upon funding.</p>
+        </div>
+      </div>
+      <div class="team-card">
+        <div class="team-avatar">🏌️</div>
+        <div>
+          <h3>Sales Lead — Golf Professional</h3>
+          <div class="role">Sales · Distribution · Golf</div>
+          <p>Currently services <span class="highlight">80+ golf clubs across Middlesex and Hertfordshire every month</span> in his existing commercial role — driving to courses, building relationships with managers and PGA professionals. He has the contact list, the trust, and the credibility. He lives and breathes golf. He is already doing the job.</p>
+        </div>
+      </div>
+    </div>
+    <p style="margin-top: 20px; font-size: 14px; color: rgba(255,255,255,0.4); line-height: 1.6;">A second engineer and an operations hire would follow within the first six months of funding.</p>
+  </section>
+
+  <!-- ─── 9. WHERE WE ARE ─── -->
+  <section class="slide slide-dark" data-index="8">
+    <div class="label">Traction</div>
+    <h2>Already live.<br/>Already working.</h2>
+    <div class="milestone-grid">
+      <div class="milestone-row live"><span>Full platform built and deployed</span><span class="badge badge-live">● LIVE</span></div>
+      <div class="milestone-row live"><span>FGC running on the platform</span><span class="badge badge-live">● LIVE</span></div>
+      <div class="milestone-row live"><span>Competition management (inc. RTSF leaderboard)</span><span class="badge badge-live">● LIVE</span></div>
+      <div class="milestone-row live"><span>Interclub — Sabres, Tigers, Foxes — live fixtures & standings</span><span class="badge badge-live">● LIVE</span></div>
+      <div class="milestone-row live"><span>Bar & pro shop point-of-sale</span><span class="badge badge-live">● LIVE</span></div>
+      <div class="milestone-row live"><span>AI results summaries & member insights</span><span class="badge badge-live">● LIVE</span></div>
+      <div class="milestone-row live"><span>Tee time booking & visitor management</span><span class="badge badge-live">● LIVE</span></div>
+      <div class="milestone-row"><span>Company incorporated</span><span class="badge badge-pending">Pending board endorsement</span></div>
+      <div class="milestone-row"><span>England Golf ISV partnership</span><span class="badge badge-progress">In progress</span></div>
+      <div class="milestone-row"><span>Second club onboarded</span><span class="badge badge-progress">Target: June 2026</span></div>
+    </div>
+  </section>
+
+  <!-- ─── 10. THE ASK ─── -->
+  <section class="slide slide-dark" data-index="9">
+    <div class="label">What we're asking</div>
+    <h2>Not money.<br/>Belief.</h2>
+    <div class="ask-items">
+      <div class="ask-item">
+        <div class="ask-num">1</div>
+        <div>
+          <h3>Endorsement</h3>
+          <p>The board's support to continue using FGC as the founding pilot club, and permission to reference Finchley in early conversations with other clubs and potential partners.</p>
+        </div>
+      </div>
+      <div class="ask-item">
+        <div class="ask-num">2</div>
+        <div>
+          <h3>Introduction rights</h3>
+          <p>Access to the club's professional network — county golf union contacts, the PGA professional, and supplier relationships that would help us navigate the England Golf partnership process.</p>
+        </div>
+      </div>
+      <div class="ask-item">
+        <div class="ask-num">3</div>
+        <div>
+          <h3>A founding club stake</h3>
+          <p>In exchange for being the club that made this possible, FGC has the opportunity to hold a small equity stake in the company. Terms to be put to the board formally once incorporated. This is genuine upside as the platform scales.</p>
+        </div>
+      </div>
+    </div>
+    <div class="ask-footer">We are not asking for money. We are asking for <span>belief</span>.</div>
+  </section>
+
+</div><!-- /deck -->
+
+<div id="progress"></div>
+<div id="counter"></div>
+<div id="nav-hint">← → to navigate · F for fullscreen</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let current = 0;
+
+  function go(n) {
+    slides[current].classList.remove('active');
+    current = Math.max(0, Math.min(slides.length - 1, n));
+    slides[current].classList.add('active');
+    document.getElementById('progress').style.width = ((current / (slides.length - 1)) * 100) + '%';
+    document.getElementById('counter').textContent = (current + 1) + ' / ' + slides.length;
+  }
+
+  go(0);
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') go(current + 1);
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') go(current - 1);
+    if (e.key === 'f' || e.key === 'F') {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    }
+  });
+
+  document.getElementById('deck').addEventListener('click', e => {
+    if (e.clientX > window.innerWidth / 2) go(current + 1);
+    else go(current - 1);
+  });
+</script>
+</body>
+</html>
