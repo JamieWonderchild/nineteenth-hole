@@ -1,6 +1,24 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { api } from "./_generated/api";
+import type { MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+
+async function assertCompetitionAdmin(ctx: MutationCtx, competitionId: Id<"competitions">) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Unauthenticated");
+  const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+  if (identity.email && superAdminEmails.includes(identity.email)) return;
+  const competition = await ctx.db.get(competitionId);
+  if (!competition) throw new Error("Competition not found");
+  if (competition.scope === "platform") throw new Error("Platform competition — super admin only");
+  if (!competition.clubId) throw new Error("No club attached to competition");
+  const member = await ctx.db
+    .query("clubMembers")
+    .withIndex("by_club_and_user", q => q.eq("clubId", competition.clubId!).eq("userId", identity.subject))
+    .unique();
+  if (!member || member.role !== "admin") throw new Error("Not authorised");
+}
 
 export const listByCompetition = query({
   args: { competitionId: v.id("competitions") },
@@ -187,13 +205,16 @@ export const linkStripeSession = mutation({
   },
 });
 
-// Assign drawn players after draw ceremony
+// Assign drawn players after draw ceremony (admin only)
 export const assignDrawnPlayers = mutation({
   args: {
     entryId: v.id("entries"),
     drawnPlayerIds: v.array(v.id("players")),
   },
   handler: async (ctx, { entryId, drawnPlayerIds }) => {
+    const entry = await ctx.db.get(entryId);
+    if (!entry) throw new Error("Entry not found");
+    if (entry.competitionId) await assertCompetitionAdmin(ctx, entry.competitionId);
     await ctx.db.patch(entryId, {
       drawnPlayerIds,
       updatedAt: new Date().toISOString(),
@@ -206,6 +227,7 @@ export const assignDrawnPlayers = mutation({
 export const runDraw = mutation({
   args: { competitionId: v.id("competitions") },
   handler: async (ctx, { competitionId }) => {
+    await assertCompetitionAdmin(ctx, competitionId);
     const competition = await ctx.db.get(competitionId);
     if (!competition) throw new Error("Competition not found");
     if (competition.drawCompletedAt) throw new Error("Draw already completed");
@@ -265,6 +287,7 @@ export const runDraw = mutation({
 export const refreshLeaderboard = mutation({
   args: { competitionId: v.id("competitions") },
   handler: async (ctx, { competitionId }) => {
+    await assertCompetitionAdmin(ctx, competitionId);
     const competition = await ctx.db.get(competitionId);
     if (!competition) throw new Error("Competition not found");
 

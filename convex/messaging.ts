@@ -321,6 +321,18 @@ export const addMembersToGroup = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthenticated");
 
+    // Caller must already be a member of the conversation
+    const callerMembership = await ctx.db
+      .query("conversationMembers")
+      .withIndex("by_conversation_and_user", q =>
+        q.eq("conversationId", conversationId).eq("userId", identity.subject)
+      )
+      .unique();
+    if (!callerMembership) throw new Error("Not a member of this conversation");
+
+    const conversation = await ctx.db.get(conversationId);
+    if (!conversation || conversation.type !== "group") throw new Error("Not a group conversation");
+
     const now = new Date().toISOString();
     for (const member of members) {
       const existing = await ctx.db

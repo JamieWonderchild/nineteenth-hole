@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 
 function getSuperAdminEmails(): string[] {
   return (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
@@ -125,7 +125,8 @@ export const generateImportToken = mutation({
   },
 });
 
-export const updateStripeCustomer = mutation({
+// Internal — called only from Stripe webhook action (not directly from client)
+export const updateStripeCustomer = internalMutation({
   args: {
     clubId: v.id("clubs"),
     stripeCustomerId: v.string(),
@@ -138,7 +139,7 @@ export const updateStripeCustomer = mutation({
   },
 });
 
-export const updateSubscription = mutation({
+export const updateSubscription = internalMutation({
   args: {
     clubId: v.id("clubs"),
     plan: v.string(),
