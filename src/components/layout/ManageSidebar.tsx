@@ -7,7 +7,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, LogOut,
-  Globe, ChevronRight, Menu, X, Flag, Trophy, Zap, ListOrdered, Clock, MapPin,
+  Globe, ChevronRight, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered, Clock, MapPin,
   MessageSquare, BookUser, Mail, Swords, UserCheck, ShoppingCart, Shield, CreditCard, UserCircle, BarChart2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
