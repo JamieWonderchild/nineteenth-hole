@@ -172,6 +172,107 @@ export const deleteScore = mutation({
   },
 });
 
+// ── Hole-by-hole score entry (kiosk + member self-service) ───────────────────
+
+// Stableford points for one hole
+function holeStableford(gross: number, par: number, strokeIndex: number, handicap: number): number {
+  const shotsReceived = Math.floor(handicap / 18) + (strokeIndex <= (handicap % 18) ? 1 : 0);
+  return Math.max(0, par - (gross - shotsReceived) + 2);
+}
+
+// Called from the pro-shop kiosk (staff submitting for a member)
+// OR from the member's own app session (self-service)
+export const submitScoreHoleByHole = mutation({
+  args: {
+    competitionId: v.id("competitions"),
+    clubId: v.id("clubs"),
+    memberId: v.id("clubMembers"),     // the member whose score this is
+    holeScores: v.array(v.object({ hole: v.number(), gross: v.number() })),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const member = await ctx.db.get(args.memberId);
+    if (!member) throw new Error("Member not found");
+
+    // Authorise: must be the member themselves OR staff/admin of the club
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+    const callerMembership = await ctx.db
+      .query("clubMembers")
+      .withIndex("by_club_and_user", q => q.eq("clubId", args.clubId).eq("userId", identity.subject))
+      .unique();
+    const isSelf = callerMembership?._id === args.memberId;
+    const isStaff = callerMembership && (callerMembership.role === "admin" || callerMembership.role === "staff");
+    if (!isSelf && !isStaff && !isSuperAdmin) throw new Error("Not authorised");
+
+    const grossScore = args.holeScores.reduce((s, h) => s + h.gross, 0);
+    const handicap = member.handicap ?? 0;
+    const netScore = grossScore - Math.round(handicap);
+
+    // Auto-calc stableford if competition has a linked course
+    let stablefordPoints: number | undefined;
+    const competition = await ctx.db.get(args.competitionId);
+    if (competition?.courseId) {
+      const course = await ctx.db.get(competition.courseId);
+      if (course) {
+        stablefordPoints = args.holeScores.reduce((sum, hs) => {
+          const h = course.holes.find(ch => ch.number === hs.hole);
+          if (!h) return sum;
+          return sum + holeStableford(hs.gross, h.par, h.strokeIndex, handicap);
+        }, 0);
+      }
+    }
+
+    const now = new Date().toISOString();
+    const existing = await ctx.db
+      .query("competitionScores")
+      .withIndex("by_competition_and_user", q =>
+        q.eq("competitionId", args.competitionId).eq("userId", member.userId)
+      )
+      .unique();
+
+    const scoreData = {
+      handicap,
+      grossScore,
+      netScore,
+      stablefordPoints,
+      holeScores: args.holeScores,
+      notes: args.notes,
+      submittedBy: identity.subject,
+      submittedAt: now,
+    };
+
+    if (existing) {
+      await ctx.db.patch(existing._id, scoreData);
+      return existing._id;
+    }
+
+    return ctx.db.insert("competitionScores", {
+      competitionId: args.competitionId,
+      clubId: args.clubId,
+      userId: member.userId,
+      displayName: member.displayName,
+      ...scoreData,
+    });
+  },
+});
+
+// Query: member's existing score for a competition (for "already submitted" check)
+export const getMyScore = query({
+  args: { competitionId: v.id("competitions"), userId: v.string() },
+  handler: async (ctx, { competitionId, userId }) => {
+    return ctx.db
+      .query("competitionScores")
+      .withIndex("by_competition_and_user", q =>
+        q.eq("competitionId", competitionId).eq("userId", userId)
+      )
+      .unique();
+  },
+});
+
 // ── Handicap management ───────────────────────────────────────────────────────
 
 export const setHandicap = mutation({

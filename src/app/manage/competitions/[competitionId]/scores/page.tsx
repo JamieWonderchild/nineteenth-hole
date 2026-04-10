@@ -5,7 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
-import { ArrowLeft, Plus, Pencil, X, Trophy, Medal, Sparkles, Copy, Check } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, X, Trophy, Medal, Sparkles, Copy, Check, ClipboardList, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 
 const FORMAT_LABELS: Record<string, string> = {
@@ -236,6 +236,226 @@ function ScoreModal({
   );
 }
 
+// ── Self-service score entry modal ───────────────────────────────────────────
+
+type CourseHole = { number: number; par: number; strokeIndex: number };
+
+function holeStableford(gross: number, par: number, si: number, handicap: number): number {
+  const shots = Math.floor(handicap / 18) + (si <= handicap % 18 ? 1 : 0);
+  return Math.max(0, par - (gross - shots) + 2);
+}
+
+function SelfScoreModal({
+  competitionId,
+  clubId,
+  memberId,
+  handicap,
+  courseHoles,
+  existingScore,
+  onClose,
+}: {
+  competitionId: Id<"competitions">;
+  clubId: Id<"clubs">;
+  memberId: Id<"clubMembers">;
+  handicap: number;
+  courseHoles: CourseHole[];
+  existingScore?: { holeScores?: Array<{ hole: number; gross: number }> } | null;
+  onClose: () => void;
+}) {
+  const totalHoles = 18;
+  const submitScore = useMutation(api.scoring.submitScoreHoleByHole);
+
+  const [scores, setScores] = useState<number[]>(() => {
+    if (existingScore?.holeScores && existingScore.holeScores.length > 0) {
+      return Array.from({ length: totalHoles }, (_, i) => {
+        const hs = existingScore.holeScores!.find(h => h.hole === i + 1);
+        const ch = courseHoles.find(h => h.number === i + 1);
+        return hs?.gross ?? ch?.par ?? 4;
+      });
+    }
+    return Array.from({ length: totalHoles }, (_, i) => {
+      const ch = courseHoles.find(h => h.number === i + 1);
+      return ch?.par ?? 4;
+    });
+  });
+  const [activeHole, setActiveHole] = useState(0);
+  const [stage, setStage] = useState<"holes" | "review">("holes");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  function change(idx: number, delta: number) {
+    setScores(prev => {
+      const next = [...prev];
+      next[idx] = Math.max(1, next[idx] + delta);
+      return next;
+    });
+  }
+
+  const gross = scores.reduce((s, v) => s + v, 0);
+  const net = gross - Math.round(handicap);
+  const stableford = courseHoles.length > 0
+    ? scores.reduce((sum, gross, i) => {
+        const h = courseHoles.find(ch => ch.number === i + 1);
+        if (!h) return sum;
+        return sum + holeStableford(gross, h.par, h.strokeIndex, handicap);
+      }, 0)
+    : undefined;
+
+  async function handleSubmit() {
+    setSaving(true);
+    setError("");
+    try {
+      await submitScore({
+        competitionId,
+        clubId,
+        memberId,
+        holeScores: scores.map((gross, i) => ({ hole: i + 1, gross })),
+      });
+      onClose();
+    } catch (e: any) {
+      setError(e.message ?? "Error submitting score");
+      setStage("holes");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-0 sm:px-4">
+      <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-xl w-full sm:max-w-lg max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 shrink-0">
+          {stage === "review" && (
+            <button onClick={() => setStage("holes")} className="text-gray-400 hover:text-gray-600">
+              <ChevronLeft size={20} />
+            </button>
+          )}
+          <h2 className="font-semibold text-gray-900 flex-1">
+            {stage === "holes" ? "Enter your scorecard" : "Review & submit"}
+          </h2>
+          <div className="text-right">
+            <p className="text-lg font-bold text-gray-900">{gross}</p>
+            <p className="text-xs text-gray-400">Gross</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-1"><X size={18} /></button>
+        </div>
+
+        {stage === "holes" ? (
+          <>
+            {/* Hole grid */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
+                {Array.from({ length: totalHoles }).map((_, i) => {
+                  const ch = courseHoles.find(h => h.number === i + 1);
+                  const par = ch?.par ?? 4;
+                  const score = scores[i];
+                  const diff = score - par;
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setActiveHole(i)}
+                      className={`rounded-xl p-2 border-2 text-center transition-all ${
+                        activeHole === i ? "border-green-500 bg-green-50" : "border-gray-200 bg-white hover:border-gray-300"
+                      }`}
+                    >
+                      <p className="text-[10px] text-gray-400">H{i + 1}</p>
+                      <p className={`text-lg font-bold ${
+                        diff < -1 ? "text-yellow-500" :
+                        diff === -1 ? "text-red-500" :
+                        diff === 0 ? "text-green-600" :
+                        diff === 1 ? "text-gray-700" : "text-gray-400"
+                      }`}>{score}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Active hole controls */}
+            <div className="shrink-0 border-t border-gray-100 px-5 py-3">
+              {(() => {
+                const ch = courseHoles.find(h => h.number === activeHole + 1);
+                const par = ch?.par ?? 4;
+                return (
+                  <div className="flex items-center gap-4">
+                    <div className="w-20">
+                      <p className="font-semibold text-gray-900 text-sm">Hole {activeHole + 1}</p>
+                      {ch && <p className="text-xs text-gray-400">Par {par}</p>}
+                    </div>
+                    <div className="flex items-center gap-3 flex-1 justify-center">
+                      <button
+                        onClick={() => change(activeHole, -1)}
+                        className="w-10 h-10 rounded-full border-2 border-gray-200 text-gray-600 text-xl font-bold hover:border-gray-400 active:bg-gray-100 transition-colors flex items-center justify-center"
+                      >
+                        −
+                      </button>
+                      <span className="text-2xl font-bold text-gray-900 w-8 text-center">{scores[activeHole]}</span>
+                      <button
+                        onClick={() => change(activeHole, 1)}
+                        className="w-10 h-10 rounded-full border-2 border-gray-200 text-gray-600 text-xl font-bold hover:border-gray-400 active:bg-gray-100 transition-colors flex items-center justify-center"
+                      >
+                        +
+                      </button>
+                    </div>
+                    {activeHole < totalHoles - 1 ? (
+                      <button
+                        onClick={() => setActiveHole(activeHole + 1)}
+                        className="text-sm text-green-600 font-medium hover:underline w-20 text-right"
+                      >
+                        Next →
+                      </button>
+                    ) : (
+                      <div className="w-20" />
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="shrink-0 px-5 pb-5 pt-2">
+              <button
+                onClick={() => setStage("review")}
+                className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-colors"
+              >
+                Review scorecard →
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="p-5 space-y-4">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-2xl font-bold text-gray-900">{gross}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Gross</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-2xl font-bold text-gray-900">{net}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Net</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-2xl font-bold text-green-700">{stableford ?? "—"}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Points</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-sm text-gray-500 bg-gray-50 rounded-xl px-4 py-2.5">
+              <span>Handicap</span>
+              <span className="font-semibold text-gray-900">{handicap}</span>
+            </div>
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+            <button
+              onClick={handleSubmit}
+              disabled={saving}
+              className="w-full py-3 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-bold rounded-xl transition-colors"
+            >
+              {saving ? "Submitting…" : existingScore ? "Update my score" : "Submit my score"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const POSITION_STYLES = [
   "text-amber-500",   // 1st
   "text-gray-400",    // 2nd
@@ -273,6 +493,18 @@ export default function CompetitionScoresPage({
     club ? { clubId: club._id } : "skip"
   ) as Member[] | undefined;
   const deleteScore = useMutation(api.scoring.deleteScore);
+
+  // Self-service score entry
+  const myScore = useQuery(
+    api.scoring.getMyScore,
+    (user && competition) ? { competitionId: competitionId as Id<"competitions">, userId: user.id } : "skip"
+  );
+  const course = useQuery(
+    api.courses.get,
+    (competition as any)?.courseId ? { courseId: (competition as any).courseId } : "skip"
+  );
+  const courseHoles: CourseHole[] = (course?.holes ?? []) as CourseHole[];
+  const [showSelfScore, setShowSelfScore] = useState(false);
 
   const generateSummary = useAction(api.corti.generateCompetitionSummary);
   const [showModal, setShowModal] = useState(false);
@@ -335,6 +567,39 @@ export default function CompetitionScoresPage({
           </button>
         )}
       </div>
+
+      {/* Member self-service score entry */}
+      {activeMembership && (competition.status === "live" || competition.status === "open") && competition.type === "club_comp" && (
+        <div className={`border rounded-xl p-4 flex items-center gap-4 ${
+          myScore ? "bg-green-50 border-green-200" : "bg-white border-gray-200"
+        }`}>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+            myScore ? "bg-green-100" : "bg-gray-100"
+          }`}>
+            <ClipboardList size={18} className={myScore ? "text-green-600" : "text-gray-500"} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900">
+              {myScore ? "Your score is submitted" : "Submit your score"}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {myScore
+                ? `Gross ${myScore.grossScore ?? "—"} · ${myScore.stablefordPoints != null ? `${myScore.stablefordPoints} pts` : `Net ${myScore.netScore ?? "—"}`}`
+                : "Enter your hole-by-hole scorecard"}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowSelfScore(true)}
+            className={`text-sm font-semibold px-4 py-2 rounded-xl transition-colors shrink-0 ${
+              myScore
+                ? "bg-green-600 hover:bg-green-500 text-white"
+                : "bg-green-600 hover:bg-green-500 text-white"
+            }`}
+          >
+            {myScore ? "Edit" : "Enter score"}
+          </button>
+        </div>
+      )}
 
       {/* Leaderboard */}
       {leaderboard.length === 0 ? (
@@ -481,6 +746,18 @@ export default function CompetitionScoresPage({
           members={(members ?? []) as Member[]}
           score={editScore}
           onClose={() => { setShowModal(false); setEditScore(undefined); }}
+        />
+      )}
+
+      {showSelfScore && activeMembership && (
+        <SelfScoreModal
+          competitionId={competitionId as Id<"competitions">}
+          clubId={club._id}
+          memberId={activeMembership._id as Id<"clubMembers">}
+          handicap={activeMembership.handicap ?? 0}
+          courseHoles={courseHoles}
+          existingScore={myScore as any}
+          onClose={() => setShowSelfScore(false)}
         />
       )}
     </div>

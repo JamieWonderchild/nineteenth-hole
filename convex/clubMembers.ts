@@ -2,6 +2,11 @@ import { v } from "convex/values";
 import { action, mutation, query } from "./_generated/server";
 import { api } from "./_generated/api";
 
+export const get = query({
+  args: { memberId: v.id("clubMembers") },
+  handler: async (ctx, { memberId }) => ctx.db.get(memberId),
+});
+
 export const listByUser = query({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {

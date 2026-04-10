@@ -147,6 +147,9 @@ export default defineSchema({
     // Club event scoring format (only relevant when type === 'club_comp')
     // 'stableford' | 'strokeplay' | 'betterball' | 'matchplay' | 'custom'
     scoringFormat: v.optional(v.string()),
+    // Course this competition is played on — used for hole-by-hole stableford calc
+    courseId: v.optional(v.id("courses")),
+    roundHoles: v.optional(v.number()),   // 9 or 18 (default 18)
     // Metadata
     drawCompletedAt: v.optional(v.string()),
     // 'stripe' (default) | 'cash' — cash means admin marks entries as paid manually
@@ -569,6 +572,8 @@ export default defineSchema({
     countback: v.optional(v.string()),   // e.g. "32 (back 9)" for tiebreak display
     notes: v.optional(v.string()),
     position: v.optional(v.number()),    // computed rank on leaderboard
+    // Per-hole breakdown (populated from kiosk or in-app hole-by-hole entry)
+    holeScores: v.optional(v.array(v.object({ hole: v.number(), gross: v.number() }))),
     submittedAt: v.string(),
     submittedBy: v.string(),             // userId of who entered the score
   })

@@ -61,6 +61,7 @@ export const searchMembers = query({
         fgcMemberId: m.fgcMemberId,
         accountBalance: m.accountBalance ?? 0,
         avatarUrl: m.avatarUrl,
+        handicap: m.handicap,
       }));
   },
 });

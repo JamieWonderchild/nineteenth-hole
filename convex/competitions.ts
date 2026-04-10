@@ -65,6 +65,25 @@ export const listPlatformActive = query({
   },
 });
 
+// Live and open club competitions — used by the kiosk score entry screen
+export const listActiveForClub = query({
+  args: { clubId: v.id("clubs") },
+  handler: async (ctx, { clubId }) => {
+    const all = await ctx.db
+      .query("competitions")
+      .withIndex("by_club", q => q.eq("clubId", clubId))
+      .collect();
+    const today = new Date().toISOString().slice(0, 10);
+    return all.filter(
+      c =>
+        (c.status === "live" || c.status === "open") &&
+        c.type === "club_comp" &&
+        c.startDate <= today &&
+        today <= c.endDate
+    );
+  },
+});
+
 export const getBySlug = query({
   args: { clubId: v.id("clubs"), slug: v.string() },
   handler: async (ctx, { clubId, slug }) => {
