@@ -36,11 +36,18 @@ It is live. It is working. It was built by a member of this club.
 
 ### 1. It saves the club money
 
-FGC currently pays for multiple separate software subscriptions — competition systems, booking tools, results management — while also relying on volunteer time and bespoke workarounds to compensate for what those tools don't do.
+The dominant club management software in this market — Intelligentgolf — charges clubs of FGC's size (500+ members) **£3,500–4,500 + VAT per year** for the base licence alone. That is before you add:
 
-A conservative estimate of what the club spends today, in software licences and volunteer administration time, is **£6,000–10,000 per year**.
+- WHS handicap integration: ~£149/year
+- EPOS (bar/pro shop software): additional cost
+- Bespoke member website: additional cost
+- igMember mobile app: £2.99/year per member — at 500 members, that is **£1,500/year just for the app**
 
-This platform replaces all of it. One system. One subscription. A fraction of the cost.
+A club running the full Intelligentgolf stack is paying **£8,000–12,000 per year** — for software that hasn't meaningfully improved in a decade, doesn't integrate properly between modules, and has no AI capability whatsoever.
+
+Beyond software licences, FGC currently compensates for what its tools don't do through volunteer time and bespoke workarounds — Python scripts, VBA macros, paper records — adding thousands more in hidden administrative cost.
+
+This platform replaces all of it. One system. One subscription. At a price that makes the comparison embarrassing.
 
 ### 2. It generates new revenue for the club
 
@@ -78,13 +85,51 @@ We are not asking for money. We are asking for belief.
 
 ## The Business
 
-The UK golf club software market is approximately 2,500 clubs. At a conservative average of £75/month per club, that is a **£22.5 million annual recurring revenue market** — currently served by legacy tools with no meaningful innovation.
+### The market opportunity
 
-Our competitive advantage is not just the product. It is distribution. One of our founding team members currently services over 80 golf clubs across Middlesex and Hertfordshire every single month in his existing role. He has direct personal relationships with club managers, PGA professionals, and committee members at each of those clubs. He is not a sales hire we need to recruit — he is already doing the job.
+There are approximately **2,500 golf clubs in the UK**. The majority of clubs with 400+ members are already paying £4,000–10,000 per year for club management software — to Intelligentgolf, BRS, ClubV1, or Club Systems. This is an established, paying market. These clubs are not being asked to adopt software for the first time; they are being asked to switch to something better and cheaper.
 
-The plan is to raise **£500,000** from a small group of investors — many of whom may be members of this club — to fund a core team of four people: a founder-engineer, a second engineer, a sales lead, and an operations hire. That investment, at a pre-money valuation of £1.5 million, gives a **25% equity stake** in a business with a clear path to £1M+ ARR within four years.
+At £100/month (£1,200/year), a club saves a minimum of £2,300 versus Intelligentgolf's base licence alone — before counting the EPOS, website, and per-member app savings. This is not a difficult commercial conversation. The pitch writes itself.
 
-Investors benefit from **SEIS tax relief** — 50% income tax relief on investment, meaning a £10,000 investment costs £5,000 net. Loss relief is also available. This is one of the most generous investor tax schemes in Europe, and it exists precisely for early-stage businesses like this one.
+Across 2,500 clubs at £100/month average, the market is **£3 million ARR**. At a more realistic £150/month for full-suite clubs, the market approaches **£4.5 million ARR**. This is conservative — it does not include visitor booking commissions, per-transaction fees, or premium AI features, all of which we intend to layer on over time.
+
+### Three revenue streams
+
+The business is not a single-product SaaS. It has three distinct revenue streams, each reinforcing the others:
+
+**① Club subscriptions — £100–150/month per club**
+
+The core revenue model. Golf clubs are already paying £4,000–10,000/year to Intelligentgolf and competitors. We charge less than £1,200 and do more. This is not a hard sell; it is a switching decision that makes itself.
+
+**② Tour Pool entry fees — per-transaction**
+
+The platform runs sweepstakes around major golf tournaments (The Masters, The Open, the Ryder Cup). Players pay an entry fee; the platform takes a margin. This revenue scales with the consumer base, has no additional marginal cost, and grows independently of club sign-ups.
+
+**③ Individual golfer tier — £3.99/month**
+
+Golfers without a club account can sign up and use the platform directly — round tracking, casual games with friends, handicap history, and tournament sweepstakes. The free tier creates a consumer base that drives bottom-up demand for club adoption. The paid tier (infrastructure already built) monetises that base directly.
+
+### Path to £1M ARR
+
+| Year | Mix | ARR |
+|---|---|---|
+| Y1 | 3 clubs + pool fees | ~£8k |
+| Y2 | 20 clubs + early consumer | ~£45k |
+| Y3 | 75 clubs + 500 golfers | ~£160k |
+| Y4 | 200 clubs + 2,000 golfers | ~£400k |
+| Y5 | 400 clubs + 5,000 golfers | ~£1M+ |
+
+With Ben's existing relationships across 80+ clubs and the consumer base feeding club discovery, these numbers are conservative.
+
+### The consumer opportunity
+
+There are over **2 million active golfers in the UK**. The majority have no software tools to manage their game beyond a handicap card. Our B2C tier is built and live. Monetising 1% of UK golfers at £3.99/month is £800,000 in ARR from a single revenue line — entirely separate from the club business.
+
+### The raise
+
+The plan is to raise **£500,000** from a small group of investors — many of whom may be members of this club — to fund a core team: a founder-engineer, a second engineer, a sales lead, and an operations hire. That investment, at a pre-money valuation of £1.5 million, gives a **25% equity stake** in a business with a clear path to £1M+ ARR within four years.
+
+Investors benefit from **SEIS tax relief** — 50% income tax relief on investment, meaning a £10,000 investment costs £5,000 net. Loss relief is also available. This is one of the most generous investor protection schemes in Europe.
 
 ---
 

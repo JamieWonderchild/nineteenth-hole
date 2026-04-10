@@ -27,6 +27,7 @@ export default function MembersPage() {
   const addMemberById = useAction(clubMembersApi.addMemberById);
 
   const setHandicap = useMutation(api.scoring.setHandicap);
+  const setRole = useMutation(api.clubMembers.setRole);
   const [nonMembers, setNonMembers] = useState<Array<{ userId: string; displayName: string; email: string }> | null>(null);
   const [nonMembersLoading, setNonMembersLoading] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
@@ -229,9 +230,21 @@ export default function MembersPage() {
                       </td>
                     )}
                     <td className="px-5 py-3.5 text-right">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${m.role === "admin" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {m.role}
-                      </span>
+                      {isAdmin ? (
+                        <select
+                          value={m.role}
+                          onChange={e => setRole({ memberId: m._id, role: e.target.value })}
+                          className="text-xs font-medium border border-gray-200 rounded-lg px-2 py-0.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-500"
+                        >
+                          <option value="member">member</option>
+                          <option value="staff">staff</option>
+                          <option value="admin">admin</option>
+                        </select>
+                      ) : (
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${m.role === "admin" ? "bg-green-100 text-green-700" : m.role === "staff" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
+                          {m.role}
+                        </span>
+                      )}
                     </td>
                     {superAdmin && (
                       <td className="px-5 py-3.5 text-right">

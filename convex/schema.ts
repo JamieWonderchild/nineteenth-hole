@@ -6,6 +6,20 @@ export default defineSchema({
   // Clubs & Membership
   // ============================================================================
 
+  // ============================================================================
+  // Individual Golfer Profiles (B2C — no club affiliation required)
+  // ============================================================================
+
+  golferProfiles: defineTable({
+    userId: v.string(),                       // Clerk user ID
+    displayName: v.string(),
+    handicapIndex: v.optional(v.number()),    // self-reported WHS index
+    homeClub: v.optional(v.string()),         // "Finchley Golf Club" (plain text)
+    goals: v.optional(v.string()),            // 'casual' | 'competitive' | 'social'
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  }).index("by_user", ["userId"]),
+
   // England Golf / county golf club directory — seed data, not platform accounts
   golfClubs: defineTable({
     name: v.string(),                       // "Finchley Golf Club"

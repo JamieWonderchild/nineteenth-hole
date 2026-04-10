@@ -84,6 +84,18 @@ export const listMyBookings = query({
   },
 });
 
+// All confirmed bookings for a club — used for analytics
+export const listAllBookings = query({
+  args: { clubId: v.id("clubs") },
+  handler: async (ctx, { clubId }) => {
+    return ctx.db
+      .query("teeTimeBookings")
+      .withIndex("by_club", q => q.eq("clubId", clubId))
+      .filter(q => q.eq(q.field("status"), "confirmed"))
+      .collect();
+  },
+});
+
 // Dates that have at least one slot for a club (for calendar)
 export const listAvailableDates = query({
   args: { clubId: v.id("clubs") },

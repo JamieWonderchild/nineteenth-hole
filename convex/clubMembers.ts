@@ -269,6 +269,7 @@ export const updateProfile = mutation({
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
     bio: v.optional(v.string()),
+    membershipCategory: v.optional(v.string()),
     directoryVisible: v.optional(v.boolean()),
     showPhone: v.optional(v.boolean()),
     showEmail: v.optional(v.boolean()),
@@ -287,6 +288,7 @@ export const updateProfile = mutation({
       phone: args.phone,
       email: args.email,
       bio: args.bio,
+      membershipCategory: args.membershipCategory,
       directoryVisible: args.directoryVisible,
       showPhone: args.showPhone,
       showEmail: args.showEmail,
@@ -323,8 +325,18 @@ export const setRole = mutation({
   args: { memberId: v.id("clubMembers"), role: v.string() },
   handler: async (ctx, { memberId, role }) => {
     const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
     const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
-    if (!identity?.email || !superAdminEmails.includes(identity.email)) throw new Error("Not authorised");
+    const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+    if (!isSuperAdmin) {
+      const member = await ctx.db.get(memberId);
+      if (!member) throw new Error("Not found");
+      const caller = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", member.clubId).eq("userId", identity.subject))
+        .unique();
+      if (!caller || caller.role !== "admin") throw new Error("Not authorised");
+    }
     await ctx.db.patch(memberId, { role, updatedAt: new Date().toISOString() });
   },
 });

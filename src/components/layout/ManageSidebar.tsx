@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, BookOpen, LogOut,
   Globe, ChevronRight, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered, Clock, MapPin,
-  MessageSquare, BookUser, Mail, Swords, UserCheck, ShoppingCart, Shield
+  MessageSquare, BookUser, Mail, Swords, UserCheck, ShoppingCart, Shield, CreditCard, UserCircle, BarChart2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -55,6 +55,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
   );
   const activeMembership = memberships?.find(m => m.status === "active");
   const isAdmin = activeMembership?.role === "admin" || superAdmin === true;
+  const isStaff = activeMembership?.role === "staff" || isAdmin;
   const club = useQuery(
     api.clubs.get,
     activeMembership ? { clubId: activeMembership.clubId } : "skip"
@@ -82,7 +83,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
           <Flag size={16} className="text-primary-foreground" />
         </div>
         <div className="min-w-0">
-          <p className="font-semibold text-sm leading-tight text-foreground">Play The Pool</p>
+          <p className="font-semibold text-sm leading-tight text-foreground">The 19th Hole</p>
           {club && <p className="text-xs text-muted-foreground truncate">{club.name}</p>}
         </div>
       </div>
@@ -153,11 +154,14 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
             <NavItem href="/manage/directory" icon={<BookUser size={16} />} label="Member Directory" active={pathname.startsWith("/manage/directory")} onClick={onNav} />
             <NavItem href="/manage/knockouts" icon={<Swords size={16} />} label="Knockouts" active={pathname.startsWith("/manage/knockouts")} onClick={onNav} />
             <NavItem href="/manage/interclub" icon={<Shield size={16} />} label="Interclub" active={pathname.startsWith("/manage/interclub")} onClick={onNav} />
-            {isAdmin && (
+            {isStaff && (
               <NavItem href="/manage/visitors" icon={<UserCheck size={16} />} label="Visitors" active={pathname.startsWith("/manage/visitors")} onClick={onNav} />
             )}
-            {isAdmin && (
+            {isStaff && (
               <NavItem href="/manage/pos" icon={<ShoppingCart size={16} />} label="Point of Sale" active={pathname.startsWith("/manage/pos")} onClick={onNav} />
+            )}
+            {isAdmin && (
+              <NavItem href="/manage/analytics" icon={<BarChart2 size={16} />} label="Analytics" active={pathname.startsWith("/manage/analytics")} onClick={onNav} />
             )}
             {isAdmin && (
               <NavItem href="/manage/comms" icon={<Mail size={16} />} label="Communications" active={pathname.startsWith("/manage/comms")} onClick={onNav} />
@@ -170,6 +174,10 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               onClick={onNav}
             />
             <div className="my-2 border-t border-border" />
+            <NavItem href="/manage/profile" icon={<UserCircle size={16} />} label="My Profile" active={is("/manage/profile")} onClick={onNav} />
+            {isAdmin && (
+              <NavItem href="/manage/billing" icon={<CreditCard size={16} />} label="Billing" active={is("/manage/billing")} onClick={onNav} />
+            )}
             <NavItem href={`/${club.slug}`} icon={<ChevronRight size={16} />} label="View public page" active={false} onClick={onNav} />
           </>
         )}
@@ -218,7 +226,7 @@ export function ManageSidebar() {
           <div className="w-6 h-6 rounded bg-primary flex items-center justify-center">
             <Flag size={12} className="text-primary-foreground" />
           </div>
-          <span className="font-semibold text-sm text-foreground">Play The Pool</span>
+          <span className="font-semibold text-sm text-foreground">The 19th Hole</span>
         </div>
         <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)}>
           <Menu size={20} />
