@@ -6,7 +6,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
-import { ShoppingCart, Minus, Plus, X, Check, CreditCard, Banknote, Trash2 } from "lucide-react";
+import { ShoppingCart, Minus, Plus, X, Check, CreditCard, Banknote, Trash2, Monitor } from "lucide-react";
 import Link from "next/link";
 
 type Product = {
@@ -147,6 +147,9 @@ export default function POSPage() {
             </Link>
             <Link href="/manage/pos/sales" className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
               Sales log
+            </Link>
+            <Link href="/kiosk/pos" className="text-xs px-3 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-700 flex items-center gap-1.5">
+              <Monitor size={13} /> Kiosk mode
             </Link>
           </div>
         </div>

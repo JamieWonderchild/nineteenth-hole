@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, LogOut,
   Globe, ChevronRight, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered, Clock, MapPin,
-  MessageSquare, BookUser, Mail, Swords, UserCheck, ShoppingCart, Shield, CreditCard, UserCircle, BarChart2
+  MessageSquare, BookUser, Mail, Swords, UserCheck, ShoppingCart, Shield, CreditCard, UserCircle, BarChart2, Wallet
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -156,6 +156,9 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
             )}
             {isStaff && (
               <NavItem href="/manage/pos" icon={<ShoppingCart size={16} />} label="Point of Sale" active={pathname.startsWith("/manage/pos")} onClick={onNav} />
+            )}
+            {isStaff && (
+              <NavItem href="/manage/accounts" icon={<Wallet size={16} />} label="Member Accounts" active={pathname.startsWith("/manage/accounts")} onClick={onNav} />
             )}
 
             {/* Admin tools */}
