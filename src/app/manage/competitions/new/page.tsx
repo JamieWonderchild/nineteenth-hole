@@ -188,6 +188,7 @@ export default function NewCompetitionPage() {
         currency: club.currency,
         prizeStructure: PRIZE_PRESETS[prizePreset].structure,
         paymentCollection,
+        scoringFormat: compType === "event" ? eventFormat : undefined,
         createdBy: user.id,
       });
       router.push(`/manage/competitions/${compId}`);

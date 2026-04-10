@@ -19,11 +19,13 @@ import type * as http from "../http.js";
 import type * as knockouts from "../knockouts.js";
 import type * as messaging from "../messaging.js";
 import type * as players from "../players.js";
+import type * as pos from "../pos.js";
 import type * as quickGames from "../quickGames.js";
 import type * as resultsImport from "../resultsImport.js";
 import type * as scores from "../scores.js";
 import type * as series from "../series.js";
 import type * as teeTimes from "../teeTimes.js";
+import type * as scoring from "../scoring.js";
 import type * as visitors from "../visitors.js";
 import type * as webhookEvents from "../webhookEvents.js";
 
@@ -45,11 +47,13 @@ declare const fullApi: ApiFromModules<{
   knockouts: typeof knockouts;
   messaging: typeof messaging;
   players: typeof players;
+  pos: typeof pos;
   quickGames: typeof quickGames;
   resultsImport: typeof resultsImport;
   scores: typeof scores;
   series: typeof series;
   teeTimes: typeof teeTimes;
+  scoring: typeof scoring;
   visitors: typeof visitors;
   webhookEvents: typeof webhookEvents;
 }>;

@@ -330,6 +330,12 @@ export default function CompetitionManagePage({
           </p>
         </div>
         <div className="flex items-center gap-4 shrink-0">
+          {competition.type === "club_comp" && (
+            <Link href={`/manage/competitions/${competitionId}/scores`}
+              className="flex items-center gap-1.5 text-sm font-medium text-green-700 hover:underline">
+              Scores →
+            </Link>
+          )}
           {publicUrl && !isPlatformPool && club && (
             <Link href={`/${club.slug}/${competition.slug}/live`} target="_blank"
               className="flex items-center gap-1.5 text-sm text-green-700 hover:underline">

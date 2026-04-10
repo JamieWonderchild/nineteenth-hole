@@ -4,8 +4,11 @@ import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "convex/_generated/api";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const clubMembersApi = api.clubMembers as any;
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
+import { Pencil, Check, X } from "lucide-react";
 
 export default function MembersPage() {
   const { user } = useUser();
@@ -20,12 +23,14 @@ export default function MembersPage() {
   const approveMember = useMutation(api.clubMembers.approveMember);
   const rejectMember = useMutation(api.clubMembers.rejectMember);
   const deleteMember = useMutation(api.clubMembers.deleteMember);
-  const listNonMembers = useAction(api.clubMembers.listNonMembers);
-  const addMemberById = useAction(api.clubMembers.addMemberById);
+  const listNonMembers = useAction(clubMembersApi.listNonMembers);
+  const addMemberById = useAction(clubMembersApi.addMemberById);
 
+  const setHandicap = useMutation(api.scoring.setHandicap);
   const [nonMembers, setNonMembers] = useState<Array<{ userId: string; displayName: string; email: string }> | null>(null);
   const [nonMembersLoading, setNonMembersLoading] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [handicapEdit, setHandicapEdit] = useState<{ id: Id<"clubMembers">; value: string } | null>(null);
 
   async function handleLoadNonMembers() {
     if (!club) return;
@@ -170,9 +175,10 @@ export default function MembersPage() {
                 <tr className="border-b border-gray-100 text-left text-gray-500 text-xs">
                   <th className="px-5 py-3 font-medium">#</th>
                   <th className="px-5 py-3 font-medium">Name</th>
-                  <th className="px-5 py-3 font-medium text-right">Entered</th>
-                  <th className="px-5 py-3 font-medium text-right">Won</th>
-                  <th className="px-5 py-3 font-medium text-right">P/L</th>
+                  <th className="px-5 py-3 font-medium text-right hidden sm:table-cell">Entered</th>
+                  <th className="px-5 py-3 font-medium text-right hidden sm:table-cell">Won</th>
+                  <th className="px-5 py-3 font-medium text-right hidden md:table-cell">P/L</th>
+                  {isAdmin && <th className="px-5 py-3 font-medium text-right">Hcp</th>}
                   <th className="px-5 py-3 font-medium text-right">Role</th>
                   {superAdmin && <th className="px-5 py-3" />}
                 </tr>
@@ -182,11 +188,46 @@ export default function MembersPage() {
                   <tr key={m._id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
                     <td className="px-5 py-3.5 text-gray-400 font-mono text-xs">{i + 1}</td>
                     <td className="px-5 py-3.5 font-medium text-gray-900">{m.displayName}</td>
-                    <td className="px-5 py-3.5 text-right text-gray-600">{m.totalEntered}</td>
-                    <td className="px-5 py-3.5 text-right font-medium text-gray-900">{formatCurrency(m.totalWon, club.currency)}</td>
-                    <td className={`px-5 py-3.5 text-right font-medium ${m.totalProfit >= 0 ? "text-green-600" : "text-red-500"}`}>
+                    <td className="px-5 py-3.5 text-right text-gray-600 hidden sm:table-cell">{m.totalEntered}</td>
+                    <td className="px-5 py-3.5 text-right font-medium text-gray-900 hidden sm:table-cell">{formatCurrency(m.totalWon, club.currency)}</td>
+                    <td className={`px-5 py-3.5 text-right font-medium hidden md:table-cell ${m.totalProfit >= 0 ? "text-green-600" : "text-red-500"}`}>
                       {m.totalProfit >= 0 ? "+" : ""}{formatCurrency(m.totalProfit, club.currency)}
                     </td>
+                    {isAdmin && (
+                      <td className="px-5 py-3.5 text-right">
+                        {handicapEdit?.id === m._id ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <input
+                              type="number"
+                              value={handicapEdit.value}
+                              onChange={e => setHandicapEdit({ id: m._id, value: e.target.value })}
+                              step="0.1" min="-5" max="54"
+                              className="w-16 border border-gray-300 rounded-lg px-2 py-0.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-green-500"
+                              autoFocus
+                            />
+                            <button
+                              onClick={async () => {
+                                const hcp = parseFloat(handicapEdit.value);
+                                await setHandicap({ memberId: m._id, handicap: isNaN(hcp) ? undefined : hcp });
+                                setHandicapEdit(null);
+                              }}
+                              className="text-green-600 hover:text-green-700"
+                            ><Check size={13} /></button>
+                            <button onClick={() => setHandicapEdit(null)} className="text-gray-400 hover:text-gray-600">
+                              <X size={13} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setHandicapEdit({ id: m._id, value: m.handicap?.toString() ?? "" })}
+                            className="flex items-center justify-end gap-1 text-gray-600 hover:text-gray-900 ml-auto"
+                          >
+                            <span className="text-xs font-medium">{m.handicap != null ? m.handicap : "—"}</span>
+                            <Pencil size={11} className="text-gray-300" />
+                          </button>
+                        )}
+                      </td>
+                    )}
                     <td className="px-5 py-3.5 text-right">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${m.role === "admin" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                         {m.role}

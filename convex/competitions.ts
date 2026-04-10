@@ -130,6 +130,7 @@ export const create = mutation({
       percentage: v.number(),
     })),
     paymentCollection: v.optional(v.string()),
+    scoringFormat: v.optional(v.string()),
     createdBy: v.string(),
   },
   handler: async (ctx, args) => {

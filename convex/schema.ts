@@ -61,6 +61,8 @@ export default defineSchema({
     directoryVisible: v.optional(v.boolean()),  // default true when absent
     showPhone: v.optional(v.boolean()),
     showEmail: v.optional(v.boolean()),
+    // Handicap — manually set by admin until WHS API integration
+    handicap: v.optional(v.number()),           // e.g. 14.2
   })
     .index("by_club", ["clubId"])
     .index("by_club_and_user", ["clubId", "userId"])
@@ -104,6 +106,9 @@ export default defineSchema({
       position: v.number(),
       percentage: v.number(),   // e.g. 55 for 55%
     })),
+    // Club event scoring format (only relevant when type === 'club_comp')
+    // 'stableford' | 'strokeplay' | 'betterball' | 'matchplay' | 'custom'
+    scoringFormat: v.optional(v.string()),
     // Metadata
     drawCompletedAt: v.optional(v.string()),
     // 'stripe' (default) | 'cash' — cash means admin marks entries as paid manually
@@ -484,6 +489,29 @@ export default defineSchema({
     createdAt: v.string(),
   })
     .index("by_conversation", ["conversationId"]),
+
+  // ============================================================================
+  // Club Competition Scoring
+  // ============================================================================
+
+  competitionScores: defineTable({
+    competitionId: v.id("competitions"),
+    clubId: v.id("clubs"),
+    userId: v.optional(v.string()),      // Clerk userId — optional for guest entries
+    displayName: v.string(),
+    handicap: v.number(),                // handicap at time of entry
+    grossScore: v.optional(v.number()),  // total gross strokes
+    netScore: v.optional(v.number()),    // gross - handicap (computed or manual)
+    stablefordPoints: v.optional(v.number()), // for stableford format
+    countback: v.optional(v.string()),   // e.g. "32 (back 9)" for tiebreak display
+    notes: v.optional(v.string()),
+    position: v.optional(v.number()),    // computed rank on leaderboard
+    submittedAt: v.string(),
+    submittedBy: v.string(),             // userId of who entered the score
+  })
+    .index("by_competition", ["competitionId"])
+    .index("by_competition_and_user", ["competitionId", "userId"])
+    .index("by_club", ["clubId"]),
 
   // ============================================================================
   // Point of Sale — Pro Shop & Bar
