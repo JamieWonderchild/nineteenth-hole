@@ -5,7 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
-import { ArrowLeft, Plus, X, Calendar, Shield } from "lucide-react";
+import { ArrowLeft, Plus, X, Calendar, Shield, Search, MapPin } from "lucide-react";
 import Link from "next/link";
 
 type Team = {
@@ -17,21 +17,36 @@ type Team = {
   captainUserId?: string;
 };
 
+type GolfClub = { _id: Id<"golfClubs">; name: string; county: string; postcode?: string };
+
 function AddTeamModal({
   leagueId,
-  clubId,
-  clubName,
+  leagueCounty,
+  ownClubId,
+  ownClubName,
   team,
   onClose,
 }: {
   leagueId: Id<"interclubLeagues">;
-  clubId: Id<"clubs">;
-  clubName: string;
+  leagueCounty?: string;
+  ownClubId: Id<"clubs">;
+  ownClubName: string;
   team?: Team;
   onClose: () => void;
 }) {
   const saveTeam = useMutation(api.interclub.saveTeam);
-  const members = useQuery(api.clubMembers.listByClub, { clubId });
+  const members = useQuery(api.clubMembers.listByClub, { clubId: ownClubId });
+
+  // "own" = adding a team for my club, "opponent" = adding another club
+  const [side, setSide] = useState<"own" | "opponent">(team ? "own" : "own");
+  const [opponentSearch, setOpponentSearch] = useState("");
+  const [selectedOpponent, setSelectedOpponent] = useState<GolfClub | null>(null);
+
+  const directoryResults = useQuery(
+    api.golfClubs.search,
+    opponentSearch.length >= 2 ? { term: opponentSearch, county: leagueCounty } : "skip"
+  ) as GolfClub[] | undefined;
+
   const [form, setForm] = useState({
     teamName: team?.teamName ?? "",
     handicapMin: team?.handicapMin?.toString() ?? "",
@@ -40,19 +55,23 @@ function AddTeamModal({
   });
   const [saving, setSaving] = useState(false);
 
+  const resolvedClubName = side === "own" ? ownClubName : (selectedOpponent?.name ?? "");
+
   async function handleSave() {
     if (!form.teamName.trim()) return;
+    if (side === "opponent" && !selectedOpponent) return;
     setSaving(true);
     try {
       await saveTeam({
         leagueId,
         teamId: team?._id,
-        clubId,
-        clubName,
+        clubId: side === "own" ? ownClubId : undefined,
+        golfClubId: selectedOpponent?._id,
+        clubName: resolvedClubName,
         teamName: form.teamName.trim(),
         handicapMin: form.handicapMin ? parseFloat(form.handicapMin) : undefined,
         handicapMax: form.handicapMax ? parseFloat(form.handicapMax) : undefined,
-        captainUserId: form.captainUserId || undefined,
+        captainUserId: side === "own" ? (form.captainUserId || undefined) : undefined,
       });
       onClose();
     } finally { setSaving(false); }
@@ -66,12 +85,76 @@ function AddTeamModal({
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="px-6 py-5 space-y-4">
+
+          {/* Side toggle — only show when adding new */}
+          {!team && (
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+              {(["own", "opponent"] as const).map(s => (
+                <button key={s} onClick={() => setSide(s)}
+                  className={`flex-1 py-2 font-medium transition-colors ${side === s ? "bg-green-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}>
+                  {s === "own" ? "My club" : "Opposition"}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Club identification */}
+          {side === "own" ? (
+            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-100 rounded-lg">
+              <Shield size={14} className="text-green-600 shrink-0" />
+              <span className="text-sm font-medium text-green-800">{ownClubName}</span>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-gray-500">
+                Opposition club {leagueCounty ? `(${leagueCounty})` : ""}
+              </label>
+              {selectedOpponent ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                  <MapPin size={14} className="text-gray-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{selectedOpponent.name}</p>
+                    <p className="text-xs text-gray-400">{selectedOpponent.county}{selectedOpponent.postcode ? ` · ${selectedOpponent.postcode}` : ""}</p>
+                  </div>
+                  <button onClick={() => { setSelectedOpponent(null); setOpponentSearch(""); }}
+                    className="text-gray-300 hover:text-gray-500"><X size={13} /></button>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="relative">
+                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input type="text" value={opponentSearch} onChange={e => setOpponentSearch(e.target.value)}
+                      placeholder="Search clubs…" autoFocus
+                      className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                  {opponentSearch.length >= 2 && directoryResults !== undefined && (
+                    <div className="border border-gray-200 rounded-lg divide-y divide-gray-50 max-h-40 overflow-y-auto">
+                      {directoryResults.length === 0 ? (
+                        <p className="px-3 py-2 text-xs text-gray-400">No clubs found</p>
+                      ) : directoryResults.map(club => (
+                        <button key={club._id} onClick={() => setSelectedOpponent(club)}
+                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-green-50 text-left transition-colors">
+                          <MapPin size={12} className="text-gray-300 shrink-0" />
+                          <div>
+                            <p className="text-sm text-gray-900">{club.name}</p>
+                            <p className="text-xs text-gray-400">{club.postcode}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Team name *</label>
             <input type="text" value={form.teamName} onChange={e => setForm(f => ({ ...f, teamName: e.target.value }))}
-              placeholder="e.g. Sabres, Tigers, Foxes"
+              placeholder="e.g. Sabres, A Team, 1st XI"
               className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Min handicap</label>
@@ -86,20 +169,24 @@ function AddTeamModal({
                 className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Team captain / league rep</label>
-            <select value={form.captainUserId} onChange={e => setForm(f => ({ ...f, captainUserId: e.target.value }))}
-              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
-              <option value="">None assigned</option>
-              {(members ?? []).map(m => (
-                <option key={m._id} value={m.userId}>{m.displayName}</option>
-              ))}
-            </select>
-          </div>
+
+          {side === "own" && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Team captain / league rep</label>
+              <select value={form.captainUserId} onChange={e => setForm(f => ({ ...f, captainUserId: e.target.value }))}
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option value="">None assigned</option>
+                {(members ?? []).map(m => (
+                  <option key={m._id} value={m.userId}>{m.displayName}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Cancel</button>
-          <button onClick={handleSave} disabled={saving || !form.teamName.trim()}
+          <button onClick={handleSave}
+            disabled={saving || !form.teamName.trim() || (side === "opponent" && !selectedOpponent)}
             className="px-5 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors">
             {saving ? "Saving…" : "Save"}
           </button>
@@ -373,8 +460,9 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
       {showAddTeam && club && (
         <AddTeamModal
           leagueId={leagueId as Id<"interclubLeagues">}
-          clubId={club._id}
-          clubName={club.name}
+          leagueCounty={league.county}
+          ownClubId={club._id}
+          ownClubName={club.name}
           onClose={() => setShowAddTeam(false)}
         />
       )}

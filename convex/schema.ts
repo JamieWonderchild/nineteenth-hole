@@ -6,10 +6,27 @@ export default defineSchema({
   // Clubs & Membership
   // ============================================================================
 
+  // England Golf / county golf club directory — seed data, not platform accounts
+  golfClubs: defineTable({
+    name: v.string(),                       // "Finchley Golf Club"
+    county: v.string(),                     // "Middlesex"
+    englandGolfId: v.optional(v.string()),  // CDH club number
+    postcode: v.optional(v.string()),       // "N3 3JH"
+    website: v.optional(v.string()),
+    platformClubId: v.optional(v.id("clubs")), // set when club joins the platform
+  })
+    .index("by_county", ["county"])
+    .index("by_name", ["name"])
+    .index("by_platform_club", ["platformClubId"]),
+
   clubs: defineTable({
     name: v.string(),
     slug: v.string(),           // URL-safe identifier e.g. "royal-troon-gc"
     clerkOrgId: v.optional(v.string()),
+    // Location / county affiliation
+    county: v.optional(v.string()),          // "Middlesex"
+    englandGolfId: v.optional(v.string()),   // CDH club number
+    golfClubId: v.optional(v.id("golfClubs")), // link to directory entry
     // Branding
     logoUrl: v.optional(v.string()),
     primaryColor: v.optional(v.string()),
@@ -529,8 +546,9 @@ export default defineSchema({
 
   interclubTeams: defineTable({
     leagueId: v.id("interclubLeagues"),
-    clubId: v.id("clubs"),
-    clubName: v.string(),           // denormalised
+    clubId: v.optional(v.id("clubs")),       // set if team is a platform customer
+    golfClubId: v.optional(v.id("golfClubs")), // set from directory
+    clubName: v.string(),           // denormalised display name
     teamName: v.string(),           // "Sabres", "Tigers", "Foxes"
     handicapMin: v.optional(v.number()), // lower bound of handicap band
     handicapMax: v.optional(v.number()), // upper bound

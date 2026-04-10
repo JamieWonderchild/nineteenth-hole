@@ -32,8 +32,8 @@ async function assertCanManageFixture(ctx: MutationCtx, fixtureId: Id<"interclub
     awayTeam?.captainUserId === identity.subject;
   if (isCaptain) return identity.subject;
 
-  // Check if club admin for either team's club
-  const clubIds = [homeTeam?.clubId, awayTeam?.clubId].filter(Boolean) as Id<"clubs">[];
+  // Check if club admin for either team's club (only platform clubs have clubId)
+  const clubIds = [homeTeam?.clubId, awayTeam?.clubId].filter((id): id is Id<"clubs"> => !!id);
   for (const clubId of clubIds) {
     const member = await ctx.db
       .query("clubMembers")
@@ -53,9 +53,10 @@ async function assertCanManageLeague(ctx: MutationCtx, leagueId: Id<"interclubLe
     .withIndex("by_league", q => q.eq("leagueId", leagueId))
     .collect();
   for (const team of teams) {
+    if (!team.clubId) continue;
     const member = await ctx.db
       .query("clubMembers")
-      .withIndex("by_club_and_user", q => q.eq("clubId", team.clubId).eq("userId", identity.subject))
+      .withIndex("by_club_and_user", q => q.eq("clubId", team.clubId!).eq("userId", identity.subject))
       .unique();
     if (member?.role === "admin") return identity.subject;
   }
@@ -121,7 +122,8 @@ export const saveTeam = mutation({
   args: {
     leagueId: v.id("interclubLeagues"),
     teamId: v.optional(v.id("interclubTeams")),
-    clubId: v.id("clubs"),
+    clubId: v.optional(v.id("clubs")),
+    golfClubId: v.optional(v.id("golfClubs")),
     clubName: v.string(),
     teamName: v.string(),
     handicapMin: v.optional(v.number()),
@@ -131,11 +133,17 @@ export const saveTeam = mutation({
   handler: async (ctx, args) => {
     const identity = await getIdentity(ctx);
     if (!isSuperAdmin(identity.email)) {
-      const member = await ctx.db
-        .query("clubMembers")
-        .withIndex("by_club_and_user", q => q.eq("clubId", args.clubId).eq("userId", identity.subject))
-        .unique();
-      if (!member || member.role !== "admin") throw new Error("Not authorised");
+      // Must be admin of their own club (clubId) or super admin
+      if (args.clubId) {
+        const member = await ctx.db
+          .query("clubMembers")
+          .withIndex("by_club_and_user", q => q.eq("clubId", args.clubId!).eq("userId", identity.subject))
+          .unique();
+        if (!member || member.role !== "admin") throw new Error("Not authorised");
+      } else {
+        // Adding an away team (not platform club) — any league admin can do this
+        await assertCanManageLeague(ctx, args.leagueId);
+      }
     }
     const { teamId, ...fields } = args;
     if (teamId) {

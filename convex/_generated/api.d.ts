@@ -9,10 +9,11 @@
  */
 
 import type * as clubMembers from "../clubMembers.js";
-import type * as corti from "../corti.js";
 import type * as clubs from "../clubs.js";
 import type * as communications from "../communications.js";
 import type * as competitions from "../competitions.js";
+import type * as corti from "../corti.js";
+import type * as golfClubs from "../golfClubs.js";
 import type * as courses from "../courses.js";
 import type * as crons from "../crons.js";
 import type * as entries from "../entries.js";
@@ -39,10 +40,11 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   clubMembers: typeof clubMembers;
-  corti: typeof corti;
   clubs: typeof clubs;
   communications: typeof communications;
   competitions: typeof competitions;
+  corti: typeof corti;
+  golfClubs: typeof golfClubs;
   courses: typeof courses;
   crons: typeof crons;
   entries: typeof entries;

@@ -58,6 +58,9 @@ export const create = mutation({
     currency: v.string(),
     userId: v.string(),
     displayName: v.string(),
+    county: v.optional(v.string()),
+    englandGolfId: v.optional(v.string()),
+    golfClubId: v.optional(v.id("golfClubs")),
   },
   handler: async (ctx, args) => {
     await assertSuperAdmin(ctx);
@@ -71,11 +74,19 @@ export const create = mutation({
       slug: args.slug,
       clerkOrgId: args.clerkOrgId,
       currency: args.currency,
+      county: args.county,
+      englandGolfId: args.englandGolfId,
+      golfClubId: args.golfClubId,
       plan: "free",
       billingStatus: "trialing",
       createdAt: now,
       updatedAt: now,
     });
+
+    // Link back from the directory entry
+    if (args.golfClubId) {
+      await ctx.db.patch(args.golfClubId, { platformClubId: clubId });
+    }
 
     // Create the founding admin member
     await ctx.db.insert("clubMembers", {
