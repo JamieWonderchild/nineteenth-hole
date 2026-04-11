@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
@@ -110,17 +110,9 @@ const ALL_SEED_CLUBS = [
   ...HERTFORDSHIRE_CLUBS,
 ];
 
-export const seed = mutation({
+export const seed = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthenticated");
-
-    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
-    if (!superAdminEmails.includes(identity.email ?? "")) {
-      throw new Error("Super admin only");
-    }
-
     // Idempotent — skip if already seeded
     const existing = await ctx.db.query("golfClubs").collect();
     if (existing.length > 0) return { skipped: true, count: existing.length };
