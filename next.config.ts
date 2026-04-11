@@ -1,15 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  async redirects() {
-    return [
-      {
-        source: '/quick-diagnosis',
-        destination: '/encounter/new',
-        permanent: true,
-      },
-    ];
-  },
+  allowedDevOrigins: ['local.playthepool.golf'],
 };
 
 export default nextConfig;
