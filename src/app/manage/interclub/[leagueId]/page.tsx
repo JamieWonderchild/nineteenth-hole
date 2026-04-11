@@ -5,7 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
-import { ArrowLeft, Plus, X, Calendar, Shield, Search, MapPin, PlusCircle } from "lucide-react";
+import { ArrowLeft, Plus, X, Calendar, Shield, Search, MapPin, PlusCircle, Pencil, Check } from "lucide-react";
 import Link from "next/link";
 
 type Team = {
@@ -212,6 +212,89 @@ function AddTeamModal({
   );
 }
 
+type FixtureData = {
+  _id: Id<"interclubFixtures">;
+  status: string;
+  date?: string;
+  venue?: string;
+  homePoints?: number;
+  awayPoints?: number;
+  homeTeam?: { clubName: string; teamName: string } | null;
+  awayTeam?: { clubName: string; teamName: string } | null;
+};
+
+function FixtureCard({ fixture: f, leagueId, isAdmin }: { fixture: FixtureData; leagueId: string; isAdmin: boolean }) {
+  const updateFixture = useMutation(api.interclub.updateFixture);
+  const [scoring, setScoring] = useState(false);
+  const [home, setHome] = useState(f.homePoints?.toString() ?? "");
+  const [away, setAway] = useState(f.awayPoints?.toString() ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSaveScore(e: React.FormEvent) {
+    e.preventDefault();
+    const hp = parseFloat(home);
+    const ap = parseFloat(away);
+    if (isNaN(hp) || isNaN(ap)) return;
+    setSaving(true);
+    try {
+      await updateFixture({ fixtureId: f._id, homePoints: hp, awayPoints: ap });
+      setScoring(false);
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 hover:border-green-300 hover:shadow-sm transition-all">
+      <div className="flex items-center gap-4">
+        <Link href={`/manage/interclub/${leagueId}/fixture/${f._id}`} className="flex-1 min-w-0">
+          <p className="font-medium text-gray-900 text-sm">
+            {f.homeTeam?.clubName} {f.homeTeam?.teamName}
+            <span className="text-gray-400 mx-2">vs</span>
+            {f.awayTeam?.clubName} {f.awayTeam?.teamName}
+          </p>
+          {f.date && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              {new Date(f.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+              {f.venue ? ` · ${f.venue}` : ""}
+            </p>
+          )}
+        </Link>
+        <div className="flex items-center gap-2 shrink-0">
+          {f.status === "complete" && f.homePoints != null ? (
+            <span className="font-bold text-gray-900 text-sm tabular-nums">{f.homePoints} – {f.awayPoints}</span>
+          ) : null}
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_STYLES[f.status] ?? "bg-gray-100 text-gray-500"}`}>
+            {f.status.replace("_", " ")}
+          </span>
+          {isAdmin && (
+            <button onClick={() => { setHome(f.homePoints?.toString() ?? ""); setAway(f.awayPoints?.toString() ?? ""); setScoring(s => !s); }}
+              className="text-gray-300 hover:text-green-600 transition-colors" title="Set score">
+              <Pencil size={13} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {scoring && (
+        <form onSubmit={handleSaveScore} className="mt-3 flex items-center gap-2 pl-0">
+          <span className="text-xs text-gray-400">Score:</span>
+          <input type="number" value={home} onChange={e => setHome(e.target.value)}
+            min="0" step="0.5" placeholder="0" autoFocus
+            className="w-14 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-green-500" />
+          <span className="text-gray-400 text-sm font-bold">–</span>
+          <input type="number" value={away} onChange={e => setAway(e.target.value)}
+            min="0" step="0.5" placeholder="0"
+            className="w-14 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-green-500" />
+          <button type="submit" disabled={saving}
+            className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg">
+            <Check size={11} /> {saving ? "…" : "Save"}
+          </button>
+          <button type="button" onClick={() => setScoring(false)} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 function NewFixtureModal({
   leagueId,
   teams,
@@ -390,32 +473,7 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
         ) : (
           <div className="space-y-2">
             {fixtures.map(f => (
-              <Link key={f._id} href={`/manage/interclub/${leagueId}/fixture/${f._id}`}
-                className="flex items-center gap-4 bg-white border border-gray-200 rounded-xl px-5 py-4 hover:border-green-300 hover:shadow-sm transition-all">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 text-sm">
-                    {f.homeTeam?.clubName} {f.homeTeam?.teamName}
-                    <span className="text-gray-400 mx-2">vs</span>
-                    {f.awayTeam?.clubName} {f.awayTeam?.teamName}
-                  </p>
-                  {f.date && (
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {new Date(f.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
-                      {f.venue ? ` · ${f.venue}` : ""}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  {f.status === "complete" && f.homePoints != null && (
-                    <span className="font-bold text-gray-900 text-sm">
-                      {f.homePoints} – {f.awayPoints}
-                    </span>
-                  )}
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_STYLES[f.status] ?? "bg-gray-100 text-gray-500"}`}>
-                    {f.status.replace("_", " ")}
-                  </span>
-                </div>
-              </Link>
+              <FixtureCard key={f._id} fixture={f} leagueId={leagueId} isAdmin={isAdmin} />
             ))}
           </div>
         )

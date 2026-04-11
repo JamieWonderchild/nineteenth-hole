@@ -225,10 +225,18 @@ export const updateFixture = mutation({
     venue: v.optional(v.string()),
     status: v.optional(v.string()),
     notes: v.optional(v.string()),
+    // Direct score entry — bypasses individual match calculation
+    homePoints: v.optional(v.number()),
+    awayPoints: v.optional(v.number()),
   },
   handler: async (ctx, { fixtureId, ...fields }) => {
     await assertCanManageFixture(ctx, fixtureId);
-    await ctx.db.patch(fixtureId, { ...fields, updatedAt: new Date().toISOString() });
+    // If a direct score is provided, mark complete automatically
+    const extra: Record<string, unknown> = {};
+    if (fields.homePoints !== undefined && fields.awayPoints !== undefined && !fields.status) {
+      extra.status = "complete";
+    }
+    await ctx.db.patch(fixtureId, { ...fields, ...extra, updatedAt: new Date().toISOString() });
   },
 });
 
