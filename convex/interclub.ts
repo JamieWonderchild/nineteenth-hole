@@ -321,6 +321,20 @@ async function recomputeFixtureScore(ctx: MutationCtx, fixtureId: Id<"interclubF
   });
 }
 
+export const deleteFixture = mutation({
+  args: { fixtureId: v.id("interclubFixtures") },
+  handler: async (ctx, { fixtureId }) => {
+    await assertCanManageFixture(ctx, fixtureId);
+    // Delete all matches first
+    const matches = await ctx.db
+      .query("interclubMatches")
+      .withIndex("by_fixture", q => q.eq("fixtureId", fixtureId))
+      .collect();
+    for (const m of matches) await ctx.db.delete(m._id);
+    await ctx.db.delete(fixtureId);
+  },
+});
+
 export const deleteMatch = mutation({
   args: { matchId: v.id("interclubMatches") },
   handler: async (ctx, { matchId }) => {

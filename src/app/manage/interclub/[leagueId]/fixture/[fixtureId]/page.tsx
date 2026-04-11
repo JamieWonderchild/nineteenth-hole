@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, use } from "react";
+import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
-import { ArrowLeft, Plus, X, Check } from "lucide-react";
+import { ArrowLeft, Plus, X, Check, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 const RESULT_PRESETS = ["1 up", "2&1", "3&2", "4&3", "5&4", "6&5", "7&6", "AS", "halved"];
@@ -228,6 +229,8 @@ export default function FixturePage({ params }: { params: Promise<{ leagueId: st
 
   const fixture = useQuery(api.interclub.getFixture, { fixtureId: fixtureId as Id<"interclubFixtures"> });
   const updateFixture = useMutation(api.interclub.updateFixture);
+  const deleteFixture = useMutation(api.interclub.deleteFixture);
+  const router = useRouter();
 
   const [addingMatch, setAddingMatch] = useState(false);
 
@@ -263,6 +266,19 @@ export default function FixturePage({ params }: { params: Promise<{ leagueId: st
             </p>
           )}
         </div>
+        {isAdmin && (
+          <button
+            onClick={async () => {
+              if (!confirm("Delete this fixture and all its match results?")) return;
+              await deleteFixture({ fixtureId: fixtureId as Id<"interclubFixtures"> });
+              router.push(`/manage/interclub/${leagueId}`);
+            }}
+            className="text-gray-300 hover:text-red-500 transition-colors"
+            title="Delete fixture"
+          >
+            <Trash2 size={17} />
+          </button>
+        )}
       </div>
 
       {/* Score banner */}
