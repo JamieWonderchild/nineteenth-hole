@@ -44,7 +44,7 @@ function AddTeamModal({
 
   const searchResults = useQuery(
     api.golfClubs.search,
-    search.length >= 2 ? { term: search, county: leagueCounty } : "skip"
+    search.length >= 2 ? { term: search } : "skip"
   ) as GolfClub[] | undefined;
 
   // Is the selected club the user's own platform club?
