@@ -337,14 +337,14 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
         </div>
         {isAdmin && (
           <div className="flex gap-2">
-            {tab === "fixtures" && (
+            {tab === "fixtures" && teams.length >= 2 && (
               <button onClick={() => setShowNewFixture(true)}
                 className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-xl">
                 <Plus size={14} /> Fixture
               </button>
             )}
-            {tab === "teams" && club && (
-              <button onClick={() => setShowAddTeam(true)}
+            {(tab === "teams" || (tab === "fixtures" && teams.length < 2)) && club && (
+              <button onClick={() => { setTab("teams"); setShowAddTeam(true); }}
                 className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-xl">
                 <Plus size={14} /> Team
               </button>
@@ -365,10 +365,27 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
 
       {/* Fixtures */}
       {tab === "fixtures" && (
-        fixtures.length === 0 ? (
+        teams.length < 2 ? (
+          <div className="bg-white border border-dashed border-gray-200 rounded-xl p-12 text-center">
+            <Shield size={28} className="text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 text-sm font-medium">Add teams first</p>
+            <p className="text-gray-400 text-xs mt-1">You need at least 2 teams before you can schedule fixtures</p>
+            {isAdmin && club && (
+              <button onClick={() => { setTab("teams"); setShowAddTeam(true); }}
+                className="mt-4 text-sm text-green-600 hover:underline font-medium">
+                Add a team →
+              </button>
+            )}
+          </div>
+        ) : fixtures.length === 0 ? (
           <div className="bg-white border border-dashed border-gray-200 rounded-xl p-12 text-center">
             <Calendar size={28} className="text-gray-300 mx-auto mb-3" />
             <p className="text-gray-400 text-sm">No fixtures scheduled yet</p>
+            {isAdmin && (
+              <button onClick={() => setShowNewFixture(true)} className="mt-2 text-sm text-green-600 hover:underline">
+                Schedule the first fixture
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-2">
