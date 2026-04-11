@@ -14,6 +14,7 @@ function NewLeagueModal({ onClose }: { onClose: () => void }) {
     county: "",
     season: "2025-26",
     format: "matchplay",
+    matchType: "singles",
     description: "",
   });
   const [saving, setSaving] = useState(false);
@@ -27,6 +28,7 @@ function NewLeagueModal({ onClose }: { onClose: () => void }) {
         county: form.county.trim() || undefined,
         season: form.season.trim(),
         format: form.format,
+        matchType: form.matchType,
         description: form.description.trim() || undefined,
       });
       onClose();
@@ -68,6 +70,15 @@ function NewLeagueModal({ onClose }: { onClose: () => void }) {
               <option value="matchplay">Match play</option>
               <option value="stableford">Stableford</option>
               <option value="strokeplay">Stroke play</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Match type</label>
+            <select value={form.matchType} onChange={e => setForm(f => ({ ...f, matchType: e.target.value }))}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+              <option value="singles">Singles</option>
+              <option value="betterball">4-ball better ball (pairs)</option>
+              <option value="mixed">Mixed — varies per fixture</option>
             </select>
           </div>
           <div>

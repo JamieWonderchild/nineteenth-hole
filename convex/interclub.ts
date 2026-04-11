@@ -83,6 +83,7 @@ export const createLeague = mutation({
     county: v.optional(v.string()),
     season: v.string(),
     format: v.string(),
+    matchType: v.optional(v.string()),
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -181,15 +182,16 @@ export const getFixture = query({
   handler: async (ctx, { fixtureId }) => {
     const fixture = await ctx.db.get(fixtureId);
     if (!fixture) return null;
-    const [home, away] = await Promise.all([
+    const [home, away, league] = await Promise.all([
       ctx.db.get(fixture.homeTeamId),
       ctx.db.get(fixture.awayTeamId),
+      ctx.db.get(fixture.leagueId),
     ]);
     const matches = await ctx.db
       .query("interclubMatches")
       .withIndex("by_fixture", q => q.eq("fixtureId", fixtureId))
       .collect();
-    return { ...fixture, homeTeam: home, awayTeam: away, matches };
+    return { ...fixture, homeTeam: home, awayTeam: away, league, matches };
   },
 });
 
@@ -237,10 +239,15 @@ export const saveMatch = mutation({
     fixtureId: v.id("interclubFixtures"),
     matchId: v.optional(v.id("interclubMatches")),
     matchNumber: v.number(),
+    matchType: v.optional(v.string()),
     homePlayer: v.string(),
+    homePlayer2: v.optional(v.string()),
     homeUserId: v.optional(v.string()),
+    homeUserId2: v.optional(v.string()),
     awayPlayer: v.string(),
+    awayPlayer2: v.optional(v.string()),
     awayUserId: v.optional(v.string()),
+    awayUserId2: v.optional(v.string()),
     result: v.optional(v.string()),
     winner: v.optional(v.string()),
   },

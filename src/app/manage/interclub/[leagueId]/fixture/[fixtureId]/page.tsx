@@ -15,6 +15,7 @@ function MatchRow({
   matchNumber,
   homeTeamName,
   awayTeamName,
+  leagueMatchType,
   existing,
   canEdit,
 }: {
@@ -22,10 +23,14 @@ function MatchRow({
   matchNumber: number;
   homeTeamName: string;
   awayTeamName: string;
+  leagueMatchType: string; // league default
   existing?: {
     _id: Id<"interclubMatches">;
+    matchType?: string;
     homePlayer: string;
+    homePlayer2?: string;
     awayPlayer: string;
+    awayPlayer2?: string;
     result?: string;
     winner?: string;
     homePoints?: number;
@@ -36,11 +41,26 @@ function MatchRow({
   const saveMatch = useMutation(api.interclub.saveMatch);
   const deleteMatch = useMutation(api.interclub.deleteMatch);
   const [editing, setEditing] = useState(!existing);
+
+  // Per-match type: use existing value, fall back to league default (clamped to singles/betterball)
+  const resolvedDefault = existing?.matchType ?? (leagueMatchType === "mixed" ? "singles" : leagueMatchType);
+  const [matchType, setMatchType] = useState<string>(resolvedDefault);
+  const isBetterball = matchType === "betterball";
+
   const [homePlayer, setHomePlayer] = useState(existing?.homePlayer ?? "");
+  const [homePlayer2, setHomePlayer2] = useState(existing?.homePlayer2 ?? "");
   const [awayPlayer, setAwayPlayer] = useState(existing?.awayPlayer ?? "");
+  const [awayPlayer2, setAwayPlayer2] = useState(existing?.awayPlayer2 ?? "");
   const [result, setResult] = useState(existing?.result ?? "");
   const [winner, setWinner] = useState(existing?.winner ?? "");
   const [saving, setSaving] = useState(false);
+
+  const homeLabel = isBetterball
+    ? [homePlayer, homePlayer2].filter(Boolean).join(" & ") || homeTeamName
+    : homePlayer || homeTeamName;
+  const awayLabel = isBetterball
+    ? [awayPlayer, awayPlayer2].filter(Boolean).join(" & ") || awayTeamName
+    : awayPlayer || awayTeamName;
 
   async function handleSave() {
     if (!homePlayer.trim() || !awayPlayer.trim()) return;
@@ -50,8 +70,11 @@ function MatchRow({
         fixtureId,
         matchId: existing?._id,
         matchNumber,
+        matchType,
         homePlayer: homePlayer.trim(),
+        homePlayer2: isBetterball ? (homePlayer2.trim() || undefined) : undefined,
         awayPlayer: awayPlayer.trim(),
+        awayPlayer2: isBetterball ? (awayPlayer2.trim() || undefined) : undefined,
         result: result || undefined,
         winner: winner || undefined,
       });
@@ -62,13 +85,15 @@ function MatchRow({
   if (!canEdit && !existing) return null;
 
   if (existing && !editing) {
+    const isBB = existing.matchType === "betterball";
     return (
       <div className="flex items-center gap-3 px-5 py-3.5 border-b border-gray-50 last:border-0">
         <span className="text-xs text-gray-400 w-6 text-center font-medium">{matchNumber}</span>
         <div className="flex-1 grid grid-cols-3 gap-2 items-center">
-          <p className={`text-sm font-medium truncate ${existing.winner === "home" ? "text-green-700" : "text-gray-900"}`}>
-            {existing.winner === "home" && "🏆 "}{existing.homePlayer}
-          </p>
+          <div className={`${existing.winner === "home" ? "text-green-700" : "text-gray-900"}`}>
+            <p className="text-sm font-medium truncate">{existing.winner === "home" && "🏆 "}{existing.homePlayer}</p>
+            {isBB && existing.homePlayer2 && <p className="text-xs text-gray-400 truncate">{existing.homePlayer2}</p>}
+          </div>
           <div className="text-center">
             {existing.result ? (
               <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium">{existing.result}</span>
@@ -77,9 +102,10 @@ function MatchRow({
             )}
             {existing.winner === "halved" && <span className="ml-1 text-xs text-gray-400">halved</span>}
           </div>
-          <p className={`text-sm font-medium truncate text-right ${existing.winner === "away" ? "text-green-700" : "text-gray-900"}`}>
-            {existing.winner === "away" && "🏆 "}{existing.awayPlayer}
-          </p>
+          <div className={`text-right ${existing.winner === "away" ? "text-green-700" : "text-gray-900"}`}>
+            <p className="text-sm font-medium truncate">{existing.winner === "away" && "🏆 "}{existing.awayPlayer}</p>
+            {isBB && existing.awayPlayer2 && <p className="text-xs text-gray-400 truncate">{existing.awayPlayer2}</p>}
+          </div>
         </div>
         {canEdit && (
           <div className="flex gap-1.5 shrink-0">
@@ -98,20 +124,45 @@ function MatchRow({
 
   return (
     <div className="px-5 py-4 border-b border-gray-50 last:border-0 space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-gray-400 w-6 text-center font-medium">{matchNumber}</span>
-        <div className="flex-1 grid grid-cols-2 gap-2">
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">{homeTeamName} player</label>
+      {/* Match type toggle — only shown for mixed leagues */}
+      {leagueMatchType === "mixed" && (
+        <div className="flex items-center gap-2 pl-8">
+          <span className="text-xs text-gray-400">Type:</span>
+          {(["singles", "betterball"] as const).map(t => (
+            <button key={t} onClick={() => setMatchType(t)}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${matchType === t ? "bg-green-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+              {t === "betterball" ? "4-ball BB" : "Singles"}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-start gap-2">
+        <span className="text-xs text-gray-400 w-6 text-center font-medium mt-2">{matchNumber}</span>
+        <div className="flex-1 grid grid-cols-2 gap-3">
+          {/* Home side */}
+          <div className="space-y-1.5">
+            <label className="block text-xs text-gray-400">{homeTeamName} {isBetterball ? "pair" : "player"}</label>
             <input type="text" value={homePlayer} onChange={e => setHomePlayer(e.target.value)}
-              placeholder="Name" autoFocus
+              placeholder={isBetterball ? "Player 1" : "Name"} autoFocus
               className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500" />
+            {isBetterball && (
+              <input type="text" value={homePlayer2} onChange={e => setHomePlayer2(e.target.value)}
+                placeholder="Player 2"
+                className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500" />
+            )}
           </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">{awayTeamName} player</label>
+          {/* Away side */}
+          <div className="space-y-1.5">
+            <label className="block text-xs text-gray-400">{awayTeamName} {isBetterball ? "pair" : "player"}</label>
             <input type="text" value={awayPlayer} onChange={e => setAwayPlayer(e.target.value)}
-              placeholder="Name"
+              placeholder={isBetterball ? "Player 1" : "Name"}
               className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500" />
+            {isBetterball && (
+              <input type="text" value={awayPlayer2} onChange={e => setAwayPlayer2(e.target.value)}
+                placeholder="Player 2"
+                className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500" />
+            )}
           </div>
         </div>
       </div>
@@ -139,12 +190,12 @@ function MatchRow({
         <label className="text-xs text-gray-400">Winner:</label>
         <div className="flex gap-2">
           {[
-            { value: "home", label: homePlayer || homeTeamName },
+            { value: "home", label: homeLabel },
             { value: "halved", label: "Halved" },
-            { value: "away", label: awayPlayer || awayTeamName },
+            { value: "away", label: awayLabel },
           ].map(opt => (
             <button key={opt.value} onClick={() => setWinner(winner === opt.value ? "" : opt.value)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors truncate max-w-[120px] ${winner === opt.value ? "bg-green-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors truncate max-w-[140px] ${winner === opt.value ? "bg-green-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
               {opt.label}
             </button>
           ))}
@@ -185,6 +236,7 @@ export default function FixturePage({ params }: { params: Promise<{ leagueId: st
   const awayTotal = matches.reduce((s, m) => s + (m.awayPoints ?? 0), 0);
 
   const canEdit = isAdmin || true; // TODO: check captain
+  const leagueMatchType = fixture.league?.matchType ?? "singles";
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
@@ -244,7 +296,9 @@ export default function FixturePage({ params }: { params: Promise<{ leagueId: st
       {/* Matches */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">Individual matches</h2>
+          <h2 className="text-sm font-semibold text-gray-900">
+            {leagueMatchType === "betterball" ? "4-ball better ball matches" : leagueMatchType === "mixed" ? "Matches" : "Singles matches"}
+          </h2>
           {canEdit && (
             <button onClick={() => setAddingMatch(true)}
               className="flex items-center gap-1.5 text-xs text-green-600 hover:text-green-700 font-medium">
@@ -271,6 +325,7 @@ export default function FixturePage({ params }: { params: Promise<{ leagueId: st
             matchNumber={m.matchNumber}
             homeTeamName={fixture.homeTeam?.teamName ?? "Home"}
             awayTeamName={fixture.awayTeam?.teamName ?? "Away"}
+            leagueMatchType={leagueMatchType}
             existing={m}
             canEdit={canEdit}
           />
@@ -282,6 +337,7 @@ export default function FixturePage({ params }: { params: Promise<{ leagueId: st
             matchNumber={nextMatchNumber}
             homeTeamName={fixture.homeTeam?.teamName ?? "Home"}
             awayTeamName={fixture.awayTeam?.teamName ?? "Away"}
+            leagueMatchType={leagueMatchType}
             canEdit={canEdit}
           />
         )}

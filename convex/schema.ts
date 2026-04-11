@@ -590,6 +590,7 @@ export default defineSchema({
     county: v.optional(v.string()), // "Middlesex"
     season: v.string(),             // "2025-26"
     format: v.string(),             // 'matchplay' | 'stableford' | 'strokeplay'
+    matchType: v.optional(v.string()), // 'singles' | 'betterball' | 'mixed'
     description: v.optional(v.string()),
     createdBy: v.string(),          // userId
     createdAt: v.string(),
@@ -630,11 +631,16 @@ export default defineSchema({
   interclubMatches: defineTable({
     fixtureId: v.id("interclubFixtures"),
     leagueId: v.id("interclubLeagues"),
-    matchNumber: v.number(),        // 1–8 (singles) or 1–4 (foursomes)
-    homePlayer: v.string(),         // display name
+    matchNumber: v.number(),        // 1–8 (singles) or 1–4 (betterball)
+    matchType: v.optional(v.string()), // 'singles' | 'betterball' — overrides league default
+    homePlayer: v.string(),         // display name (player 1)
+    homePlayer2: v.optional(v.string()), // partner name (betterball only)
     homeUserId: v.optional(v.string()),
+    homeUserId2: v.optional(v.string()),
     awayPlayer: v.string(),
+    awayPlayer2: v.optional(v.string()),
     awayUserId: v.optional(v.string()),
+    awayUserId2: v.optional(v.string()),
     result: v.optional(v.string()), // e.g. "3&2", "1 up", "halved", "conceded"
     // 'home' | 'away' | 'halved' | null
     winner: v.optional(v.string()),
