@@ -133,6 +133,29 @@ export const seed = mutation({
   },
 });
 
+// Add a new club to the directory (any club admin — used when opponent isn't seeded)
+export const create = mutation({
+  args: {
+    name: v.string(),
+    county: v.string(),
+    postcode: v.optional(v.string()),
+    website: v.optional(v.string()),
+    englandGolfId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    // Deduplicate by name + county
+    const existing = await ctx.db
+      .query("golfClubs")
+      .withIndex("by_county", q => q.eq("county", args.county))
+      .collect();
+    const dupe = existing.find(c => c.name.toLowerCase() === args.name.toLowerCase().trim());
+    if (dupe) return dupe._id;
+    return ctx.db.insert("golfClubs", { ...args, name: args.name.trim() });
+  },
+});
+
 // Link a platform club to its directory entry
 export const linkToPlatformClub = mutation({
   args: {

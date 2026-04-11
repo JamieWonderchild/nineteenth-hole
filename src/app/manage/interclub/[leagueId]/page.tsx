@@ -5,7 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
-import { ArrowLeft, Plus, X, Calendar, Shield, Search, MapPin } from "lucide-react";
+import { ArrowLeft, Plus, X, Calendar, Shield, Search, MapPin, PlusCircle } from "lucide-react";
 import Link from "next/link";
 
 type Team = {
@@ -35,6 +35,7 @@ function AddTeamModal({
   onClose: () => void;
 }) {
   const saveTeam = useMutation(api.interclub.saveTeam);
+  const createGolfClub = useMutation(api.golfClubs.create);
   const members = useQuery(api.clubMembers.listByClub, { clubId: ownClubId });
 
   // "own" = adding a team for my club, "opponent" = adding another club
@@ -56,6 +57,18 @@ function AddTeamModal({
   const [saving, setSaving] = useState(false);
 
   const resolvedClubName = side === "own" ? ownClubName : (selectedOpponent?.name ?? "");
+
+  async function handleAddNewClub() {
+    if (!opponentSearch.trim()) return;
+    setSaving(true);
+    try {
+      const golfClubId = await createGolfClub({
+        name: opponentSearch.trim(),
+        county: leagueCounty ?? "Unknown",
+      });
+      setSelectedOpponent({ _id: golfClubId as Id<"golfClubs">, name: opponentSearch.trim(), county: leagueCounty ?? "Unknown" });
+    } finally { setSaving(false); }
+  }
 
   async function handleSave() {
     if (!form.teamName.trim()) return;
@@ -129,9 +142,7 @@ function AddTeamModal({
                   </div>
                   {opponentSearch.length >= 2 && directoryResults !== undefined && (
                     <div className="border border-gray-200 rounded-lg divide-y divide-gray-50 max-h-40 overflow-y-auto">
-                      {directoryResults.length === 0 ? (
-                        <p className="px-3 py-2 text-xs text-gray-400">No clubs found</p>
-                      ) : directoryResults.map(club => (
+                      {directoryResults.map(club => (
                         <button key={club._id} onClick={() => setSelectedOpponent(club)}
                           className="w-full flex items-center gap-2 px-3 py-2 hover:bg-green-50 text-left transition-colors">
                           <MapPin size={12} className="text-gray-300 shrink-0" />
@@ -141,6 +152,11 @@ function AddTeamModal({
                           </div>
                         </button>
                       ))}
+                      <button onClick={handleAddNewClub} disabled={saving}
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-green-50 text-left transition-colors text-green-700">
+                        <PlusCircle size={12} className="shrink-0" />
+                        <p className="text-sm font-medium">Add &ldquo;{opponentSearch.trim()}&rdquo; as new club</p>
+                      </button>
                     </div>
                   )}
                 </div>
