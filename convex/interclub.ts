@@ -393,11 +393,11 @@ export const standings = query({
       else { home.drawn++; away.drawn++; }
     }
 
+    // Golf interclub: points = total match points won (not fixture wins)
+    // e.g. winning a fixture 4–0 earns 4 points, not 2
     return Object.values(stats).sort((a, b) => {
-      const ptA = a.won * 2 + a.drawn;
-      const ptB = b.won * 2 + b.drawn;
-      if (ptA !== ptB) return ptB - ptA;
-      return (b.matchPointsFor - b.matchPointsAgainst) - (a.matchPointsFor - a.matchPointsAgainst);
-    }).map((s, i) => ({ ...s, position: i + 1, points: s.won * 2 + s.drawn }));
+      if (b.matchPointsFor !== a.matchPointsFor) return b.matchPointsFor - a.matchPointsFor;
+      return b.won - a.won; // tiebreak: fixture wins
+    }).map((s, i) => ({ ...s, position: i + 1, points: s.matchPointsFor }));
   },
 });
