@@ -5,7 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
-import { ArrowLeft, Plus, X, Calendar, Shield, Search, MapPin, PlusCircle, Pencil, Check } from "lucide-react";
+import { ArrowLeft, Plus, X, Calendar, Shield, Search, MapPin, PlusCircle, Pencil, Check, Settings } from "lucide-react";
 import Link from "next/link";
 
 type Team = {
@@ -400,9 +400,16 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
   const fixtures = useQuery(api.interclub.listFixtures, { leagueId: leagueId as Id<"interclubLeagues"> });
   const table = useQuery(api.interclub.standings, { leagueId: leagueId as Id<"interclubLeagues"> });
 
+  const updateLeague = useMutation(api.interclub.updateLeague);
   const [tab, setTab] = useState<"fixtures" | "table" | "teams">("fixtures");
   const [showAddTeam, setShowAddTeam] = useState(false);
   const [showNewFixture, setShowNewFixture] = useState(false);
+  const [editingLeague, setEditingLeague] = useState(false);
+  const [leagueForm, setLeagueForm] = useState({
+    matchType: league?.matchType ?? "singles",
+    handicapMin: league?.handicapMin?.toString() ?? "",
+    handicapMax: league?.handicapMax?.toString() ?? "",
+  });
 
   if (!league || !teams || !fixtures || !table) {
     return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" /></div>;
@@ -416,10 +423,18 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
         <Link href="/manage/interclub" className="text-gray-400 hover:text-gray-600"><ArrowLeft size={20} /></Link>
         <div className="flex-1">
           <h1 className="text-xl font-bold text-gray-900">{league.name}</h1>
-          <p className="text-sm text-gray-500">{league.season}{league.county ? ` · ${league.county}` : ""}</p>
+          <p className="text-sm text-gray-500">
+            {league.season}{league.county ? ` · ${league.county}` : ""}
+            {league.matchType && league.matchType !== "singles" ? ` · ${league.matchType === "betterball" ? "4-ball BB" : "Mixed"}` : ""}
+            {league.handicapMin != null ? ` · HCP ${league.handicapMin}+` : ""}
+          </p>
         </div>
         {isAdmin && (
           <div className="flex gap-2">
+            <button onClick={() => { setLeagueForm({ matchType: league.matchType ?? "singles", handicapMin: league.handicapMin?.toString() ?? "", handicapMax: league.handicapMax?.toString() ?? "" }); setEditingLeague(e => !e); }}
+              className="p-2 text-gray-400 hover:text-gray-700 transition-colors" title="League settings">
+              <Settings size={16} />
+            </button>
             {tab === "fixtures" && teams.length >= 2 && (
               <button onClick={() => setShowNewFixture(true)}
                 className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-xl">
@@ -435,6 +450,50 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
           </div>
         )}
       </div>
+
+      {/* League settings panel */}
+      {editingLeague && isAdmin && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl px-5 py-4 space-y-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">League settings</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Match type</label>
+              <select value={leagueForm.matchType} onChange={e => setLeagueForm(f => ({ ...f, matchType: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option value="singles">Singles</option>
+                <option value="betterball">4-ball better ball</option>
+                <option value="mixed">Mixed</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Min handicap</label>
+              <input type="number" value={leagueForm.handicapMin} onChange={e => setLeagueForm(f => ({ ...f, handicapMin: e.target.value }))}
+                placeholder="e.g. 5.5" step="0.1"
+                className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Max handicap</label>
+              <input type="number" value={leagueForm.handicapMax} onChange={e => setLeagueForm(f => ({ ...f, handicapMax: e.target.value }))}
+                placeholder="none"  step="0.1"
+                className="w-full border border-gray-300 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setEditingLeague(false)} className="text-sm text-gray-400 hover:text-gray-600 px-3 py-1.5">Cancel</button>
+            <button onClick={async () => {
+              await updateLeague({
+                leagueId: leagueId as Id<"interclubLeagues">,
+                matchType: leagueForm.matchType,
+                handicapMin: leagueForm.handicapMin ? parseFloat(leagueForm.handicapMin) : undefined,
+                handicapMax: leagueForm.handicapMax ? parseFloat(leagueForm.handicapMax) : undefined,
+              });
+              setEditingLeague(false);
+            }} className="flex items-center gap-1.5 px-4 py-1.5 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-lg">
+              <Check size={13} /> Save
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">

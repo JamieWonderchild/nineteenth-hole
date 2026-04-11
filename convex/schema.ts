@@ -591,6 +591,8 @@ export default defineSchema({
     season: v.string(),             // "2025-26"
     format: v.string(),             // 'matchplay' | 'stableford' | 'strokeplay'
     matchType: v.optional(v.string()), // 'singles' | 'betterball' | 'mixed'
+    handicapMin: v.optional(v.number()), // min handicap for this league (e.g. 5.5 for Sabres)
+    handicapMax: v.optional(v.number()), // max handicap (null = no limit)
     description: v.optional(v.string()),
     createdBy: v.string(),          // userId
     createdAt: v.string(),

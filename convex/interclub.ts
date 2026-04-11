@@ -84,16 +84,34 @@ export const createLeague = mutation({
     season: v.string(),
     format: v.string(),
     matchType: v.optional(v.string()),
+    handicapMin: v.optional(v.number()),
+    handicapMax: v.optional(v.number()),
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await getIdentity(ctx);
-    // Any admin can create a league
     return ctx.db.insert("interclubLeagues", {
       ...args,
       createdBy: identity.subject,
       createdAt: new Date().toISOString(),
     });
+  },
+});
+
+export const updateLeague = mutation({
+  args: {
+    leagueId: v.id("interclubLeagues"),
+    name: v.optional(v.string()),
+    county: v.optional(v.string()),
+    season: v.optional(v.string()),
+    matchType: v.optional(v.string()),
+    handicapMin: v.optional(v.number()),
+    handicapMax: v.optional(v.number()),
+    description: v.optional(v.string()),
+  },
+  handler: async (ctx, { leagueId, ...fields }) => {
+    await assertCanManageLeague(ctx, leagueId);
+    await ctx.db.patch(leagueId, fields);
   },
 });
 

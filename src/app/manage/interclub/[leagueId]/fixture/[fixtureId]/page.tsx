@@ -14,7 +14,9 @@ function MatchRow({
   fixtureId,
   matchNumber,
   homeTeamName,
+  homeClubName,
   awayTeamName,
+  awayClubName,
   leagueMatchType,
   existing,
   canEdit,
@@ -22,7 +24,9 @@ function MatchRow({
   fixtureId: Id<"interclubFixtures">;
   matchNumber: number;
   homeTeamName: string;
+  homeClubName: string;
   awayTeamName: string;
+  awayClubName: string;
   leagueMatchType: string; // league default
   existing?: {
     _id: Id<"interclubMatches">;
@@ -41,6 +45,7 @@ function MatchRow({
   const saveMatch = useMutation(api.interclub.saveMatch);
   const deleteMatch = useMutation(api.interclub.deleteMatch);
   const [editing, setEditing] = useState(!existing);
+  // Use club name for winner buttons so "Sabres vs Sabres" is distinguishable
 
   // Per-match type: use existing value, fall back to league default (clamped to singles/betterball)
   const resolvedDefault = existing?.matchType ?? (leagueMatchType === "mixed" ? "singles" : leagueMatchType);
@@ -56,11 +61,11 @@ function MatchRow({
   const [saving, setSaving] = useState(false);
 
   const homeLabel = isBetterball
-    ? [homePlayer, homePlayer2].filter(Boolean).join(" & ") || homeTeamName
-    : homePlayer || homeTeamName;
+    ? [homePlayer, homePlayer2].filter(Boolean).join(" & ") || homeClubName
+    : homePlayer || homeClubName;
   const awayLabel = isBetterball
-    ? [awayPlayer, awayPlayer2].filter(Boolean).join(" & ") || awayTeamName
-    : awayPlayer || awayTeamName;
+    ? [awayPlayer, awayPlayer2].filter(Boolean).join(" & ") || awayClubName
+    : awayPlayer || awayClubName;
 
   async function handleSave() {
     if (!homePlayer.trim() || !awayPlayer.trim()) return;
@@ -142,7 +147,7 @@ function MatchRow({
         <div className="flex-1 grid grid-cols-2 gap-3">
           {/* Home side */}
           <div className="space-y-1.5">
-            <label className="block text-xs text-gray-400">{homeTeamName} {isBetterball ? "pair" : "player"}</label>
+            <label className="block text-xs text-gray-400">{homeClubName} {isBetterball ? "pair" : "player"}</label>
             <input type="text" value={homePlayer} onChange={e => setHomePlayer(e.target.value)}
               placeholder={isBetterball ? "Player 1" : "Name"} autoFocus
               className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500" />
@@ -154,7 +159,7 @@ function MatchRow({
           </div>
           {/* Away side */}
           <div className="space-y-1.5">
-            <label className="block text-xs text-gray-400">{awayTeamName} {isBetterball ? "pair" : "player"}</label>
+            <label className="block text-xs text-gray-400">{awayClubName} {isBetterball ? "pair" : "player"}</label>
             <input type="text" value={awayPlayer} onChange={e => setAwayPlayer(e.target.value)}
               placeholder={isBetterball ? "Player 1" : "Name"}
               className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500" />
@@ -324,7 +329,9 @@ export default function FixturePage({ params }: { params: Promise<{ leagueId: st
             fixtureId={fixtureId as Id<"interclubFixtures">}
             matchNumber={m.matchNumber}
             homeTeamName={fixture.homeTeam?.teamName ?? "Home"}
+            homeClubName={fixture.homeTeam?.clubName ?? "Home"}
             awayTeamName={fixture.awayTeam?.teamName ?? "Away"}
+            awayClubName={fixture.awayTeam?.clubName ?? "Away"}
             leagueMatchType={leagueMatchType}
             existing={m}
             canEdit={canEdit}
@@ -336,7 +343,9 @@ export default function FixturePage({ params }: { params: Promise<{ leagueId: st
             fixtureId={fixtureId as Id<"interclubFixtures">}
             matchNumber={nextMatchNumber}
             homeTeamName={fixture.homeTeam?.teamName ?? "Home"}
+            homeClubName={fixture.homeTeam?.clubName ?? "Home"}
             awayTeamName={fixture.awayTeam?.teamName ?? "Away"}
+            awayClubName={fixture.awayTeam?.clubName ?? "Away"}
             leagueMatchType={leagueMatchType}
             canEdit={canEdit}
           />
