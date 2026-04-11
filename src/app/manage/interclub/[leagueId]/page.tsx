@@ -502,8 +502,7 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
                   <th className="px-3 py-3 font-medium text-center">W</th>
                   <th className="px-3 py-3 font-medium text-center">D</th>
                   <th className="px-3 py-3 font-medium text-center">L</th>
-                  <th className="px-3 py-3 font-medium text-center hidden sm:table-cell">MP+</th>
-                  <th className="px-3 py-3 font-medium text-center hidden sm:table-cell">MP-</th>
+                  <th className="px-3 py-3 font-medium text-center hidden sm:table-cell">Against</th>
                   <th className="px-5 py-3 font-medium text-right">Pts</th>
                 </tr>
               </thead>
@@ -519,7 +518,6 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
                     <td className="px-3 py-3 text-center text-gray-600">{row.won}</td>
                     <td className="px-3 py-3 text-center text-gray-600">{row.drawn}</td>
                     <td className="px-3 py-3 text-center text-gray-600">{row.lost}</td>
-                    <td className="px-3 py-3 text-center text-gray-400 hidden sm:table-cell">{row.matchPointsFor}</td>
                     <td className="px-3 py-3 text-center text-gray-400 hidden sm:table-cell">{row.matchPointsAgainst}</td>
                     <td className="px-5 py-3 text-right font-bold text-green-800">{row.points}</td>
                   </tr>
