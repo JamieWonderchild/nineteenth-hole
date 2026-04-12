@@ -8,7 +8,7 @@ import { useActiveClub } from "@/lib/club-context";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/format";
-import { Trophy, Users, CalendarDays, TrendingUp, Star, ArrowRight, Zap, ChevronRight, Send, Mail } from "lucide-react";
+import { Trophy, Users, CalendarDays, TrendingUp, Star, ArrowRight, Zap, ChevronRight, Send, Mail, Shield } from "lucide-react";
 
 export default function ManagePage() {
   const router = useRouter();
@@ -50,6 +50,8 @@ export default function ManagePage() {
   const approveMember = useMutation(api.clubMembers.approveMember);
   const rejectMember = useMutation(api.clubMembers.rejectMember);
   const generateImportToken = useMutation(api.clubs.generateImportToken);
+  const squadInvites = useQuery(api.squadMembers.listPendingInvites);
+  const respondToSquad = useMutation(api.squadMembers.respond);
 
   const [copied, setCopied] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
@@ -110,34 +112,76 @@ export default function ManagePage() {
     try { await generateImportToken({ clubId: club._id }); } finally { setGeneratingToken(false); }
   }
 
-  return isAdmin
-    ? <AdminDashboard
-        club={club}
-        competitions={competitions}
-        members={members}
-        pendingMembers={pendingMembers ?? []}
-        todayRevenuePence={todayRevenue?.totalRevenue ?? 0}
-        inviteUrl={inviteUrl}
-        copied={copied}
-        onCopyLink={handleCopyLink}
-        tokenCopied={tokenCopied}
-        onCopyToken={handleCopyToken}
-        generatingToken={generatingToken}
-        onGenerateToken={handleGenerateToken}
-        superAdmin={superAdmin ?? false}
-        onApprove={(id) => approveMember({ memberId: id as any })}
-        onReject={(id) => rejectMember({ memberId: id as any })}
-      />
-    : <MemberDashboard
-        club={club}
-        membership={activeMembership}
-        competitions={competitions}
-        members={members}
-        userId={user?.id ?? ""}
-        inviteUrl={inviteUrl}
-        copied={copied}
-        onCopyLink={handleCopyLink}
-      />;
+  const pendingSquadInvites = (squadInvites ?? []).filter(i => i.invite !== null);
+
+  return (
+    <div className="flex flex-col">
+      {/* Squad invite banners */}
+      {pendingSquadInvites.length > 0 && (
+        <div className="px-4 pt-4 space-y-2 md:px-6">
+          {pendingSquadInvites.map(({ invite, team, league }) => (
+            <div key={invite._id} className="flex items-center justify-between gap-3 bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Users size={14} className="text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    You&apos;ve been invited to join the <strong>{team?.teamName ?? "team"}</strong> squad
+                  </p>
+                  {league && <p className="text-xs text-muted-foreground">{league.name} · {league.season}</p>}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => respondToSquad({ squadMemberId: invite._id, accept: true })}
+                  className="text-xs font-medium px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Accept
+                </button>
+                <button
+                  onClick={() => respondToSquad({ squadMemberId: invite._id, accept: false })}
+                  className="text-xs font-medium px-3 py-1.5 border border-border text-muted-foreground rounded-lg hover:bg-accent transition-colors"
+                >
+                  Decline
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isAdmin
+        ? <AdminDashboard
+            club={club}
+            competitions={competitions}
+            members={members}
+            pendingMembers={pendingMembers ?? []}
+            todayRevenuePence={todayRevenue?.totalRevenue ?? 0}
+            inviteUrl={inviteUrl}
+            copied={copied}
+            onCopyLink={handleCopyLink}
+            tokenCopied={tokenCopied}
+            onCopyToken={handleCopyToken}
+            generatingToken={generatingToken}
+            onGenerateToken={handleGenerateToken}
+            superAdmin={superAdmin ?? false}
+            onApprove={(id) => approveMember({ memberId: id as any })}
+            onReject={(id) => rejectMember({ memberId: id as any })}
+          />
+        : <MemberDashboard
+            club={club}
+            membership={activeMembership}
+            competitions={competitions}
+            members={members}
+            userId={user?.id ?? ""}
+            inviteUrl={inviteUrl}
+            copied={copied}
+            onCopyLink={handleCopyLink}
+          />
+      }
+    </div>
+  );
 }
 
 // ── Golfer Dashboard (no club affiliation) ─────────────────────────────────────

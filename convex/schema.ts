@@ -684,6 +684,35 @@ export default defineSchema({
     .index("by_fixture", ["fixtureId"])
     .index("by_league", ["leagueId"]),
 
+  // Squad membership — links a club member to an interclub team
+  squadMembers: defineTable({
+    teamId: v.id("interclubTeams"),
+    clubId: v.id("clubs"),              // denormalised for easy querying
+    memberId: v.id("clubMembers"),      // the club member
+    status: v.string(),                 // 'invited' | 'active' | 'declined' | 'removed'
+    invitedBy: v.string(),              // userId of captain who sent the invite
+    invitedAt: v.string(),
+    respondedAt: v.optional(v.string()),
+  })
+    .index("by_team", ["teamId"])
+    .index("by_member", ["memberId"])
+    .index("by_club", ["clubId"])
+    .index("by_team_and_member", ["teamId", "memberId"]),
+
+  // Fixture availability — squad member's response to a fixture call-up
+  fixtureAvailability: defineTable({
+    fixtureId: v.id("interclubFixtures"),
+    teamId: v.id("interclubTeams"),
+    memberId: v.id("clubMembers"),
+    status: v.string(),                 // 'available' | 'unavailable' | 'tentative'
+    note: v.optional(v.string()),
+    updatedAt: v.string(),
+  })
+    .index("by_fixture", ["fixtureId"])
+    .index("by_member", ["memberId"])
+    .index("by_fixture_and_team", ["fixtureId", "teamId"])
+    .index("by_fixture_and_member", ["fixtureId", "memberId"]),
+
   // ============================================================================
   // Point of Sale — Pro Shop & Bar
   // ============================================================================

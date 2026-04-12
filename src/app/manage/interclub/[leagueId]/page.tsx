@@ -5,7 +5,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
-import { ArrowLeft, Plus, X, Calendar, Shield, Search, MapPin, PlusCircle, Pencil, Check, Settings } from "lucide-react";
+import { ArrowLeft, Plus, X, Calendar, Shield, Search, MapPin, PlusCircle, Pencil, Check, Settings, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
 import { AIAssistant } from "@/components/AIAssistant";
 
@@ -13,6 +13,7 @@ type Team = {
   _id: Id<"interclubTeams">;
   teamName: string;
   clubName: string;
+  clubId?: Id<"clubs">;
   handicapMin?: number;
   handicapMax?: number;
   captainUserId?: string;
@@ -328,6 +329,138 @@ function NewFixtureModal({
   );
 }
 
+function SquadPanel({
+  team,
+  clubMembers: allMembers,
+  squadMembers: squad,
+  onInvite,
+  onRemove,
+  isAdmin,
+}: {
+  team: { _id: Id<"interclubTeams">; teamName: string };
+  clubMembers: Array<{ _id: Id<"clubMembers">; displayName: string; handicap?: number }>;
+  squadMembers: Array<{
+    _id: Id<"squadMembers">;
+    memberId: Id<"clubMembers">;
+    status: string;
+    member: { _id: Id<"clubMembers">; displayName: string; handicap?: number } | null;
+  }>;
+  onInvite: (memberId: Id<"clubMembers">) => Promise<void>;
+  onRemove: (squadMemberId: Id<"squadMembers">) => Promise<void>;
+  isAdmin: boolean;
+}) {
+  const [showInvite, setShowInvite] = useState(false);
+  const [search, setSearch] = useState("");
+  const [inviting, setInviting] = useState<Id<"clubMembers"> | null>(null);
+
+  const squadMemberIds = new Set(squad.filter(s => s.status !== "removed").map(s => s.memberId));
+  const eligible = (allMembers ?? []).filter(m => !squadMemberIds.has(m._id));
+  const filtered = eligible.filter(m =>
+    search === "" || m.displayName.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const active = squad.filter(s => s.status === "active");
+  const invited = squad.filter(s => s.status === "invited");
+  const declined = squad.filter(s => s.status === "declined");
+
+  const statusBadge = (status: string) => {
+    if (status === "active") return <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Active</span>;
+    if (status === "invited") return <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Invited</span>;
+    if (status === "declined") return <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">Declined</span>;
+    return null;
+  };
+
+  return (
+    <div className="mt-3 border border-border rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-muted/50 border-b border-border">
+        <div className="flex items-center gap-2">
+          <Users size={13} className="text-muted-foreground" />
+          <span className="text-xs font-semibold text-foreground">{team.teamName} Squad</span>
+          <span className="text-xs text-muted-foreground">({active.length} active{invited.length ? `, ${invited.length} pending` : ""})</span>
+        </div>
+        {isAdmin && (
+          <button
+            onClick={() => setShowInvite(v => !v)}
+            className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+          >
+            <UserPlus size={12} />
+            Invite
+          </button>
+        )}
+      </div>
+
+      {/* Invite search */}
+      {showInvite && isAdmin && (
+        <div className="px-4 py-3 border-b border-border bg-background">
+          <div className="relative">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              autoFocus
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search members…"
+              className="w-full pl-7 pr-3 py-1.5 text-xs border border-border rounded-lg bg-muted focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          {search && (
+            <div className="mt-1.5 border border-border rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-muted-foreground">No members found</p>
+              ) : filtered.slice(0, 8).map(m => (
+                <button
+                  key={m._id}
+                  disabled={inviting === m._id}
+                  onClick={async () => {
+                    setInviting(m._id);
+                    try { await onInvite(m._id); setSearch(""); } finally { setInviting(null); }
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-accent transition-colors text-xs"
+                >
+                  <span className="text-foreground">{m.displayName}</span>
+                  <span className="text-muted-foreground">{m.handicap != null ? `HCP ${m.handicap}` : ""}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Squad list */}
+      <div className="divide-y divide-border">
+        {[...active, ...invited, ...declined].length === 0 ? (
+          <p className="px-4 py-3 text-xs text-muted-foreground">No squad members yet. Invite club members to join the {team.teamName} squad.</p>
+        ) : (
+          [...active, ...invited, ...declined].map(s => (
+            <div key={s._id} className="flex items-center justify-between px-4 py-2.5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary shrink-0">
+                  {s.member?.displayName?.[0] ?? "?"}
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-foreground">{s.member?.displayName ?? "Unknown"}</p>
+                  {s.member?.handicap != null && <p className="text-[10px] text-muted-foreground">HCP {s.member.handicap}</p>}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {statusBadge(s.status)}
+                {isAdmin && s.status !== "removed" && (
+                  <button
+                    onClick={() => onRemove(s._id)}
+                    className="text-muted-foreground hover:text-destructive transition-colors"
+                    title="Remove from squad"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 const STATUS_STYLES: Record<string, string> = {
   scheduled: "bg-gray-100 text-gray-500",
   in_progress: "bg-amber-100 text-amber-700",
@@ -347,6 +480,26 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
 
   const updateLeague = useMutation(api.interclub.updateLeague);
   const bulkCreateFixtures = useMutation(api.interclub.bulkCreateFixtures);
+  const inviteToSquad = useMutation(api.squadMembers.invite);
+  const removeFromSquad = useMutation(api.squadMembers.remove);
+
+  // Derive ownTeam before hooks (teams may be undefined while loading)
+  const ownTeamId = teams && activeMembership
+    ? teams.find(t => t.clubId === activeMembership.clubId)?._id
+    : undefined;
+  const ownTeamClubId = teams && activeMembership
+    ? teams.find(t => t.clubId === activeMembership.clubId)?.clubId
+    : undefined;
+
+  const squadMembers = useQuery(
+    api.squadMembers.listByTeam,
+    ownTeamId ? { teamId: ownTeamId } : "skip"
+  );
+  const clubMembersForSquad = useQuery(
+    api.clubMembers.listByClub,
+    ownTeamClubId ? { clubId: ownTeamClubId } : "skip"
+  );
+
   const [tab, setTab] = useState<"fixtures" | "table" | "teams">("fixtures");
   const [showAddTeam, setShowAddTeam] = useState(false);
   const [showNewFixture, setShowNewFixture] = useState(false);
@@ -362,6 +515,7 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
   }
 
   const myTeam = club ? teams.find(t => t.clubId === club._id) : undefined;
+  const ownTeam = activeMembership ? teams.find(t => t.clubId === activeMembership.clubId) : undefined;
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
@@ -535,13 +689,42 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
             <p className="text-gray-400 text-sm">No teams registered yet</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {teams.map(team => (
-              <div key={team._id} className="bg-white border border-gray-200 rounded-xl px-5 py-4">
-                <p className="font-semibold text-gray-900">{team.clubName}</p>
-                <p className="text-sm text-gray-500">{team.teamName}</p>
+          <div className="space-y-3">
+            {ownTeam && (
+              <div>
+                <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
+                  <p className="font-semibold text-gray-900">{ownTeam.clubName}</p>
+                  <p className="text-sm text-gray-500">{ownTeam.teamName}</p>
+                </div>
+                {squadMembers !== undefined && clubMembersForSquad !== undefined && (
+                  <SquadPanel
+                    team={ownTeam}
+                    clubMembers={clubMembersForSquad as Array<{ _id: Id<"clubMembers">; displayName: string; handicap?: number }>}
+                    squadMembers={squadMembers as Array<{
+                      _id: Id<"squadMembers">;
+                      memberId: Id<"clubMembers">;
+                      status: string;
+                      member: { _id: Id<"clubMembers">; displayName: string; handicap?: number } | null;
+                    }>}
+                    onInvite={async (memberId) => {
+                      await inviteToSquad({ teamId: ownTeam._id, memberId });
+                    }}
+                    onRemove={async (squadMemberId) => {
+                      await removeFromSquad({ squadMemberId });
+                    }}
+                    isAdmin={isAdmin}
+                  />
+                )}
               </div>
-            ))}
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {teams.filter(team => team._id !== ownTeam?._id).map(team => (
+                <div key={team._id} className="bg-white border border-gray-200 rounded-xl px-5 py-4">
+                  <p className="font-semibold text-gray-900">{team.clubName}</p>
+                  <p className="text-sm text-gray-500">{team.teamName}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )
       )}
@@ -580,7 +763,7 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
             if (!fixtures.length) return;
             try {
               const result = await bulkCreateFixtures({
-                leagueId,
+                leagueId: leagueId as Id<"interclubLeagues">,
                 fixtures: fixtures.map(f => ({
                   homeTeamId: f.homeTeamId as Id<"interclubTeams">,
                   awayTeamId: f.awayTeamId as Id<"interclubTeams">,

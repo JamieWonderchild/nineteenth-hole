@@ -6,10 +6,110 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
-import { ArrowLeft, Plus, X, Check, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, X, Check, Trash2, CheckCircle, XCircle, Clock, Users } from "lucide-react";
 import Link from "next/link";
 
 const RESULT_PRESETS = ["1 up", "2&1", "3&2", "4&3", "5&4", "6&5", "7&6", "AS", "halved"];
+
+// ── AvailabilityPanel ──────────────────────────────────────────────────────────
+
+type SquadMemberWithMember = {
+  _id: Id<"squadMembers">;
+  memberId: Id<"clubMembers">;
+  member: { _id: Id<"clubMembers">; displayName: string; handicap?: number } | null;
+};
+
+type AvailabilityEntry = {
+  memberId: Id<"clubMembers">;
+  status: string;
+  note?: string;
+};
+
+function AvailabilityPanel({
+  fixtureId,
+  teamId,
+  squadMembers,
+  availability,
+  onMark,
+  isAdmin,
+}: {
+  fixtureId: Id<"interclubFixtures">;
+  teamId: Id<"interclubTeams">;
+  squadMembers: SquadMemberWithMember[];
+  availability: AvailabilityEntry[];
+  onMark: (memberId: Id<"clubMembers">, status: "available" | "unavailable" | "tentative") => Promise<void>;
+  isAdmin: boolean;
+}) {
+  const availMap = new Map(availability.map(a => [a.memberId, a.status]));
+  const active = squadMembers.filter(s => s.member);
+
+  const available = active.filter(s => availMap.get(s.memberId) === "available");
+  const tentative = active.filter(s => availMap.get(s.memberId) === "tentative");
+  const unavailable = active.filter(s => availMap.get(s.memberId) === "unavailable");
+  const noResponse = active.filter(s => !availMap.has(s.memberId));
+
+  const statusIcon = (status: string | undefined) => {
+    if (status === "available") return <CheckCircle size={13} className="text-green-500" />;
+    if (status === "tentative") return <Clock size={13} className="text-amber-500" />;
+    if (status === "unavailable") return <XCircle size={13} className="text-red-400" />;
+    return <div className="w-3 h-3 rounded-full border-2 border-muted-foreground/30" />;
+  };
+
+  return (
+    <div className="border border-border rounded-xl overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/50 border-b border-border">
+        <Users size={13} className="text-muted-foreground" />
+        <span className="text-xs font-semibold text-foreground">Squad Availability</span>
+        <span className="ml-auto text-xs text-muted-foreground">
+          {available.length} available · {tentative.length} maybe · {unavailable.length} out · {noResponse.length} no response
+        </span>
+      </div>
+      <div className="divide-y divide-border">
+        {active.length === 0 ? (
+          <p className="px-4 py-3 text-xs text-muted-foreground">No squad members — add players to the squad first.</p>
+        ) : (
+          [...available, ...tentative, ...noResponse, ...unavailable].map(s => {
+            const status = availMap.get(s.memberId);
+            return (
+              <div key={s._id} className="flex items-center justify-between px-4 py-2.5">
+                <div className="flex items-center gap-2.5">
+                  {statusIcon(status)}
+                  <div>
+                    <p className="text-xs font-medium text-foreground">{s.member?.displayName}</p>
+                    {s.member?.handicap != null && <p className="text-[10px] text-muted-foreground">HCP {s.member.handicap}</p>}
+                  </div>
+                </div>
+                {isAdmin && (
+                  <div className="flex items-center gap-1">
+                    {(["available", "tentative", "unavailable"] as const).map(st => (
+                      <button
+                        key={st}
+                        onClick={() => onMark(s.memberId, st)}
+                        className={`text-[10px] px-2 py-1 rounded-lg border transition-colors ${
+                          status === st
+                            ? st === "available" ? "bg-green-100 border-green-300 text-green-700"
+                              : st === "tentative" ? "bg-amber-100 border-amber-300 text-amber-700"
+                              : "bg-red-50 border-red-200 text-red-600"
+                            : "border-border text-muted-foreground hover:bg-accent"
+                        }`}
+                      >
+                        {st === "available" ? "✓ In" : st === "tentative" ? "? Maybe" : "✗ Out"}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── MatchRow ───────────────────────────────────────────────────────────────────
+
+type AvailableSquadMember = { _id: Id<"clubMembers">; displayName: string; handicap?: number };
 
 function MatchRow({
   fixtureId,
@@ -21,6 +121,7 @@ function MatchRow({
   leagueMatchType,
   existing,
   canEdit,
+  availableSquadMembers,
 }: {
   fixtureId: Id<"interclubFixtures">;
   matchNumber: number;
@@ -42,11 +143,11 @@ function MatchRow({
     awayPoints?: number;
   };
   canEdit: boolean;
+  availableSquadMembers?: AvailableSquadMember[];
 }) {
   const saveMatch = useMutation(api.interclub.saveMatch);
   const deleteMatch = useMutation(api.interclub.deleteMatch);
   const [editing, setEditing] = useState(!existing);
-  // Use club name for winner buttons so "Sabres vs Sabres" is distinguishable
 
   // Per-match type: use existing value, fall back to league default (clamped to singles/betterball)
   const resolvedDefault = existing?.matchType ?? (leagueMatchType === "mixed" ? "singles" : leagueMatchType);
@@ -60,6 +161,7 @@ function MatchRow({
   const [result, setResult] = useState(existing?.result ?? "");
   const [winner, setWinner] = useState(existing?.winner ?? "");
   const [saving, setSaving] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const homeLabel = isBetterball
     ? [homePlayer, homePlayer2].filter(Boolean).join(" & ") || homeClubName
@@ -149,13 +251,67 @@ function MatchRow({
           {/* Home side */}
           <div className="space-y-1.5">
             <label className="block text-xs text-gray-400">{homeClubName} {isBetterball ? "pair" : "player"}</label>
-            <input type="text" value={homePlayer} onChange={e => setHomePlayer(e.target.value)}
-              placeholder={isBetterball ? "Player 1" : "Name"} autoFocus
-              className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500" />
+            {/* homePlayer input with squad suggestion */}
+            <div className="relative">
+              <input
+                type="text"
+                value={homePlayer}
+                onChange={e => setHomePlayer(e.target.value)}
+                placeholder={isBetterball ? "Player 1" : "Name"}
+                autoFocus
+                onFocus={() => setFocusedField("homePlayer")}
+                onBlur={() => setTimeout(() => setFocusedField(null), 150)}
+                className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+              />
+              {focusedField === "homePlayer" && availableSquadMembers && availableSquadMembers.length > 0 && (
+                <div className="absolute z-10 top-full left-0 right-0 mt-0.5 bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-40 overflow-y-auto">
+                  {availableSquadMembers
+                    .filter(m => homePlayer === "" || m.displayName.toLowerCase().includes(homePlayer.toLowerCase()))
+                    .slice(0, 6)
+                    .map(m => (
+                      <button
+                        key={m._id}
+                        type="button"
+                        onMouseDown={e => { e.preventDefault(); setHomePlayer(m.displayName); setFocusedField(null); }}
+                        className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-accent text-left transition-colors"
+                      >
+                        <span className="font-medium text-foreground">{m.displayName}</span>
+                        {m.handicap != null && <span className="text-muted-foreground">HCP {m.handicap}</span>}
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
             {isBetterball && (
-              <input type="text" value={homePlayer2} onChange={e => setHomePlayer2(e.target.value)}
-                placeholder="Player 2"
-                className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500" />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={homePlayer2}
+                  onChange={e => setHomePlayer2(e.target.value)}
+                  placeholder="Player 2"
+                  onFocus={() => setFocusedField("homePlayer2")}
+                  onBlur={() => setTimeout(() => setFocusedField(null), 150)}
+                  className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                />
+                {focusedField === "homePlayer2" && availableSquadMembers && availableSquadMembers.length > 0 && (
+                  <div className="absolute z-10 top-full left-0 right-0 mt-0.5 bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-40 overflow-y-auto">
+                    {availableSquadMembers
+                      .filter(m => homePlayer2 === "" || m.displayName.toLowerCase().includes(homePlayer2.toLowerCase()))
+                      .slice(0, 6)
+                      .map(m => (
+                        <button
+                          key={m._id}
+                          type="button"
+                          onMouseDown={e => { e.preventDefault(); setHomePlayer2(m.displayName); setFocusedField(null); }}
+                          className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-accent text-left transition-colors"
+                        >
+                          <span className="font-medium text-foreground">{m.displayName}</span>
+                          {m.handicap != null && <span className="text-muted-foreground">HCP {m.handicap}</span>}
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
           {/* Away side */}
@@ -219,6 +375,8 @@ function MatchRow({
   );
 }
 
+// ── Page ───────────────────────────────────────────────────────────────────────
+
 export default function FixturePage({ params }: { params: Promise<{ leagueId: string; fixtureId: string }> }) {
   const { leagueId, fixtureId } = use(params);
   const { activeMembership } = useActiveClub();
@@ -227,9 +385,33 @@ export default function FixturePage({ params }: { params: Promise<{ leagueId: st
   const fixture = useQuery(api.interclub.getFixture, { fixtureId: fixtureId as Id<"interclubFixtures"> });
   const updateFixture = useMutation(api.interclub.updateFixture);
   const deleteFixture = useMutation(api.interclub.deleteFixture);
+  const markAvailability = useMutation(api.fixtureAvailability.markAvailability);
   const router = useRouter();
 
   const [addingMatch, setAddingMatch] = useState(false);
+
+  // Determine which team side belongs to our club
+  const myClubId = activeMembership?.clubId;
+  const homeTeamClubId = fixture?.homeTeam?.clubId;
+  const awayTeamClubId = fixture?.awayTeam?.clubId;
+  const ownTeamId: Id<"interclubTeams"> | undefined =
+    myClubId && homeTeamClubId && myClubId === homeTeamClubId
+      ? (fixture?.homeTeamId as Id<"interclubTeams">)
+      : myClubId && awayTeamClubId && myClubId === awayTeamClubId
+      ? (fixture?.awayTeamId as Id<"interclubTeams">)
+      : undefined;
+
+  // Load squad for our team (skip if we don't know our team yet)
+  const squadMembers = useQuery(
+    api.squadMembers.listByTeam,
+    ownTeamId ? { teamId: ownTeamId } : "skip"
+  );
+
+  // Load availability for this fixture
+  const availability = useQuery(
+    api.fixtureAvailability.listByFixture,
+    fixture ? { fixtureId: fixtureId as Id<"interclubFixtures"> } : "skip"
+  );
 
   if (!fixture) {
     return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" /></div>;
@@ -242,6 +424,32 @@ export default function FixturePage({ params }: { params: Promise<{ leagueId: st
 
   const canEdit = isAdmin || true; // TODO: check captain
   const leagueMatchType = fixture.league?.matchType ?? "singles";
+
+  // Available squad members to pass to MatchRow for home-side suggestions
+  const availableSquadMembers: AvailableSquadMember[] = (squadMembers ?? [])
+    .filter(s => {
+      if (!s.member) return false;
+      if (s.status !== "active") return false;
+      const avail = (availability ?? []).find(a => a.memberId === s.memberId);
+      // include if marked available, or no response yet (don't exclude tentative/unavailable)
+      return !avail || avail.status === "available" || avail.status === "tentative";
+    })
+    .map(s => ({
+      _id: s.member!._id,
+      displayName: s.member!.displayName,
+      handicap: (s.member as { handicap?: number } | null)?.handicap,
+    }));
+
+  // Handler to mark availability
+  async function handleMarkAvailability(memberId: Id<"clubMembers">, status: "available" | "unavailable" | "tentative") {
+    if (!ownTeamId) return;
+    await markAvailability({
+      fixtureId: fixtureId as Id<"interclubFixtures">,
+      teamId: ownTeamId,
+      memberId,
+      status,
+    });
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
@@ -311,6 +519,18 @@ export default function FixturePage({ params }: { params: Promise<{ leagueId: st
         </div>
       )}
 
+      {/* Availability panel — only shown when we can identify our team */}
+      {ownTeamId && (
+        <AvailabilityPanel
+          fixtureId={fixtureId as Id<"interclubFixtures">}
+          teamId={ownTeamId}
+          squadMembers={(squadMembers ?? []) as SquadMemberWithMember[]}
+          availability={(availability ?? []).map(a => ({ memberId: a.memberId, status: a.status, note: a.note ?? undefined }))}
+          onMark={handleMarkAvailability}
+          isAdmin={isAdmin}
+        />
+      )}
+
       {/* Matches */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
@@ -348,6 +568,7 @@ export default function FixturePage({ params }: { params: Promise<{ leagueId: st
             leagueMatchType={leagueMatchType}
             existing={m}
             canEdit={canEdit}
+            availableSquadMembers={ownTeamId && fixture.homeTeamId === ownTeamId ? availableSquadMembers : undefined}
           />
         ))}
 
@@ -361,6 +582,7 @@ export default function FixturePage({ params }: { params: Promise<{ leagueId: st
             awayClubName={fixture.awayTeam?.clubName ?? "Away"}
             leagueMatchType={leagueMatchType}
             canEdit={canEdit}
+            availableSquadMembers={ownTeamId && fixture.homeTeamId === ownTeamId ? availableSquadMembers : undefined}
           />
         )}
       </div>
