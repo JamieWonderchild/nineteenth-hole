@@ -192,12 +192,39 @@ export const bookSlot = mutation({
     if (!slot) throw new Error("Slot not found");
     if (slot.isBlocked) throw new Error("This slot is not available");
 
-    // Advance booking window
     const club = await ctx.db.get(args.clubId);
     const today = new Date().toISOString().split("T")[0];
-    const maxDate = addDays(today, club?.advanceBookingDays ?? 7);
-    if (slot.date > maxDate) {
-      throw new Error(`Bookings open up to ${club?.advanceBookingDays ?? 7} days in advance`);
+
+    // Check membership category restrictions
+    const member = await ctx.db
+      .query("clubMembers")
+      .withIndex("by_club_and_user", q => q.eq("clubId", args.clubId).eq("userId", identity.subject))
+      .unique();
+
+    if (member?.membershipCategoryId) {
+      const cat = await ctx.db.get(member.membershipCategoryId);
+      if (cat) {
+        // Weekend restriction
+        if (cat.canBookWeekends === false && isWeekend(slot.date)) {
+          throw new Error(`${cat.name} members cannot book weekend tee times`);
+        }
+        // Earliest booking time restriction
+        if (cat.bookingStartTime && slot.time < cat.bookingStartTime) {
+          throw new Error(`${cat.name} members cannot book before ${cat.bookingStartTime}`);
+        }
+        // Category-specific advance window
+        const advanceDays = cat.advanceBookingDays ?? club?.advanceBookingDays ?? 7;
+        const maxDate = addDays(today, advanceDays);
+        if (slot.date > maxDate) {
+          throw new Error(`${cat.name} members can book up to ${advanceDays} days in advance`);
+        }
+      }
+    } else {
+      // Club default advance window
+      const maxDate = addDays(today, club?.advanceBookingDays ?? 7);
+      if (slot.date > maxDate) {
+        throw new Error(`Bookings open up to ${club?.advanceBookingDays ?? 7} days in advance`);
+      }
     }
 
     // Check capacity
@@ -222,6 +249,47 @@ export const bookSlot = mutation({
       date: slot.date,
       time: slot.time,
       userId: identity.subject,
+      displayName: args.displayName,
+      playerCount: args.playerCount,
+      notes: args.notes,
+      bookingType: "member",
+      status: "confirmed",
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+// Admin: manually book a slot for a named member
+export const bookForMember = mutation({
+  args: {
+    slotId: v.id("teeTimeSlots"),
+    clubId: v.id("clubs"),
+    displayName: v.string(),
+    playerCount: v.number(),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await assertClubAdmin(ctx, args.clubId);
+    const slot = await ctx.db.get(args.slotId);
+    if (!slot) throw new Error("Slot not found");
+
+    const existing = await ctx.db
+      .query("teeTimeBookings")
+      .withIndex("by_slot", q => q.eq("slotId", args.slotId))
+      .filter(q => q.eq(q.field("status"), "confirmed"))
+      .collect();
+    const takenPlayers = existing.reduce((sum, b) => sum + b.playerCount, 0);
+    if (takenPlayers + args.playerCount > slot.maxPlayers) {
+      throw new Error(`Only ${slot.maxPlayers - takenPlayers} spot${slot.maxPlayers - takenPlayers === 1 ? "" : "s"} remaining`);
+    }
+
+    const now = new Date().toISOString();
+    return ctx.db.insert("teeTimeBookings", {
+      clubId: args.clubId,
+      slotId: args.slotId,
+      date: slot.date,
+      time: slot.time,
       displayName: args.displayName,
       playerCount: args.playerCount,
       notes: args.notes,

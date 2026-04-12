@@ -326,6 +326,40 @@ export const setMembershipCategory = mutation({
   },
 });
 
+// Admin assigns a structured membership category to a member
+export const setMembershipCategoryId = mutation({
+  args: {
+    memberId: v.id("clubMembers"),
+    categoryId: v.optional(v.id("membershipCategories")),
+  },
+  handler: async (ctx, { memberId, categoryId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const member = await ctx.db.get(memberId);
+    if (!member) throw new Error("Member not found");
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+    if (!isSuperAdmin) {
+      const caller = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", member.clubId).eq("userId", identity.subject))
+        .unique();
+      if (!caller || caller.role !== "admin") throw new Error("Not authorised");
+    }
+    // Also update the plain-text field for display
+    let categoryName: string | undefined;
+    if (categoryId) {
+      const cat = await ctx.db.get(categoryId);
+      categoryName = cat?.name;
+    }
+    await ctx.db.patch(memberId, {
+      membershipCategoryId: categoryId,
+      membershipCategory: categoryName,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
 export const setRole = mutation({
   args: { memberId: v.id("clubMembers"), role: v.string() },
   handler: async (ctx, { memberId, role }) => {

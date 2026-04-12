@@ -69,6 +69,20 @@ export default defineSchema({
     .index("by_stripe_customer", ["stripeCustomerId"])
     .index("by_import_token", ["importToken"]),
 
+  // Membership categories (Full, Weekday, Junior, Social, etc.)
+  membershipCategories: defineTable({
+    clubId: v.id("clubs"),
+    name: v.string(),                              // "Full Member", "Weekday Member", etc.
+    colour: v.string(),                            // "green" | "blue" | "amber" | "purple" | "gray"
+    advanceBookingDays: v.optional(v.number()),    // overrides club default when set
+    canBookWeekends: v.optional(v.boolean()),      // false = weekday only
+    bookingStartTime: v.optional(v.string()),      // e.g. "09:00" — earliest allowed tee time
+    competitionEligible: v.optional(v.boolean()),  // false = cannot enter club competitions
+    sortOrder: v.optional(v.number()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  }).index("by_club", ["clubId"]),
+
   // Club members — one row per (club, user) pair
   // Accumulates stats across all competitions at this club
   clubMembers: defineTable({
@@ -93,7 +107,8 @@ export default defineSchema({
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
     bio: v.optional(v.string()),
-    membershipCategory: v.optional(v.string()), // e.g. "Full Member", "Social", "Junior"
+    membershipCategory: v.optional(v.string()),         // legacy plain text display name
+    membershipCategoryId: v.optional(v.id("membershipCategories")), // structured category
     directoryVisible: v.optional(v.boolean()),  // default true when absent
     showPhone: v.optional(v.boolean()),
     showEmail: v.optional(v.boolean()),

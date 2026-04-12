@@ -8,7 +8,173 @@ import { api } from "convex/_generated/api";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const clubMembersApi = api.clubMembers as any;
 import type { Id } from "convex/_generated/dataModel";
-import { Pencil, Check, X, Search, MessageSquare, Edit2, Phone, Mail, User } from "lucide-react";
+import { Pencil, Check, X, Search, MessageSquare, Edit2, Phone, Mail, User, Tag, Plus, Trash2 } from "lucide-react";
+
+type Category = {
+  _id: Id<"membershipCategories">;
+  name: string;
+  colour: string;
+  advanceBookingDays?: number;
+  canBookWeekends?: boolean;
+  bookingStartTime?: string;
+  competitionEligible?: boolean;
+};
+
+const COLOURS = ["green", "blue", "amber", "purple", "gray", "red"] as const;
+type Colour = typeof COLOURS[number];
+
+function categoryColourClasses(colour: string) {
+  const map: Record<string, string> = {
+    green: "bg-green-100 text-green-700",
+    blue: "bg-blue-100 text-blue-700",
+    amber: "bg-amber-100 text-amber-700",
+    purple: "bg-purple-100 text-purple-700",
+    gray: "bg-gray-100 text-gray-600",
+    red: "bg-red-100 text-red-600",
+  };
+  return map[colour] ?? map.gray;
+}
+
+function CategoryBadge({ name, colour }: { name: string; colour: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${categoryColourClasses(colour)}`}>
+      <Tag size={9} /> {name}
+    </span>
+  );
+}
+
+function CategoryManager({ clubId, categories }: { clubId: Id<"clubs">; categories: Category[] }) {
+  const createCategory = useMutation(api.membershipCategories.create);
+  const updateCategory = useMutation(api.membershipCategories.update);
+  const removeCategory = useMutation(api.membershipCategories.remove);
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<Id<"membershipCategories"> | null>(null);
+  const [form, setForm] = useState({ name: "", colour: "green" as Colour, advanceBookingDays: "", canBookWeekends: true, bookingStartTime: "", competitionEligible: true });
+  const [saving, setSaving] = useState(false);
+
+  function startNew() {
+    setForm({ name: "", colour: "green", advanceBookingDays: "", canBookWeekends: true, bookingStartTime: "", competitionEligible: true });
+    setEditingId(null);
+    setShowForm(true);
+  }
+
+  function startEdit(cat: Category) {
+    setForm({
+      name: cat.name,
+      colour: cat.colour as Colour,
+      advanceBookingDays: cat.advanceBookingDays?.toString() ?? "",
+      canBookWeekends: cat.canBookWeekends !== false,
+      bookingStartTime: cat.bookingStartTime ?? "",
+      competitionEligible: cat.competitionEligible !== false,
+    });
+    setEditingId(cat._id);
+    setShowForm(true);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const payload = {
+        name: form.name.trim(),
+        colour: form.colour,
+        advanceBookingDays: form.advanceBookingDays ? parseInt(form.advanceBookingDays) : undefined,
+        canBookWeekends: form.canBookWeekends,
+        bookingStartTime: form.bookingStartTime || undefined,
+        competitionEligible: form.competitionEligible,
+      };
+      if (editingId) {
+        await updateCategory({ categoryId: editingId, ...payload });
+      } else {
+        await createCategory({ clubId, ...payload, sortOrder: categories.length });
+      }
+      setShowForm(false); setEditingId(null);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex flex-wrap gap-2">
+          {categories.map(cat => (
+            <button key={cat._id} onClick={() => startEdit(cat)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border hover:opacity-80 transition-opacity ${categoryColourClasses(cat.colour)}`}>
+              {cat.name}
+              {cat.canBookWeekends === false && <span className="opacity-60">· weekday</span>}
+              {cat.advanceBookingDays && <span className="opacity-60">· {cat.advanceBookingDays}d</span>}
+            </button>
+          ))}
+          {categories.length === 0 && <p className="text-xs text-gray-400">No categories yet</p>}
+        </div>
+        <button onClick={startNew} className="flex items-center gap-1 text-xs text-green-700 font-medium hover:underline shrink-0 ml-3">
+          <Plus size={13} /> New
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-4 space-y-3">
+          <h3 className="text-sm font-semibold text-gray-900">{editingId ? "Edit category" : "New category"}</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
+              <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Full Member"
+                className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Colour</label>
+              <div className="flex gap-1.5 flex-wrap">
+                {COLOURS.map(c => (
+                  <button key={c} type="button" onClick={() => setForm(f => ({ ...f, colour: c }))}
+                    className={`w-6 h-6 rounded-full border-2 transition-all ${form.colour === c ? "border-gray-900 scale-110" : "border-transparent"} ${categoryColourClasses(c).split(" ")[0]}`} />
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Advance booking (days)</label>
+              <input type="number" value={form.advanceBookingDays} onChange={e => setForm(f => ({ ...f, advanceBookingDays: e.target.value }))}
+                placeholder="Leave blank to use club default" min={1} max={60}
+                className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Earliest tee time</label>
+              <input type="time" value={form.bookingStartTime} onChange={e => setForm(f => ({ ...f, bookingStartTime: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white" />
+            </div>
+          </div>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.canBookWeekends} onChange={e => setForm(f => ({ ...f, canBookWeekends: e.target.checked }))}
+                className="rounded border-gray-300 text-green-600 focus:ring-green-500" />
+              <span className="text-xs text-gray-700">Can book weekends</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.competitionEligible} onChange={e => setForm(f => ({ ...f, competitionEligible: e.target.checked }))}
+                className="rounded border-gray-300 text-green-600 focus:ring-green-500" />
+              <span className="text-xs text-gray-700">Competition eligible</span>
+            </label>
+          </div>
+          <div className="flex items-center gap-2 justify-between">
+            {editingId && (
+              <button onClick={async () => { if (confirm("Delete this category?")) { await removeCategory({ categoryId: editingId }); setShowForm(false); setEditingId(null); } }}
+                className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700">
+                <Trash2 size={12} /> Delete
+              </button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <button onClick={() => { setShowForm(false); setEditingId(null); }} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100">Cancel</button>
+              <button onClick={handleSave} disabled={saving || !form.name.trim()}
+                className="px-4 py-1.5 text-sm bg-green-700 text-white font-medium rounded-lg hover:bg-green-600 disabled:opacity-50">
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Member = {
   _id: Id<"clubMembers">;
@@ -18,6 +184,7 @@ type Member = {
   role: string;
   handicap?: number;
   membershipCategory?: string;
+  membershipCategoryId?: Id<"membershipCategories">;
   bio?: string;
   phone?: string;
   email?: string;
@@ -165,10 +332,12 @@ function MemberCard({
   isAdmin: boolean;
   isSuperAdmin: boolean;
   clubId: Id<"clubs">;
+  categories: Category[];
   handicapEdit: { id: Id<"clubMembers">; value: string } | null;
   onSetHandicapEdit: (v: { id: Id<"clubMembers">; value: string } | null) => void;
   onSaveHandicap: (id: Id<"clubMembers">, value: string) => void;
   onSetRole: (id: Id<"clubMembers">, role: string) => void;
+  onSetCategory: (id: Id<"clubMembers">, categoryId: Id<"membershipCategories"> | undefined) => void;
   onDelete: (member: Member) => void;
   onMessage: (member: Member) => void;
   onEditProfile: () => void;
@@ -185,11 +354,14 @@ function MemberCard({
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="font-semibold text-gray-900 leading-tight">{member.displayName}</p>
-              {member.membershipCategory && (
-                <span className="inline-block mt-1 px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded-full">
-                  {member.membershipCategory}
-                </span>
-              )}
+              {member.membershipCategoryId ? (
+                (() => {
+                  const cat = categories.find(c => c._id === member.membershipCategoryId);
+                  return cat ? <CategoryBadge name={cat.name} colour={cat.colour} /> : null;
+                })()
+              ) : member.membershipCategory ? (
+                <span className="inline-block mt-1 px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded-full">{member.membershipCategory}</span>
+              ) : null}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {isMe ? (
@@ -269,6 +441,17 @@ function MemberCard({
                 <option value="staff">staff</option>
                 <option value="admin">admin</option>
               </select>
+              {/* Category */}
+              {categories.length > 0 && (
+                <select
+                  value={member.membershipCategoryId ?? ""}
+                  onChange={e => onSetCategory(member._id, e.target.value ? e.target.value as Id<"membershipCategories"> : undefined)}
+                  className="text-xs font-medium border border-gray-200 rounded-lg px-2 py-0.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-500"
+                >
+                  <option value="">No category</option>
+                  {categories.map(cat => <option key={cat._id} value={cat._id}>{cat.name}</option>)}
+                </select>
+              )}
             </div>
           )}
         </div>
@@ -289,12 +472,14 @@ export default function MembersPage() {
   const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
   const members = useQuery(api.clubMembers.listByClub, club ? { clubId: club._id } : "skip") as Member[] | undefined;
   const pending = useQuery(api.clubMembers.listPending, (club && isAdmin) ? { clubId: club._id } : "skip");
+  const categories = (useQuery(api.membershipCategories.listByClub, club ? { clubId: club._id } : "skip") ?? []) as Category[];
 
   const approveMember = useMutation(api.clubMembers.approveMember);
   const rejectMember = useMutation(api.clubMembers.rejectMember);
   const deleteMember = useMutation(api.clubMembers.deleteMember);
   const setHandicap = useMutation(api.scoring.setHandicap);
   const setRole = useMutation(api.clubMembers.setRole);
+  const setCategoryId = useMutation(api.clubMembers.setMembershipCategoryId);
   const getOrCreateDirect = useMutation(api.messaging.getOrCreateDirect);
   const listNonMembers = useAction(clubMembersApi.listNonMembers);
   const addMemberById = useAction(clubMembersApi.addMemberById);
@@ -374,6 +559,16 @@ export default function MembersPage() {
         <h1 className="text-2xl font-bold text-gray-900">Members</h1>
         <p className="text-gray-500 text-sm mt-0.5">{members.length} active member{members.length !== 1 ? "s" : ""} at {club.name}</p>
       </div>
+
+      {/* Membership categories — admin only */}
+      {isAdmin && (
+        <section>
+          <h2 className="text-base font-semibold text-gray-900 mb-3">Membership categories</h2>
+          <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
+            <CategoryManager clubId={club._id} categories={categories} />
+          </div>
+        </section>
+      )}
 
       {/* Pending requests — admin only */}
       {isAdmin && pending && pending.length > 0 && (
@@ -478,10 +673,12 @@ export default function MembersPage() {
               isAdmin={isAdmin}
               isSuperAdmin={isSuperAdmin}
               clubId={club._id}
+              categories={categories}
               handicapEdit={handicapEdit}
               onSetHandicapEdit={setHandicapEdit}
               onSaveHandicap={handleSaveHandicap}
               onSetRole={(id, role) => setRole({ memberId: id, role })}
+              onSetCategory={(id, categoryId) => setCategoryId({ memberId: id, categoryId })}
               onDelete={m => { if (confirm(`Remove ${m.displayName} from the club?`)) deleteMember({ memberId: m._id }); }}
               onMessage={handleMessage}
               onEditProfile={() => setEditingProfile(true)}
