@@ -112,6 +112,9 @@ export default defineSchema({
     directoryVisible: v.optional(v.boolean()),  // default true when absent
     showPhone: v.optional(v.boolean()),
     showEmail: v.optional(v.boolean()),
+    // Club roles — cosmetic titles assigned by admin (separate from system role)
+    // e.g. ["captain", "secretary", "committee", "treasurer", "competition_secretary"]
+    clubRoles: v.optional(v.array(v.string())),
     // Handicap — manually set by admin until WHS API integration
     handicap: v.optional(v.number()),           // e.g. 14.2
     // Member account (pre-paid credit for bar/pro shop)

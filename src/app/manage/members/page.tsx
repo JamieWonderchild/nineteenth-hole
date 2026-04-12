@@ -9,7 +9,7 @@ import { useActiveClub } from "@/lib/club-context";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const clubMembersApi = api.clubMembers as any;
 import type { Id } from "convex/_generated/dataModel";
-import { Pencil, Check, X, Search, MessageSquare, Edit2, Phone, Mail, User, Tag, Plus, Trash2 } from "lucide-react";
+import { Pencil, Check, X, Search, MessageSquare, Edit2, Phone, Mail, User, Tag, Plus, Trash2, ChevronDown } from "lucide-react";
 import { AIAssistant } from "@/components/AIAssistant";
 import type { CapabilityId } from "@/lib/ai-capabilities";
 
@@ -188,6 +188,7 @@ type Member = {
   handicap?: number;
   membershipCategory?: string;
   membershipCategoryId?: Id<"membershipCategories">;
+  clubRoles?: string[];
   bio?: string;
   phone?: string;
   email?: string;
@@ -196,6 +197,86 @@ type Member = {
   directoryVisible?: boolean;
   joinedAt: string;
 };
+
+// Predefined club roles — cosmetic titles separate from system access roles
+const CLUB_ROLES: { value: string; label: string; colour: string }[] = [
+  { value: "captain",               label: "Club Captain",          colour: "bg-yellow-100 text-yellow-800 border-yellow-300" },
+  { value: "vice_captain",          label: "Vice Captain",          colour: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+  { value: "secretary",             label: "Secretary",             colour: "bg-blue-100 text-blue-800 border-blue-300" },
+  { value: "treasurer",             label: "Treasurer",             colour: "bg-emerald-100 text-emerald-800 border-emerald-300" },
+  { value: "committee",             label: "Committee",             colour: "bg-purple-100 text-purple-800 border-purple-300" },
+  { value: "competition_secretary", label: "Competition Secretary", colour: "bg-orange-100 text-orange-800 border-orange-300" },
+  { value: "junior_organiser",      label: "Junior Organiser",      colour: "bg-sky-100 text-sky-800 border-sky-300" },
+  { value: "professional",          label: "Club Professional",     colour: "bg-gray-100 text-gray-800 border-gray-300" },
+  { value: "team_captain",          label: "Team Captain",          colour: "bg-green-100 text-green-800 border-green-300" },
+];
+
+function ClubRoleBadge({ value }: { value: string }) {
+  const def = CLUB_ROLES.find(r => r.value === value);
+  if (!def) return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-gray-100 text-gray-700 border-gray-300">{value}</span>;
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${def.colour}`}>
+      {def.label}
+    </span>
+  );
+}
+
+function ClubRolePicker({
+  current,
+  onChange,
+}: {
+  current: string[];
+  onChange: (roles: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  function toggle(value: string) {
+    const next = current.includes(value)
+      ? current.filter(r => r !== value)
+      : [...current, value];
+    onChange(next);
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg px-2 py-0.5 transition-colors"
+      >
+        <Tag size={10} />
+        Roles
+        <ChevronDown size={10} className={open ? "rotate-180 transition-transform" : "transition-transform"} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-xl shadow-lg p-2 min-w-[200px] space-y-0.5">
+          {CLUB_ROLES.map(r => (
+            <button
+              key={r.value}
+              onClick={() => toggle(r.value)}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-left transition-colors ${
+                current.includes(r.value) ? "bg-green-50 text-green-800" : "hover:bg-gray-50 text-gray-700"
+              }`}
+            >
+              {r.label}
+              {current.includes(r.value) && <Check size={11} className="text-green-600 shrink-0" />}
+            </button>
+          ))}
+          {current.length > 0 && (
+            <>
+              <div className="border-t border-gray-100 my-1" />
+              <button
+                onClick={() => onChange([])}
+                className="w-full text-left px-2.5 py-1.5 text-xs text-red-500 hover:bg-red-50 rounded-lg"
+              >
+                Clear all roles
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Avatar({ member, size = "md" }: { member: Pick<Member, "displayName" | "avatarUrl">; size?: "sm" | "md" | "lg" }) {
   const sz = size === "sm" ? "w-9 h-9 text-sm" : size === "lg" ? "w-14 h-14 text-xl" : "w-12 h-12 text-base";
@@ -328,6 +409,7 @@ function MemberCard({
   onSaveHandicap,
   onSetRole,
   onSetCategory,
+  onSetClubRoles,
   onDelete,
   onMessage,
   onEditProfile,
@@ -343,6 +425,7 @@ function MemberCard({
   onSaveHandicap: (id: Id<"clubMembers">, value: string) => void;
   onSetRole: (id: Id<"clubMembers">, role: string) => void;
   onSetCategory: (id: Id<"clubMembers">, categoryId: Id<"membershipCategories"> | undefined) => void;
+  onSetClubRoles: (id: Id<"clubMembers">, roles: string[]) => void;
   onDelete: (member: Member) => void;
   onMessage: (member: Member) => void;
   onEditProfile: () => void;
@@ -387,6 +470,13 @@ function MemberCard({
               )}
             </div>
           </div>
+
+          {/* Club role badges */}
+          {member.clubRoles && member.clubRoles.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {member.clubRoles.map(r => <ClubRoleBadge key={r} value={r} />)}
+            </div>
+          )}
 
           {member.bio && <p className="text-sm text-gray-500 mt-2 leading-relaxed line-clamp-2">{member.bio}</p>}
 
@@ -457,6 +547,11 @@ function MemberCard({
                   {categories.map(cat => <option key={cat._id} value={cat._id}>{cat.name}</option>)}
                 </select>
               )}
+              {/* Club roles */}
+              <ClubRolePicker
+                current={member.clubRoles ?? []}
+                onChange={roles => onSetClubRoles(member._id, roles)}
+              />
             </div>
           )}
         </div>
@@ -484,6 +579,7 @@ export default function MembersPage() {
   const setHandicap = useMutation(api.scoring.setHandicap);
   const setRole = useMutation(api.clubMembers.setRole);
   const setCategoryId = useMutation(api.clubMembers.setMembershipCategoryId);
+  const setClubRoles = useMutation(api.clubMembers.setClubRoles);
   const getOrCreateDirect = useMutation(api.messaging.getOrCreateDirect);
   const listNonMembers = useAction(clubMembersApi.listNonMembers);
   const addMemberById = useAction(clubMembersApi.addMemberById);
@@ -683,6 +779,7 @@ export default function MembersPage() {
               onSaveHandicap={handleSaveHandicap}
               onSetRole={(id, role) => setRole({ memberId: id, role })}
               onSetCategory={(id, categoryId) => setCategoryId({ memberId: id, categoryId })}
+              onSetClubRoles={(id, clubRoles) => setClubRoles({ memberId: id, clubRoles })}
               onDelete={m => { if (confirm(`Remove ${m.displayName} from the club?`)) deleteMember({ memberId: m._id }); }}
               onMessage={handleMessage}
               onEditProfile={() => setEditingProfile(true)}

@@ -400,6 +400,26 @@ export const setRole = mutation({
   },
 });
 
+export const setClubRoles = mutation({
+  args: { memberId: v.id("clubMembers"), clubRoles: v.array(v.string()) },
+  handler: async (ctx, { memberId, clubRoles }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+    if (!isSuperAdmin) {
+      const member = await ctx.db.get(memberId);
+      if (!member) throw new Error("Not found");
+      const caller = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", member.clubId).eq("userId", identity.subject))
+        .unique();
+      if (!caller || caller.role !== "admin") throw new Error("Not authorised");
+    }
+    await ctx.db.patch(memberId, { clubRoles, updatedAt: new Date().toISOString() });
+  },
+});
+
 type ClerkUser = {
   id: string;
   first_name?: string;
