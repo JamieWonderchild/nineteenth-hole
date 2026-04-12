@@ -181,6 +181,7 @@ export const recordSale = mutation({
       const saleId = await ctx.db.insert("posSales", {
         clubId: args.clubId,
         memberId: member.userId,
+        clubMemberId: args.chargeAccountMemberId,
         memberName: member.displayName,
         items: args.items,
         subtotalPence,

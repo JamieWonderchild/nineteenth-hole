@@ -9,7 +9,8 @@ import { useActiveClub } from "@/lib/club-context";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const clubMembersApi = api.clubMembers as any;
 import type { Id } from "convex/_generated/dataModel";
-import { Pencil, Check, X, Search, MessageSquare, Edit2, Phone, Mail, User, Tag, Plus, Trash2, ChevronDown } from "lucide-react";
+import { Pencil, Check, X, Search, MessageSquare, Edit2, Phone, Mail, User, Tag, Plus, Trash2, ChevronDown, Wallet, ArrowUpCircle } from "lucide-react";
+import { formatCurrency } from "@/lib/format";
 import { AIAssistant } from "@/components/AIAssistant";
 import type { CapabilityId } from "@/lib/ai-capabilities";
 
@@ -189,6 +190,7 @@ type Member = {
   membershipCategory?: string;
   membershipCategoryId?: Id<"membershipCategories">;
   clubRoles?: string[];
+  accountBalance?: number;
   bio?: string;
   phone?: string;
   email?: string;
@@ -397,6 +399,128 @@ function EditProfileModal({ member, clubId, onClose }: { member: Member; clubId:
   );
 }
 
+// ── Wallet Modal ──────────────────────────────────────────────────────────────
+
+function WalletModal({ member, clubId, currency, onClose }: {
+  member: Member;
+  clubId: Id<"clubs">;
+  currency: string;
+  onClose: () => void;
+}) {
+  const adminTopUp = useMutation(api.wallet.adminTopUp);
+  const transactions = useQuery(api.wallet.listTransactions, { memberId: member._id });
+  const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function handleTopUp() {
+    const pence = Math.round(parseFloat(amount) * 100);
+    if (!pence || pence <= 0) return;
+    setSaving(true);
+    try {
+      await adminTopUp({
+        clubId,
+        memberId: member._id,
+        amount: pence,
+        description: description || "Manual top-up",
+      });
+      setAmount("");
+      setDescription("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const PRESETS = [500, 1000, 2000, 5000]; // pence
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="font-bold text-gray-900 flex items-center gap-2">
+              <Wallet size={16} /> {member.displayName}&apos;s Account
+            </h2>
+            <p className="text-2xl font-bold text-green-600 mt-0.5">
+              {formatCurrency(member.accountBalance ?? 0, currency)}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        {/* Top-up section */}
+        <div className="px-6 py-4 border-b border-gray-100">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Manual Top-Up</p>
+          <div className="flex gap-2 mb-3">
+            {PRESETS.map(p => (
+              <button
+                key={p}
+                onClick={() => setAmount((p / 100).toFixed(2))}
+                className="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-green-400 hover:text-green-700 font-medium"
+              >
+                {formatCurrency(p, currency)}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 mb-2">
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">£</span>
+              <input
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                placeholder="0.00"
+                type="number"
+                min="0"
+                step="0.01"
+                className="w-full pl-7 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <input
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Reason (optional)"
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            onClick={handleTopUp}
+            disabled={saving || !amount || parseFloat(amount) <= 0}
+            className="w-full py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-500 disabled:opacity-50 flex items-center justify-center gap-1.5"
+          >
+            <ArrowUpCircle size={14} /> {saving ? "Adding…" : "Add credit"}
+          </button>
+        </div>
+
+        {/* Transaction history */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Transaction History</p>
+          {!transactions ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin h-5 w-5 border-2 border-green-600 border-t-transparent rounded-full" />
+            </div>
+          ) : transactions.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No transactions yet</p>
+          ) : (
+            <div className="space-y-2">
+              {transactions.map(tx => (
+                <div key={tx._id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                  <div className="min-w-0">
+                    <p className="text-sm text-gray-800 truncate">{tx.description}</p>
+                    <p className="text-xs text-gray-400">{new Date(tx.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                  </div>
+                  <span className={`text-sm font-bold ml-3 shrink-0 ${tx.amount > 0 ? "text-green-600" : "text-red-500"}`}>
+                    {tx.amount > 0 ? "+" : ""}{formatCurrency(tx.amount, currency)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MemberCard({
   member,
   isMe,
@@ -413,6 +537,8 @@ function MemberCard({
   onDelete,
   onMessage,
   onEditProfile,
+  onWallet,
+  currency,
 }: {
   member: Member;
   isMe: boolean;
@@ -429,6 +555,8 @@ function MemberCard({
   onDelete: (member: Member) => void;
   onMessage: (member: Member) => void;
   onEditProfile: () => void;
+  onWallet: (member: Member) => void;
+  currency: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasContactInfo = (member.phone && member.showPhone) || (member.email && member.showEmail);
@@ -552,6 +680,14 @@ function MemberCard({
                 current={member.clubRoles ?? []}
                 onChange={roles => onSetClubRoles(member._id, roles)}
               />
+              {/* Wallet */}
+              <button
+                onClick={() => onWallet(member)}
+                className="ml-auto flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:border-green-400 hover:text-green-700 transition-colors"
+              >
+                <Wallet size={11} />
+                {formatCurrency(member.accountBalance ?? 0, currency)}
+              </button>
             </div>
           )}
         </div>
@@ -586,6 +722,7 @@ export default function MembersPage() {
 
   const [search, setSearch] = useState("");
   const [editingProfile, setEditingProfile] = useState(false);
+  const [walletMember, setWalletMember] = useState<Member | null>(null);
   const [handicapEdit, setHandicapEdit] = useState<{ id: Id<"clubMembers">; value: string } | null>(null);
   const [nonMembers, setNonMembers] = useState<Array<{ userId: string; displayName: string; email: string }> | null>(null);
   const [nonMembersLoading, setNonMembersLoading] = useState(false);
@@ -783,6 +920,8 @@ export default function MembersPage() {
               onDelete={m => { if (confirm(`Remove ${m.displayName} from the club?`)) deleteMember({ memberId: m._id }); }}
               onMessage={handleMessage}
               onEditProfile={() => setEditingProfile(true)}
+              onWallet={m => setWalletMember(m)}
+              currency={club.currency}
             />
           ))}
         </div>
@@ -796,6 +935,15 @@ export default function MembersPage() {
 
       {editingProfile && myMember && (
         <EditProfileModal member={myMember} clubId={club._id} onClose={() => setEditingProfile(false)} />
+      )}
+
+      {walletMember && (
+        <WalletModal
+          member={walletMember}
+          clubId={club._id}
+          currency={club.currency}
+          onClose={() => setWalletMember(null)}
+        />
       )}
 
       {isAdmin && club && (

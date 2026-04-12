@@ -28,6 +28,7 @@ import type * as membershipCategories from "../membershipCategories.js";
 import type * as messaging from "../messaging.js";
 import type * as players from "../players.js";
 import type * as pos from "../pos.js";
+import type * as posTerminals from "../posTerminals.js";
 import type * as quickGames from "../quickGames.js";
 import type * as resultsImport from "../resultsImport.js";
 import type * as scores from "../scores.js";
@@ -36,6 +37,7 @@ import type * as series from "../series.js";
 import type * as squadMembers from "../squadMembers.js";
 import type * as teeTimes from "../teeTimes.js";
 import type * as visitors from "../visitors.js";
+import type * as wallet from "../wallet.js";
 import type * as webhookEvents from "../webhookEvents.js";
 
 import type {
@@ -65,6 +67,7 @@ declare const fullApi: ApiFromModules<{
   messaging: typeof messaging;
   players: typeof players;
   pos: typeof pos;
+  posTerminals: typeof posTerminals;
   quickGames: typeof quickGames;
   resultsImport: typeof resultsImport;
   scores: typeof scores;
@@ -73,6 +76,7 @@ declare const fullApi: ApiFromModules<{
   squadMembers: typeof squadMembers;
   teeTimes: typeof teeTimes;
   visitors: typeof visitors;
+  wallet: typeof wallet;
   webhookEvents: typeof webhookEvents;
 }>;
 

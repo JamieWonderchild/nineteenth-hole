@@ -6,7 +6,10 @@ import { api } from "convex/_generated/api";
 import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
-import { ShoppingCart, Minus, Plus, X, Check, CreditCard, Banknote, Trash2, Monitor } from "lucide-react";
+import {
+  ShoppingCart, Minus, Plus, X, Check, CreditCard, Banknote,
+  Trash2, Monitor, Terminal, Wifi, User, Search,
+} from "lucide-react";
 import Link from "next/link";
 
 type Product = {
@@ -28,11 +31,18 @@ type BasketItem = {
   subtotalPence: number;
 };
 
+type Member = {
+  _id: Id<"clubMembers">;
+  displayName: string;
+  accountBalance?: number;
+};
+
 const PAYMENT_METHODS = [
-  { id: "cash", label: "Cash", icon: <Banknote size={16} /> },
-  { id: "card", label: "Card", icon: <CreditCard size={16} /> },
-  { id: "tab", label: "Tab", icon: <Check size={16} /> },
-  { id: "complimentary", label: "Comp", icon: <Check size={16} /> },
+  { id: "cash",         label: "Cash",     icon: <Banknote size={14} /> },
+  { id: "card",         label: "Card",     icon: <CreditCard size={14} /> },
+  { id: "account",      label: "Account",  icon: <User size={14} /> },
+  { id: "terminal",     label: "Terminal", icon: <Terminal size={14} /> },
+  { id: "complimentary", label: "Comp",   icon: <Check size={14} /> },
 ];
 
 export default function POSPage() {
@@ -40,6 +50,8 @@ export default function POSPage() {
 
   const categories = useQuery(api.pos.listCategories, club ? { clubId: club._id } : "skip");
   const products = useQuery(api.pos.listProducts, club ? { clubId: club._id } : "skip");
+  const terminals = useQuery(api.posTerminals.listByClub, club ? { clubId: club._id } : "skip");
+  const members = useQuery(api.clubMembers.listByClub, club ? { clubId: club._id } : "skip");
   const recordSale = useMutation(api.pos.recordSale);
 
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
@@ -47,7 +59,33 @@ export default function POSPage() {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
-  const [lastSale, setLastSale] = useState<number | null>(null); // total of last sale
+  const [lastSale, setLastSale] = useState<{ total: number; method: string } | null>(null);
+
+  // Terminal payment state
+  const [selectedTerminalId, setSelectedTerminalId] = useState<string>("");
+
+  // Account (wallet) state
+  const [memberSearch, setMemberSearch] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState<Id<"clubMembers"> | null>(null);
+
+  const activeTerminals = useMemo(
+    () => (terminals ?? []).filter(t => t.isActive),
+    [terminals]
+  );
+
+  const filteredMembers = useMemo(() => {
+    if (!members) return [];
+    const q = memberSearch.toLowerCase();
+    if (!q) return members.slice(0, 8);
+    return members
+      .filter(m => m.displayName.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [members, memberSearch]);
+
+  const selectedMember = useMemo(
+    () => members?.find(m => m._id === selectedMemberId) ?? null,
+    [members, selectedMemberId]
+  );
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -88,6 +126,8 @@ export default function POSPage() {
     setBasket([]);
     setNotes("");
     setLastSale(null);
+    setSelectedMemberId(null);
+    setMemberSearch("");
   }
 
   const total = basket.reduce((s, i) => s + i.subtotalPence, 0);
@@ -97,16 +137,83 @@ export default function POSPage() {
     if (!club || basket.length === 0) return;
     setSaving(true);
     try {
+      // ── Terminal: send to Dojo terminal, then record sale ──────────────────
+      if (paymentMethod === "terminal") {
+        if (!selectedTerminalId) { alert("Select a terminal first"); return; }
+
+        const res = await fetch("/api/payments/terminal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clubId: club._id,
+            terminalId: selectedTerminalId,
+            amount: total,
+            currency,
+            purpose: "pos_sale",
+            description: basket.map(i => `${i.quantity}× ${i.productName}`).join(", "),
+            memberId: selectedMemberId ?? undefined,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json() as { error?: string };
+          alert(err.error ?? "Failed to reach terminal");
+          return;
+        }
+
+        await recordSale({
+          clubId: club._id,
+          memberId: selectedMember?.userId,
+          memberName: selectedMember?.displayName,
+          items: basket,
+          currency,
+          paymentMethod: "terminal",
+          notes: notes || undefined,
+        });
+
+        setLastSale({ total, method: "terminal" });
+        setBasket([]);
+        setNotes("");
+        return;
+      }
+
+      // ── Account: deduct from member wallet atomically ──────────────────────
+      if (paymentMethod === "account") {
+        if (!selectedMemberId) { alert("Select a member first"); return; }
+        await recordSale({
+          clubId: club._id,
+          chargeAccountMemberId: selectedMemberId,
+          items: basket,
+          currency,
+          paymentMethod: "account",
+          notes: notes || undefined,
+        });
+
+        setLastSale({ total, method: "account" });
+        setBasket([]);
+        setNotes("");
+        setSelectedMemberId(null);
+        setMemberSearch("");
+        return;
+      }
+
+      // ── Cash / Card / Complimentary ────────────────────────────────────────
       await recordSale({
         clubId: club._id,
+        memberId: selectedMember?.userId,
+        memberName: selectedMember?.displayName,
         items: basket,
         currency,
         paymentMethod,
         notes: notes || undefined,
       });
-      setLastSale(total);
+
+      setLastSale({ total, method: paymentMethod });
       setBasket([]);
       setNotes("");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      alert(msg);
     } finally {
       setSaving(false);
     }
@@ -120,7 +227,6 @@ export default function POSPage() {
     );
   }
 
-  // Build category list (include "All" + "Uncategorised" if products exist without a category)
   const hasUncategorised = products.some(p => !p.categoryId);
   const catTabs = [
     { id: null, label: "All" },
@@ -139,6 +245,9 @@ export default function POSPage() {
             <p className="text-xs text-gray-400">Pro Shop & Bar</p>
           </div>
           <div className="flex gap-2">
+            <Link href="/manage/pos/terminals" className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-1">
+              <Wifi size={12} /> Terminals
+            </Link>
             <Link href="/manage/pos/products" className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
               Products
             </Link>
@@ -234,9 +343,15 @@ export default function POSPage() {
         {/* Last sale confirmation */}
         {lastSale !== null && basket.length === 0 && (
           <div className="mx-4 mt-4 p-3 bg-green-50 border border-green-200 rounded-xl">
-            <p className="text-green-700 text-sm font-semibold text-center">
-              Sale complete — {formatCurrency(lastSale, currency)}
-            </p>
+            {lastSale.method === "terminal" ? (
+              <p className="text-green-700 text-sm font-semibold text-center">
+                Sent to terminal ✓
+              </p>
+            ) : (
+              <p className="text-green-700 text-sm font-semibold text-center">
+                Sale complete — {formatCurrency(lastSale.total, currency)}
+              </p>
+            )}
             <button onClick={() => setLastSale(null)} className="w-full text-xs text-green-600 mt-1 hover:underline">
               Dismiss
             </button>
@@ -275,13 +390,14 @@ export default function POSPage() {
 
         {/* Bottom — totals + charge */}
         <div className="border-t border-gray-100 px-4 py-4 space-y-3">
+
           {/* Payment method */}
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
             {PAYMENT_METHODS.map(m => (
               <button
                 key={m.id}
                 onClick={() => setPaymentMethod(m.id)}
-                className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                className={`flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                   paymentMethod === m.id
                     ? "bg-green-600 border-green-600 text-white"
                     : "border-gray-200 text-gray-600 hover:border-green-300"
@@ -291,6 +407,77 @@ export default function POSPage() {
               </button>
             ))}
           </div>
+
+          {/* Terminal selector */}
+          {paymentMethod === "terminal" && (
+            <div>
+              {activeTerminals.length === 0 ? (
+                <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                  No terminals registered.{" "}
+                  <Link href="/manage/pos/terminals" className="underline">Add one →</Link>
+                </p>
+              ) : (
+                <select
+                  value={selectedTerminalId}
+                  onChange={e => setSelectedTerminalId(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs"
+                >
+                  <option value="">Select terminal…</option>
+                  {activeTerminals.map(t => (
+                    <option key={t._id} value={t.terminalId}>{t.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {/* Member / account lookup */}
+          {(paymentMethod === "account" || paymentMethod === "terminal") && (
+            <div className="relative">
+              {selectedMember ? (
+                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  <div>
+                    <p className="text-xs font-semibold text-green-800">{selectedMember.displayName}</p>
+                    <p className="text-xs text-green-600">
+                      Balance: {formatCurrency(selectedMember.accountBalance ?? 0, currency)}
+                      {paymentMethod === "account" && (selectedMember.accountBalance ?? 0) < total && (
+                        <span className="text-red-500 ml-1">— insufficient</span>
+                      )}
+                    </p>
+                  </div>
+                  <button onClick={() => { setSelectedMemberId(null); setMemberSearch(""); }} className="text-green-400 hover:text-red-400">
+                    <X size={13} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center border border-gray-200 rounded-lg px-3 py-2 gap-2">
+                    <Search size={13} className="text-gray-400 shrink-0" />
+                    <input
+                      value={memberSearch}
+                      onChange={e => setMemberSearch(e.target.value)}
+                      placeholder={paymentMethod === "account" ? "Search member…" : "Member (optional)"}
+                      className="flex-1 text-xs outline-none bg-transparent"
+                    />
+                  </div>
+                  {memberSearch && filteredMembers.length > 0 && (
+                    <div className="absolute bottom-full mb-1 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-10">
+                      {filteredMembers.map(m => (
+                        <button
+                          key={m._id}
+                          onClick={() => { setSelectedMemberId(m._id); setMemberSearch(""); }}
+                          className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center justify-between"
+                        >
+                          <span>{m.displayName}</span>
+                          <span className="text-gray-400">{formatCurrency(m.accountBalance ?? 0, currency)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {/* Notes */}
           <input
@@ -309,10 +496,20 @@ export default function POSPage() {
 
           <button
             onClick={handleCharge}
-            disabled={saving || basket.length === 0}
+            disabled={
+              saving ||
+              basket.length === 0 ||
+              (paymentMethod === "terminal" && !selectedTerminalId) ||
+              (paymentMethod === "account" && !selectedMemberId)
+            }
             className="w-full py-3 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white font-bold rounded-xl transition-colors text-sm"
           >
-            {saving ? "Processing…" : `Charge ${formatCurrency(total, currency)}`}
+            {saving
+              ? paymentMethod === "terminal" ? "Sending to terminal…" : "Processing…"
+              : paymentMethod === "terminal"
+                ? `Send to terminal`
+                : `Charge ${formatCurrency(total, currency)}`
+            }
           </button>
         </div>
       </div>

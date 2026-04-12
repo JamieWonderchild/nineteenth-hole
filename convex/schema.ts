@@ -750,6 +750,7 @@ export default defineSchema({
   posSales: defineTable({
     clubId: v.id("clubs"),
     memberId: v.optional(v.string()),     // Clerk userId if sold to a member
+    clubMemberId: v.optional(v.id("clubMembers")), // linked member record (for account charges)
     memberName: v.optional(v.string()),
     items: v.array(v.object({
       productId: v.optional(v.id("posProducts")),
@@ -761,13 +762,54 @@ export default defineSchema({
     subtotalPence: v.number(),           // sum of line items
     totalPence: v.number(),              // subtotal (no tax split yet)
     currency: v.string(),
-    // 'cash' | 'card' | 'tab' | 'terminal' | 'complimentary'
+    // 'cash' | 'card' | 'account' | 'terminal' | 'complimentary'
     paymentMethod: v.string(),
+    paymentIntentId: v.optional(v.id("paymentIntents")), // set when terminal payment
     notes: v.optional(v.string()),
     voidedAt: v.optional(v.string()),
     servedBy: v.string(),               // userId
     createdAt: v.string(),
   })
     .index("by_club", ["clubId"])
-    .index("by_club_and_date", ["clubId", "createdAt"]),
+    .index("by_club_and_date", ["clubId", "createdAt"])
+    .index("by_club_member", ["clubMemberId"]),
+
+  // ============================================================================
+  // Payment Intents — provider-agnostic record of each payment (Dojo, Square, …)
+  // ============================================================================
+
+  paymentIntents: defineTable({
+    clubId: v.id("clubs"),
+    clubMemberId: v.optional(v.id("clubMembers")),
+    provider: v.string(),               // 'dojo' | 'square'
+    providerIntentId: v.string(),       // provider's own ID
+    amount: v.number(),                 // pence
+    currency: v.string(),
+    purpose: v.string(),                // 'topup' | 'pos_sale' | 'green_fee' | 'competition' | 'tee_time'
+    status: v.string(),                 // 'pending' | 'captured' | 'failed' | 'refunded' | 'cancelled'
+    terminalId: v.optional(v.string()), // set when sent to a physical terminal
+    checkoutUrl: v.optional(v.string()), // hosted checkout URL (online top-up)
+    saleId: v.optional(v.id("posSales")),
+    description: v.optional(v.string()),
+    createdAt: v.string(),
+    completedAt: v.optional(v.string()),
+  })
+    .index("by_club", ["clubId"])
+    .index("by_club_member", ["clubMemberId"])
+    .index("by_provider_intent", ["provider", "providerIntentId"])
+    .index("by_status", ["status"]),
+
+  // ============================================================================
+  // POS Terminals — registered payment terminals per club
+  // ============================================================================
+
+  posTerminals: defineTable({
+    clubId: v.id("clubs"),
+    provider: v.string(),               // 'dojo' | 'square'
+    terminalId: v.string(),             // provider's terminal / device ID
+    name: v.string(),                   // "Bar", "Pro Shop", "Reception"
+    isActive: v.boolean(),
+    createdAt: v.string(),
+  })
+    .index("by_club", ["clubId"]),
 });
