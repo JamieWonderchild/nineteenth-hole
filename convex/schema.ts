@@ -521,6 +521,23 @@ export default defineSchema({
     .index("by_club", ["clubId"]),
 
   // ============================================================================
+  // Member Invitations (email-based, one-time-use)
+  // ============================================================================
+
+  invites: defineTable({
+    clubId: v.id("clubs"),
+    email: v.string(),          // recipient email address
+    token: v.string(),          // unique 32-char random token
+    invitedBy: v.string(),      // Clerk userId of admin who sent it
+    createdAt: v.string(),
+    expiresAt: v.string(),      // 7 days from creation
+    usedAt: v.optional(v.string()),
+    usedByUserId: v.optional(v.string()),
+  })
+    .index("by_token", ["token"])
+    .index("by_club", ["clubId"]),
+
+  // ============================================================================
   // Messaging
   // ============================================================================
 

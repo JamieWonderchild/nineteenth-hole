@@ -4,142 +4,92 @@
 
 ---
 
-## The Opportunity
+## The Gap
 
-Finchley Golf Club deserves better software.
+Finchley Golf Club has 500 members. Right now, most of them have no meaningful digital relationship with this club at all.
 
-Right now, managing competitions at FGC requires a Python script to bypass Cloudflare security on our own website, VBA macros in Excel, and significant manual effort from a small number of people keeping it together. Results get lost. The member website is outdated. Interclub match results are tracked on paper. The bar has no real sales data. New members don't know how to get involved.
+They can't check competition results from their phone. They don't receive a proper results summary after a Saturday comp — they get a PDF attached to an email, or nothing. They find out about the Saturday draw from a noticeboard. New members arrive and have no idea how to get involved. The interclub results from last weekend's Sabres match? Filed away somewhere, visible to nobody.
 
-Meanwhile, the software tools golf clubs typically pay for — BRS, ClubV1, Intelligentgolf — are expensive, fragmented, and haven't materially improved in a decade. None of them use AI. None of them talk to each other.
+This isn't a criticism of the people running things. It's the consequence of tools that were never designed to give members a real experience. The club is more active, more ambitious, and more interesting than its digital presence suggests — and the gap between what FGC is and what members experience online is costing the club money and engagement every single year.
 
-We have built something better. It is already running at FGC.
-
----
-
-## What We've Built
-
-A single platform that replaces every fragmented tool the club currently uses:
-
-- **Competition management** — entries, draws, live scoring, RTSF leaderboard, results history. No more Excel. No more scraping.
-- **Tee time booking** — member and visitor bookings in one place, with utilisation tracking.
-- **Interclub** — full Middlesex county league management: fixtures, match-by-match results, live standings for Sabres, Tigers, and Foxes.
-- **Bar & pro shop POS** — a full point-of-sale system with stock management, sales reporting, and daily revenue summaries.
-- **Member app** — handicap tracking, competition history, member directory, messaging, tee time bookings.
-- **AI tools** — automatic competition result summaries, member engagement analysis, team selection suggestions.
-- **Communications** — email and WhatsApp-ready broadcasts to the whole membership in one click.
-
-It is live. It is working. It was built by a member of this club.
+We have already fixed it. This platform is live at FGC today.
 
 ---
 
-## Why This Matters for FGC
+## What Members Now Have
 
-### 1. It saves the club money
+When a member downloads the app and logs in, they see:
 
-The dominant club management software in this market — Intelligentgolf — charges clubs of FGC's size (500+ members) **£3,500–4,500 + VAT per year** for the base licence alone. That is before you add:
+- Their current handicap and where it's been trending
+- Their full competition history at FGC — every entry, every result, every payout
+- The live draw and leaderboard for any active competition, updated in real time
+- Interclub standings for the Sabres, Tigers, and Foxes — updated after every fixture
+- The ability to book a tee time in under thirty seconds
+- A member directory with direct messaging
 
-- WHS handicap integration: ~£149/year
-- EPOS (bar/pro shop software): additional cost
-- Bespoke member website: additional cost
-- igMember mobile app: £2.99/year per member — at 500 members, that is **£1,500/year just for the app**
+No scraping. No PDF. No noticeboard. A member who joined FGC six months ago can pull out their phone and immediately understand the club they've joined.
 
-A club running the full Intelligentgolf stack is paying **£8,000–12,000 per year** — for software that hasn't meaningfully improved in a decade, doesn't integrate properly between modules, and has no AI capability whatsoever.
+That is what this platform delivers today, for every member of this club, right now.
 
-Beyond software licences, FGC currently compensates for what its tools don't do through volunteer time and bespoke workarounds — Python scripts, VBA macros, paper records — adding thousands more in hidden administrative cost.
+---
 
-This platform replaces all of it. One system. One subscription. At a price that makes the comparison embarrassing.
+## The Revenue Case
 
-### 2. It generates new revenue for the club
+The board will want to understand what this is worth to FGC financially. The answer is not primarily about software costs — it is about revenue the club is currently missing.
 
-**Tee times:** The platform surfaces utilisation data that clubs typically don't have visibility over. Identifying and filling just 10% more visitor tee time slots at FGC's standard green fee generates an estimated **£15,000–20,000 in additional annual revenue**.
+### Tee time utilisation
 
-**Bar and pro shop:** Clubs running our point-of-sale system routinely identify 15–20% in untracked bar revenue — stock variances, tab discrepancies, and peak period gaps — that were previously invisible. At FGC's bar turnover, this represents a meaningful recoverable sum every year.
+FGC has no reliable visibility over visitor tee time utilisation. The platform surfaces this data automatically — which slots fill, which don't, how far in advance, at what times of year. Clubs that actively manage this data routinely identify and fill **10–15% more visitor green fee slots** than they did before. At FGC's standard visitor green fee across a full season, filling 10% more slots generates an estimated **£15,000–20,000 in additional annual revenue**. That is not a saving. That is new money.
 
-**Competition entries:** Platform fees from competition entries currently flow to third-party providers. Under this model, those fees stay at the club.
+### Bar and pro shop recovery
 
-**Total estimated annual benefit to FGC: £25,000–40,000.**
+The bar and pro shop POS system gives FGC something it has never had: daily revenue data with variance tracking. Clubs running this system routinely identify **15–20% in untracked revenue** — stock discrepancies, tab reconciliation gaps, peak period losses — that were previously invisible. The money was always being taken; it just wasn't all making it to the till. At FGC's bar turnover, the recoverable figure is meaningful. This is also new money — it was already being spent by members.
 
-### 3. It improves the member experience — meaningfully
+### Competition entry fees
 
-The current FGC website is, by any honest assessment, not good enough. It is difficult to navigate, slow to update, and reflects a club that is far more active and ambitious than the digital experience suggests.
+Processing fees on competition entries currently leave the club. Under this model, they stay at the club. At FGC's competition volume across a season, this is a small but entirely recoverable line.
 
-Members want to see their handicap trend, their competition history, the interclub results, and who's playing in the Saturday draw — from their phone, instantly. They want to be able to book a tee time in thirty seconds. They want to receive a proper results summary after a competition, not a PDF attached to an email.
+### Total estimated annual benefit to FGC: £25,000–40,000
 
-That is what this platform delivers.
+This figure is conservative. It does not include the value of improved member retention — which is the harder-to-quantify but arguably larger prize.
+
+---
+
+## The Cost Comparison
+
+This is secondary to the revenue case, but it matters.
+
+Clubs of FGC's size running the full Intelligentgolf stack — base licence, WHS integration, EPOS, member app — are paying **£8,000–12,000 per year**. For software that hasn't materially improved in a decade. That doesn't integrate properly between its own modules. And that has no AI capability whatsoever.
+
+This platform replaces all of it. One system. One subscription. At a price where the comparison is embarrassing.
+
+The switch is not a cost — it pays for itself in the first quarter.
 
 ---
 
 ## What We Are Asking from the Board
 
-Three things:
+Three things only:
 
-**1. Endorsement** — the board's support to continue using FGC as the founding pilot club, and permission to reference Finchley in early conversations with other clubs.
+**1. Endorsement** — the board's support to continue using FGC as the founding pilot club, and permission to reference Finchley in early conversations with other clubs. We are already in contact with clubs who have heard about what we've built here. Your endorsement is what moves those conversations forward.
 
-**2. Introduction rights** — access to the club's professional network: county golf union contacts, the PGA professional, and any existing supplier relationships that would be useful in navigating the England Golf partnership process.
+**2. Introduction rights** — access to the club's professional network: Middlesex County Golf contacts, the PGA professional, and any existing relationships with England Golf. These introductions are how we accelerate the ISV partnership process that makes handicap integration seamless.
 
-**3. Consideration of a founding club stake** — in exchange for being the club that helped build this, FGC has the opportunity to hold a small equity stake in the company. This would represent genuine upside for the club as the platform scales. The structure and terms would be put to the board formally once the company is incorporated.
+**3. Consideration of a founding club stake** — FGC has the opportunity to hold a small equity stake in the company in recognition of being the club that built this with us. The structure and terms would be put to the board formally once the company is incorporated. This is not a request for investment. It is an offer of upside.
 
-We are not asking for money. We are asking for belief.
-
----
-
-## The Business
-
-### The market opportunity
-
-There are approximately **2,500 golf clubs in the UK**. The majority of clubs with 400+ members are already paying £4,000–10,000 per year for club management software — to Intelligentgolf, BRS, ClubV1, or Club Systems. This is an established, paying market. These clubs are not being asked to adopt software for the first time; they are being asked to switch to something better and cheaper.
-
-At £100/month (£1,200/year), a club saves a minimum of £2,300 versus Intelligentgolf's base licence alone — before counting the EPOS, website, and per-member app savings. This is not a difficult commercial conversation. The pitch writes itself.
-
-Across 2,500 clubs at £100/month average, the market is **£3 million ARR**. At a more realistic £150/month for full-suite clubs, the market approaches **£4.5 million ARR**. This is conservative — it does not include visitor booking commissions, per-transaction fees, or premium AI features, all of which we intend to layer on over time.
-
-### Three revenue streams
-
-The business is not a single-product SaaS. It has three distinct revenue streams, each reinforcing the others:
-
-**① Club subscriptions — £100–150/month per club**
-
-The core revenue model. Golf clubs are already paying £4,000–10,000/year to Intelligentgolf and competitors. We charge less than £1,200 and do more. This is not a hard sell; it is a switching decision that makes itself.
-
-**② Tour Pool entry fees — per-transaction**
-
-The platform runs sweepstakes around major golf tournaments (The Masters, The Open, the Ryder Cup). Players pay an entry fee; the platform takes a margin. This revenue scales with the consumer base, has no additional marginal cost, and grows independently of club sign-ups.
-
-**③ Individual golfer tier — £3.99/month**
-
-Golfers without a club account can sign up and use the platform directly — round tracking, casual games with friends, handicap history, and tournament sweepstakes. The free tier creates a consumer base that drives bottom-up demand for club adoption. The paid tier (infrastructure already built) monetises that base directly.
-
-### Path to £1M ARR
-
-| Year | Mix | ARR |
-|---|---|---|
-| Y1 | 3 clubs + pool fees | ~£8k |
-| Y2 | 20 clubs + early consumer | ~£45k |
-| Y3 | 75 clubs + 500 golfers | ~£160k |
-| Y4 | 200 clubs + 2,000 golfers | ~£400k |
-| Y5 | 400 clubs + 5,000 golfers | ~£1M+ |
-
-With Ben's existing relationships across 80+ clubs and the consumer base feeding club discovery, these numbers are conservative.
-
-### The consumer opportunity
-
-There are over **2 million active golfers in the UK**. The majority have no software tools to manage their game beyond a handicap card. Our B2C tier is built and live. Monetising 1% of UK golfers at £3.99/month is £800,000 in ARR from a single revenue line — entirely separate from the club business.
-
-### The raise
-
-The plan is to raise **£500,000** from a small group of investors — many of whom may be members of this club — to fund a core team: a founder-engineer, a second engineer, a sales lead, and an operations hire. That investment, at a pre-money valuation of £1.5 million, gives a **25% equity stake** in a business with a clear path to £1M+ ARR within four years.
-
-Investors benefit from **SEIS tax relief** — 50% income tax relief on investment, meaning a £10,000 investment costs £5,000 net. Loss relief is also available. This is one of the most generous investor protection schemes in Europe.
+We are not asking for money. We are asking for belief — and a club that, by adopting this platform, has already demonstrated it.
 
 ---
 
-## The Team
+## The Bigger Picture
 
-**Founder** — a software engineer and FGC member who has already built the full platform in his spare time. Currently employed at a leading European AI company, which is why the platform has genuine AI capability built into its foundation. Intends to leave that role to pursue this full-time upon funding.
+For those on the board who want to understand where this is going:
 
-**Sales lead** — a golf professional with established relationships across 80+ golf clubs in the region, currently servicing those clubs in a separate commercial role. Would transition to full-time sales upon funding.
+There are approximately 2,500 golf clubs in the UK. The majority of clubs with 400+ members are already paying £4,000–10,000 per year to Intelligentgolf, BRS, or Club Systems. This is an established, paying market. These clubs are not being asked to try something new. They are being asked to switch to something better and cheaper, with a proven install at a club they can visit and see working.
 
-Two further engineering and operations hires would follow in the first six months.
+The business has three revenue streams: club subscriptions (the core model), tour pool entry fees (sweepstakes on majors and tour events that scale with the consumer base), and an individual golfer tier for players who aren't club members. Each stream reinforces the others.
+
+The plan is to raise £500,000 from a small group of investors — some of whom may be in this room — at a pre-money valuation of £1.5 million. That raise funds a team of four: a founder-engineer, a second engineer, a full-time sales lead, and operations. With SEIS relief, a £10,000 investment costs £5,000 net. At a realistic exit valuation of 5–7x revenue on £1M ARR — a conservative multiple for a growing SaaS — investors who came in at this stage are looking at **5–8x their net investment**. That conversation is available to any board member who wants to have it separately.
 
 ---
 

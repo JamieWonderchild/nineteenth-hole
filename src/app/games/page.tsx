@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Plus, Zap, ChevronRight, X, Users, MapPin } from "lucide-react";
 import {
   Dialog,
@@ -425,6 +426,13 @@ export default function GamesPage() {
   const { user } = useUser();
   const games = useQuery(api.quickGames.listByUser, user ? { userId: user.id } : "skip");
   const [modalOpen, setModalOpen] = useState(false);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setModalOpen(true);
+    }
+  }, [searchParams]);
 
   const active = games?.filter(g => g.status !== "complete") ?? [];
   const completed = games?.filter(g => g.status === "complete") ?? [];

@@ -1,63 +1,11 @@
 "use client";
 
 import { useQuery, useMutation } from "convex/react";
-import { useUser } from "@clerk/nextjs";
-import { useClerk } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "convex/_generated/api";
-import type { Id } from "convex/_generated/dataModel";
-import Link from "next/link";
-import { formatCurrency } from "@/lib/format";
 import { use } from "react";
-
-function StatusPill({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    open: "bg-blue-100 text-blue-700",
-    live: "bg-green-100 text-green-700",
-    draft: "bg-gray-100 text-gray-400",
-    complete: "bg-purple-100 text-purple-700",
-  };
-  return (
-    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${map[status] ?? "bg-gray-100 text-gray-500"}`}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
-  );
-}
-
-function SeriesStandingsWidget({ seriesId }: { seriesId: Id<"series"> }) {
-  const standings = useQuery(api.series.computeStandings, { seriesId });
-
-  if (!standings || standings.length === 0) return null;
-
-  const top5 = standings.slice(0, 5);
-
-  return (
-    <section>
-      <h2 className="text-base font-semibold text-gray-900 mb-3">Series Standings</h2>
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 text-left text-gray-500">
-              <th className="px-4 py-2.5 font-medium">#</th>
-              <th className="px-4 py-2.5 font-medium">Member</th>
-              <th className="px-4 py-2.5 font-medium text-right">Points</th>
-            </tr>
-          </thead>
-          <tbody>
-            {top5.map((row, i) => (
-              <tr key={i} className="border-b border-gray-50 last:border-0">
-                <td className="px-4 py-2.5 text-gray-400 font-mono text-xs">{i + 1}</td>
-                <td className="px-4 py-2.5 font-medium text-gray-900">{row.displayName}</td>
-                <td className="px-4 py-2.5 text-right font-semibold text-green-700">{row.total}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
 
 export default function ClubPage({ params }: { params: Promise<{ clubSlug: string }> }) {
   const { clubSlug } = use(params);
@@ -70,10 +18,6 @@ export default function ClubPage({ params }: { params: Promise<{ clubSlug: strin
   const ensureMember = useMutation(api.clubMembers.ensureMember);
 
   const club = useQuery(api.clubs.getBySlug, { slug: clubSlug });
-  const competitions = useQuery(
-    api.competitions.listByClub,
-    club ? { clubId: club._id } : "skip"
-  );
   const membership = useQuery(
     api.clubMembers.getByClubAndUser,
     club && user ? { clubId: club._id, userId: user.id } : "skip"
@@ -82,14 +26,8 @@ export default function ClubPage({ params }: { params: Promise<{ clubSlug: strin
     api.clubMembers.listByClub,
     club ? { clubId: club._id } : "skip"
   );
-  const seriesList = useQuery(
-    api.series.listByClub,
-    club ? { clubId: club._id } : "skip"
-  );
 
-  const activeSeries = seriesList?.find(s => s.status === "active");
-
-  // Active members get the full dashboard — no need to see the public page
+  // Active members get the full dashboard
   useEffect(() => {
     if (membership?.status === "active") {
       router.replace("/manage");
@@ -133,161 +71,61 @@ export default function ClubPage({ params }: { params: Promise<{ clubSlug: strin
     );
   }
 
-  const activeComps = (competitions ?? []).filter(c => c.status !== "complete");
-  const pastComps = (competitions ?? []).filter(c => c.status === "complete");
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-green-900 text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-lg">⛳</div>
-                <span className="text-green-300 text-sm font-medium">Play The Pool</span>
-              </div>
-              <h1 className="text-2xl font-bold mt-2">{club.name}</h1>
-              <p className="text-green-300 text-sm mt-1">
-                {activeComps.length > 0
-                  ? `${activeComps.length} active competition${activeComps.length !== 1 ? "s" : ""}`
-                  : "No active competitions right now"}
-                {membersList && membersList.length > 0 && (
-                  <span> · {membersList.length} member{membersList.length !== 1 ? "s" : ""}</span>
-                )}
-              </p>
-            </div>
-            {membership?.status === "active" && membership.role === "admin" && (
-              <Link
-                href="/manage"
-                className="text-xs bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg transition-colors font-medium"
-              >
-                Manage club
-              </Link>
-            )}
-            {!membership && (
-              joined ? (
-                <span className="text-xs bg-white/20 text-green-200 px-3 py-1.5 rounded-lg font-medium">
-                  Request sent ✓
-                </span>
-              ) : (
-                <button
-                  onClick={handleJoin}
-                  disabled={joining}
-                  className="text-xs bg-white text-green-900 hover:bg-green-50 px-3 py-1.5 rounded-lg transition-colors font-medium disabled:opacity-60"
-                >
-                  {joining ? "Joining…" : "Join club"}
-                </button>
-              )
-            )}
-            {membership?.status === "pending" && (
-              <span className="text-xs bg-white/20 text-green-200 px-3 py-1.5 rounded-lg font-medium">
-                Request pending
-              </span>
-            )}
-          </div>
+  // Pending state
+  if (membership?.status === "pending") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center max-w-sm">
+          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-5 text-2xl">⏳</div>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Request pending</h1>
+          <p className="text-gray-500 text-sm">Your request to join <strong>{club.name}</strong> has been received. An admin will approve you shortly.</p>
         </div>
-      </header>
+      </div>
+    );
+  }
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+  // Non-member (or not signed in) — focused invite acceptance screen
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-green-950 to-green-900 flex flex-col items-center justify-center px-4">
+      <div className="w-full max-w-sm text-center">
+        {/* Club icon */}
+        <div className="w-20 h-20 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mx-auto mb-6 text-4xl">
+          ⛳
+        </div>
 
-        {/* Tee times link — members only */}
-        {membership?.status === "active" && (
-          <Link
-            href={`/${clubSlug}/tee-times`}
-            className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-4 hover:border-green-400 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-xl">⏰</span>
-              <div>
-                <div className="font-semibold text-gray-900">Book a tee time</div>
-                <p className="text-sm text-gray-500">View available slots and make a booking</p>
-              </div>
-            </div>
-            <span className="text-sm text-green-700 font-medium">View →</span>
-          </Link>
-        )}
+        {/* Invite label */}
+        <p className="text-green-300 text-sm font-medium tracking-wide uppercase mb-2">You&apos;ve been invited</p>
 
-        {/* Active competitions */}
-        {activeComps.length > 0 && (
-          <section>
-            <h2 className="text-base font-semibold text-gray-900 mb-3">Active Competitions</h2>
-            <div className="space-y-2">
-              {activeComps.map(comp => (
-                <Link
-                  key={comp._id}
-                  href={`/${clubSlug}/${comp.slug}`}
-                  className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-4 hover:border-green-400 transition-colors group"
-                >
-                  <div>
-                    <div className="flex items-center gap-2.5 mb-1">
-                      <span className="font-semibold text-gray-900">{comp.name}</span>
-                      <StatusPill status={comp.status} />
-                    </div>
-                    <p className="text-sm text-gray-500">
-                      {new Date(comp.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                      {" – "}
-                      {new Date(comp.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                      {comp.entryFee > 0 && ` · ${formatCurrency(comp.entryFee, comp.currency)} entry`}
-                    </p>
-                    {comp.status === "open" && new Date(comp.entryDeadline) > new Date() && (
-                      <p className="text-xs text-amber-600 mt-0.5">
-                        Entries close {new Date(comp.entryDeadline).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {comp.status === "open" && (
-                      <span className="px-3 py-1.5 bg-green-700 text-white text-xs font-medium rounded-lg group-hover:bg-green-600 transition-colors">
-                        Enter {formatCurrency(comp.entryFee, comp.currency)}
-                      </span>
-                    )}
-                    {comp.status === "live" && (
-                      <span className="text-sm text-green-700 font-medium">View →</span>
-                    )}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
+        {/* Club name */}
+        <h1 className="text-3xl font-bold text-white mb-3">{club.name}</h1>
 
-        {/* No active competitions */}
-        {activeComps.length === 0 && (
-          <div className="text-center py-12 bg-white border border-dashed border-gray-200 rounded-xl">
-            <div className="text-4xl mb-3">⛳</div>
-            <p className="text-gray-500">No active competitions right now.</p>
-            <p className="text-gray-400 text-sm mt-1">Check back soon — new pools are added before each major.</p>
+        {/* Welcome message */}
+        <p className="text-green-200 text-base leading-relaxed mb-8">
+          Join your club on The 19th Hole — access competitions, interclub results, tee time booking, and more.
+        </p>
+
+        {/* CTA */}
+        {joined ? (
+          <div className="bg-white/10 border border-white/20 rounded-2xl px-6 py-4 text-center">
+            <div className="text-2xl mb-2">✓</div>
+            <p className="text-white font-semibold">Request sent!</p>
+            <p className="text-green-300 text-sm mt-1">An admin will approve you shortly.</p>
           </div>
+        ) : (
+          <button
+            onClick={handleJoin}
+            disabled={joining}
+            className="w-full bg-white text-green-900 font-semibold text-base py-4 rounded-2xl hover:bg-green-50 transition-colors disabled:opacity-60"
+          >
+            {joining ? "Joining…" : `Join ${club.name}`}
+          </button>
         )}
 
-        {/* Series standings */}
-        {activeSeries && (
-          <SeriesStandingsWidget seriesId={activeSeries._id} />
-        )}
-
-        {/* Past competitions */}
-        {pastComps.length > 0 && (
-          <section>
-            <h2 className="text-base font-semibold text-gray-900 mb-3">Past Competitions</h2>
-            <div className="space-y-2">
-              {pastComps.slice(0, 5).map(comp => (
-                <Link
-                  key={comp._id}
-                  href={`/${clubSlug}/${comp.slug}`}
-                  className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-3.5 hover:border-gray-300 transition-colors"
-                >
-                  <div>
-                    <span className="font-medium text-gray-700">{comp.name}</span>
-                    <p className="text-sm text-gray-400 mt-0.5">
-                      {new Date(comp.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
-                    </p>
-                  </div>
-                  <StatusPill status={comp.status} />
-                </Link>
-              ))}
-            </div>
-          </section>
+        {/* Member count hint */}
+        {membersList && membersList.length > 0 && !joined && (
+          <p className="text-green-400 text-sm mt-5">
+            {membersList.length} member{membersList.length !== 1 ? "s" : ""} already on the platform
+          </p>
         )}
       </div>
     </div>

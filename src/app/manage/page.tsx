@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "convex/_generated/api";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { formatCurrency } from "@/lib/format";
-import { Trophy, Users, CalendarDays, TrendingUp, Star, ArrowRight, Zap, ChevronRight } from "lucide-react";
+import { Trophy, Users, CalendarDays, TrendingUp, Star, ArrowRight, Zap, ChevronRight, Send, Mail } from "lucide-react";
 
 export default function ManagePage() {
   const router = useRouter();
@@ -157,7 +156,7 @@ function GolferDashboard({
   recentGames: QuickGame[];
   onSaveProfile: (handicap: number | undefined, homeClub: string) => Promise<unknown>;
 }) {
-  const [editingProfile, setEditingProfile] = useState(!profile);
+  const [editingProfile, setEditingProfile] = useState(false);
   const [handicapStr, setHandicapStr] = useState(profile?.handicapIndex?.toString() ?? "");
   const [homeClub, setHomeClub] = useState(profile?.homeClub ?? "");
   const [saving, setSaving] = useState(false);
@@ -176,22 +175,54 @@ function GolferDashboard({
 
   const activeGames = recentGames.filter(g => g.status !== "complete").slice(0, 3);
   const completedGames = recentGames.filter(g => g.status === "complete").slice(0, 3);
+  const hasProfile = profile && (profile.handicapIndex != null || profile.homeClub);
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8 space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          {user?.firstName ? `Welcome, ${user.firstName}` : "Welcome"}
-        </h1>
-        <p className="text-gray-500 text-sm mt-0.5">Your golfer dashboard</p>
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+
+      {/* Hero — handicap + greeting */}
+      <div className="bg-gradient-to-br from-green-800 to-green-950 rounded-2xl px-6 py-7 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-green-300 text-sm font-medium mb-0.5">
+            {user?.firstName ? `Welcome back, ${user.firstName}` : "Welcome back"}
+          </p>
+          <h1 className="text-2xl font-bold text-white">
+            {profile?.homeClub || "Your dashboard"}
+          </h1>
+          {!hasProfile && (
+            <button
+              onClick={() => setEditingProfile(true)}
+              className="mt-3 text-xs text-green-300 underline underline-offset-2"
+            >
+              Set your handicap
+            </button>
+          )}
+        </div>
+        {profile?.handicapIndex != null ? (
+          <div className="text-center shrink-0">
+            <div className="w-20 h-20 rounded-full bg-white/10 border-2 border-white/20 flex flex-col items-center justify-center">
+              <span className="text-2xl font-black text-white leading-none">{profile.handicapIndex.toFixed(1)}</span>
+              <span className="text-green-300 text-[10px] font-medium mt-0.5 uppercase tracking-wide">HCP</span>
+            </div>
+            <button onClick={() => setEditingProfile(true)} className="text-[11px] text-green-400 mt-1.5 hover:underline">
+              Edit
+            </button>
+          </div>
+        ) : (
+          <div className="text-center shrink-0">
+            <div className="w-20 h-20 rounded-full bg-white/5 border-2 border-dashed border-white/20 flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setEditingProfile(true)}>
+              <span className="text-white/40 text-2xl font-black leading-none">?</span>
+              <span className="text-green-400/60 text-[10px] font-medium mt-0.5 uppercase tracking-wide">HCP</span>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Profile setup / edit */}
-      {(editingProfile || !profile) ? (
+      {/* Profile edit form */}
+      {(editingProfile || (!hasProfile && !editingProfile)) && (
         <div className="bg-white border border-gray-200 rounded-xl px-6 py-5">
           <h2 className="text-sm font-semibold text-gray-900 mb-4">
-            {profile ? "Update your profile" : "Quick setup — takes 10 seconds"}
+            {hasProfile ? "Update your profile" : "Quick setup — takes 10 seconds"}
           </h2>
           <form onSubmit={handleSave} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -225,7 +256,7 @@ function GolferDashboard({
               >
                 {saving ? "Saving…" : "Save"}
               </button>
-              {profile && (
+              {hasProfile && (
                 <button type="button" onClick={() => setEditingProfile(false)} className="text-sm text-gray-400 hover:text-gray-600">
                   Cancel
                 </button>
@@ -233,55 +264,56 @@ function GolferDashboard({
             </div>
           </form>
         </div>
-      ) : (
-        <div className="bg-white border border-gray-200 rounded-xl px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {profile.handicapIndex != null && (
-              <div className="text-center bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
-                <div className="text-2xl font-bold text-green-800">{profile.handicapIndex.toFixed(1)}</div>
-                <div className="text-xs text-green-600 mt-0.5">Handicap</div>
-              </div>
-            )}
-            <div>
-              <p className="font-medium text-gray-900">{profile.homeClub || "No home club set"}</p>
-              <p className="text-sm text-gray-400">Your profile</p>
-            </div>
-          </div>
-          <button onClick={() => setEditingProfile(true)} className="text-sm text-green-700 hover:underline">Edit</button>
-        </div>
       )}
 
-      {/* CTAs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Link
-          href="/games"
-          className="bg-green-700 hover:bg-green-600 text-white rounded-xl p-6 transition-colors"
-        >
-          <Zap size={24} className="mb-3 text-green-300" />
-          <h3 className="font-bold text-lg mb-1">Quick Games</h3>
-          <p className="text-green-200 text-sm">Stableford, betterball, nassau, skins — set a stake and play.</p>
-          <div className="mt-4 flex items-center gap-1 text-green-300 text-sm font-medium">
-            Start a game <ArrowRight size={14} />
-          </div>
-        </Link>
-        <Link
-          href="/pools"
-          className="bg-white border border-gray-200 hover:border-green-400 rounded-xl p-6 transition-colors"
-        >
-          <Trophy size={24} className="mb-3 text-yellow-500" />
-          <h3 className="font-bold text-lg mb-1 text-gray-900">Tour Pools</h3>
-          <p className="text-gray-500 text-sm">Enter sweepstakes for the Masters, The Open, US Open and more.</p>
-          <div className="mt-4 flex items-center gap-1 text-green-700 text-sm font-medium">
-            View pools <ArrowRight size={14} />
-          </div>
-        </Link>
+      {/* Quick actions */}
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Quick actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Link
+            href="/games?new=1"
+            className="flex items-center gap-3 bg-green-700 hover:bg-green-600 text-white rounded-xl px-5 py-4 transition-colors group"
+          >
+            <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
+              <Zap size={18} className="text-white" />
+            </div>
+            <div>
+              <div className="font-semibold text-sm">New game</div>
+              <div className="text-green-200 text-xs">Stableford, nassau &amp; more</div>
+            </div>
+          </Link>
+          <Link
+            href="/games"
+            className="flex items-center gap-3 bg-white border border-gray-200 hover:border-green-400 rounded-xl px-5 py-4 transition-colors"
+          >
+            <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+              <Star size={18} className="text-gray-500" />
+            </div>
+            <div>
+              <div className="font-semibold text-sm text-gray-900">My games</div>
+              <div className="text-gray-400 text-xs">{recentGames.length > 0 ? `${recentGames.length} game${recentGames.length !== 1 ? "s" : ""}` : "No games yet"}</div>
+            </div>
+          </Link>
+          <Link
+            href="/pools"
+            className="flex items-center gap-3 bg-white border border-gray-200 hover:border-green-400 rounded-xl px-5 py-4 transition-colors"
+          >
+            <div className="w-9 h-9 rounded-lg bg-yellow-50 flex items-center justify-center shrink-0">
+              <Trophy size={18} className="text-yellow-500" />
+            </div>
+            <div>
+              <div className="font-semibold text-sm text-gray-900">Tour pools</div>
+              <div className="text-gray-400 text-xs">Masters, The Open &amp; more</div>
+            </div>
+          </Link>
+        </div>
       </div>
 
       {/* Recent games */}
       {recentGames.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold text-gray-900">Recent games</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Recent games</h2>
             <Link href="/games" className="text-sm text-green-700 hover:underline">All games →</Link>
           </div>
           <div className="space-y-2">
@@ -319,20 +351,18 @@ function GolferDashboard({
       )}
 
       {/* Invite club CTA */}
-      <div className="bg-gray-900 rounded-xl px-6 py-5 flex items-start justify-between gap-4">
-        <div>
-          <h3 className="font-semibold text-white mb-1">Is your club on The 19th Hole?</h3>
-          <p className="text-gray-400 text-sm leading-relaxed">
-            If your club uses our platform, you can join and access competitions, interclub results, tee time booking, and more. Ask your club secretary or admin to invite you.
-          </p>
-          <p className="text-gray-400 text-sm mt-2">
-            Not on the platform yet?{" "}
-            <a href="mailto:hello@the19thhole.golf?subject=Club enquiry" className="text-green-400 hover:underline">
-              Let us know
-            </a>{" "}
-            and we'll reach out to your club.
-          </p>
-        </div>
+      <div className="bg-gray-900 rounded-xl px-6 py-5">
+        <h3 className="font-semibold text-white mb-1">Is your club on The 19th Hole?</h3>
+        <p className="text-gray-400 text-sm leading-relaxed">
+          If your club uses our platform, you can join and access competitions, interclub results, tee time booking, and more. Ask your club secretary or admin to invite you.
+        </p>
+        <p className="text-gray-400 text-sm mt-2">
+          Not on the platform yet?{" "}
+          <a href="mailto:hello@the19thhole.golf?subject=Club enquiry" className="text-green-400 hover:underline">
+            Let us know
+          </a>{" "}
+          and we&apos;ll reach out to your club.
+        </p>
       </div>
     </div>
   );
@@ -466,19 +496,8 @@ function AdminDashboard({
         ))}
       </div>
 
-      {/* Invite link */}
-      <section>
-        <h2 className="text-base font-semibold text-gray-900 mb-3">Member invite link</h2>
-        <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
-          <p className="text-sm text-gray-500 mb-3">Share this link so members can find and enter your competitions.</p>
-          <div className="flex items-center gap-3">
-            <code className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-700 font-mono overflow-x-auto whitespace-nowrap">{inviteUrl}</code>
-            <button onClick={onCopyLink} className="shrink-0 px-4 py-2.5 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors">
-              {copied ? "Copied!" : "Copy link"}
-            </button>
-          </div>
-        </div>
-      </section>
+      {/* Invite members */}
+      <InviteSection clubId={club._id} inviteUrl={inviteUrl} copied={copied} onCopyLink={onCopyLink} />
 
       {/* Data import — super admin only */}
       {superAdmin && (
@@ -688,6 +707,109 @@ function MemberDashboard({
         </Link>
       </div>
     </div>
+  );
+}
+
+// ── Invite Section ─────────────────────────────────────────────────────────────
+
+function InviteSection({
+  clubId, inviteUrl, copied, onCopyLink,
+}: {
+  clubId: string;
+  inviteUrl: string;
+  copied: boolean;
+  onCopyLink: () => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const sendInvite = useAction(api.invites.send);
+  const pendingInvites = useQuery(api.invites.listByClub, { clubId: clubId as any });
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setSending(true);
+    setErr(null);
+    try {
+      await sendInvite({ clubId: clubId as any, email: email.trim() });
+      setSent(email.trim());
+      setEmail("");
+    } catch (ex: unknown) {
+      setErr(ex instanceof Error ? ex.message : "Failed to send invite");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <section>
+      <h2 className="text-base font-semibold text-gray-900 mb-3">Invite members</h2>
+      <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
+
+        {/* Email invite */}
+        <div className="px-5 py-4">
+          <p className="text-sm text-gray-500 mb-3">Send a personal invitation — the link is one-time use and expires in 7 days.</p>
+          <form onSubmit={handleSend} className="flex gap-2">
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="member@email.com"
+              required
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <button
+              type="submit"
+              disabled={sending || !email.trim()}
+              className="shrink-0 flex items-center gap-2 px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
+            >
+              <Send size={14} />
+              {sending ? "Sending…" : "Send invite"}
+            </button>
+          </form>
+          {sent && (
+            <p className="text-sm text-green-600 mt-2 flex items-center gap-1">
+              <span>✓</span> Invite sent to {sent}
+            </p>
+          )}
+          {err && <p className="text-sm text-red-500 mt-2">{err}</p>}
+        </div>
+
+        {/* Pending invites */}
+        {pendingInvites && pendingInvites.length > 0 && (
+          <div className="px-5 py-3">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Pending invites</p>
+            <div className="space-y-1.5">
+              {pendingInvites.map(inv => (
+                <div key={inv._id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Mail size={13} className="text-gray-400" />
+                    <span className="text-sm text-gray-700">{inv.email}</span>
+                  </div>
+                  <span className="text-xs text-gray-400">
+                    Expires {new Date(inv.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Public link — secondary option */}
+        <div className="px-5 py-3">
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Public join link</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-xs text-gray-500 font-mono overflow-x-auto whitespace-nowrap">{inviteUrl}</code>
+            <button onClick={onCopyLink} className="shrink-0 px-3 py-2 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-200 transition-colors">
+              {copied ? "Copied!" : "Copy"}
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1.5">Anyone with this link can request to join — requires admin approval.</p>
+        </div>
+      </div>
+    </section>
   );
 }
 
