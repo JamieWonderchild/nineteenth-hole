@@ -4,14 +4,13 @@ import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import { Check, Wallet, TrendingUp, TrendingDown } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 
 export default function ProfilePage() {
   const { user } = useUser();
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
+  const { activeMembership, club } = useActiveClub();
 
   const updateProfile = useMutation(api.clubMembers.updateProfile);
   const recentTransactions = useQuery(

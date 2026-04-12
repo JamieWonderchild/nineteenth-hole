@@ -38,3 +38,5 @@ debug-logs/
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+certificates

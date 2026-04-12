@@ -4,6 +4,7 @@ import { useState, use } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import { ArrowLeft, Plus, Pencil, X, Trophy, Medal, Sparkles, Copy, Check, ClipboardList, ChevronLeft } from "lucide-react";
 import Link from "next/link";
@@ -476,11 +477,8 @@ export default function CompetitionScoresPage({
 }) {
   const { competitionId } = use(params);
   const { user } = useUser();
-
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
+  const { activeMembership, club } = useActiveClub();
   const isAdmin = activeMembership?.role === "admin";
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
 
   const competition = useQuery(api.competitions.get, {
     competitionId: competitionId as Id<"competitions">,

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import { formatCurrency } from "@/lib/format";
 import { ArrowLeft, TrendingUp, Banknote, CreditCard, X } from "lucide-react";
 import Link from "next/link";
@@ -17,10 +17,7 @@ const METHOD_LABELS: Record<string, string> = {
 };
 
 export default function POSSalesPage() {
-  const { user } = useUser();
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
+  const { club } = useActiveClub();
 
   const sales = useQuery(api.pos.listSales, club ? { clubId: club._id } : "skip");
   const summary = useQuery(api.pos.salesSummary, club ? { clubId: club._id } : "skip");

@@ -1,9 +1,9 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
 import { useMemo, useState } from "react";
+import { useActiveClub } from "@/lib/club-context";
 import { formatCurrency } from "@/lib/format";
 import { TrendingUp, TrendingDown, Users, CalendarDays, ShoppingCart, Clock } from "lucide-react";
 
@@ -34,12 +34,8 @@ function pct(curr: number, prev: number) {
 }
 
 export default function AnalyticsPage() {
-  const { user } = useUser();
   const [period, setPeriod] = useState<Period>("30d");
-
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
+  const { club } = useActiveClub();
 
   const sales = useQuery(api.pos.listSales, club ? { clubId: club._id, limit: 1000 } : "skip");
   const members = useQuery(api.clubMembers.listByClub, club ? { clubId: club._id } : "skip");

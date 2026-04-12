@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -361,12 +361,9 @@ function CourseForm({
 }
 
 export default function CoursesPage() {
-  const { user } = useUser();
   const superAdmin = useQuery(api.clubs.isSuperAdmin);
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
+  const { activeMembership, club } = useActiveClub();
   const isAdmin = activeMembership?.role === "admin" || superAdmin === true;
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
   const courses = useQuery(api.courses.listByClub, club ? { clubId: club._id } : "skip");
   const removeCourse = useMutation(api.courses.remove);
 

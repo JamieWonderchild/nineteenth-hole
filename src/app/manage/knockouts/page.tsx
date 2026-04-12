@@ -1,8 +1,8 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import Link from "next/link";
 import { Plus, Trophy, ChevronRight } from "lucide-react";
 
@@ -13,10 +13,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default function KnockoutsPage() {
-  const { user } = useUser();
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
+  const { activeMembership, club } = useActiveClub();
   const tournaments = useQuery(api.knockouts.listByClub, club ? { clubId: club._id } : "skip");
 
   if (!club) {

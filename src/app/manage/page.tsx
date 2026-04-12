@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/format";
@@ -18,13 +19,9 @@ export default function ManagePage() {
     api.clubMembers.listByUser,
     user ? { userId: user.id } : "skip"
   );
-  const activeMembership = memberships?.find(m => m.status === "active");
+  const { activeMembership, club } = useActiveClub();
   const pendingMembership = memberships?.find(m => m.status === "pending");
   const isAdmin = activeMembership?.role === "admin" || superAdmin === true;
-  const club = useQuery(
-    api.clubs.get,
-    activeMembership ? { clubId: activeMembership.clubId } : "skip"
-  );
   const competitions = useQuery(
     api.competitions.listByClub,
     club ? { clubId: club._id } : "skip"

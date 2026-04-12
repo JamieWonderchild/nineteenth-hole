@@ -5,16 +5,14 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import { Check, X, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 export default function NewKnockoutPage() {
   const { user } = useUser();
   const router = useRouter();
-
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active" && m.role === "admin");
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
+  const { activeMembership, club } = useActiveClub();
   const members = useQuery(api.clubMembers.listByClub, club ? { clubId: club._id } : "skip");
   const createKnockout = useMutation(api.knockouts.create);
 

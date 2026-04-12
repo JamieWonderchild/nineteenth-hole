@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useAction } from "convex/react";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import { Send, Mail, Users, ChevronDown } from "lucide-react";
 
 const FILTERS = [
@@ -24,9 +25,7 @@ function timeAgo(iso: string) {
 
 export default function CommsPage() {
   const { user } = useUser();
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
+  const { club } = useActiveClub();
   const history = useQuery(api.communications.listByClub, club ? { clubId: club._id } : "skip");
   const sendBulkEmail = useAction(api.communications.sendBulkEmail);
 

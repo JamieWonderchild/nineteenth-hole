@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import Link from "next/link";
 import { Plus, Trophy } from "lucide-react";
 import {
@@ -155,12 +155,9 @@ function NewSeriesModal({
 }
 
 export default function SeriesListPage() {
-  const { user } = useUser();
   const superAdmin = useQuery(api.clubs.isSuperAdmin);
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
+  const { activeMembership, club } = useActiveClub();
   const isAdmin = activeMembership?.role === "admin" || superAdmin === true;
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
   const seriesList = useQuery(api.series.listByClub, club ? { clubId: club._id } : "skip");
   const [modalOpen, setModalOpen] = useState(false);
 

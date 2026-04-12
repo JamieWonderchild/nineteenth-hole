@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, use } from "react";
-import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import { ArrowLeft, Trophy, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
@@ -146,11 +146,8 @@ export default function KnockoutDetailPage({
   params: Promise<{ tournamentId: string }>;
 }) {
   const { tournamentId } = use(params);
-  const { user } = useUser();
   const router = useRouter();
-
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
+  const { activeMembership } = useActiveClub();
   const isAdmin = activeMembership?.role === "admin";
 
   const tournament = useQuery(api.knockouts.get, { tournamentId: tournamentId as Id<"knockoutTournaments"> });

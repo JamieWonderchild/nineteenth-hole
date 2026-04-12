@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
 import { ShoppingCart, Minus, Plus, X, Check, CreditCard, Banknote, Trash2, Monitor } from "lucide-react";
@@ -36,10 +36,7 @@ const PAYMENT_METHODS = [
 ];
 
 export default function POSPage() {
-  const { user } = useUser();
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
+  const { club } = useActiveClub();
 
   const categories = useQuery(api.pos.listCategories, club ? { clubId: club._id } : "skip");
   const products = useQuery(api.pos.listProducts, club ? { clubId: club._id } : "skip");

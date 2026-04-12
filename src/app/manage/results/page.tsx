@@ -1,27 +1,17 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
 import Link from "next/link";
 import { Plus, Trophy } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
+import { useActiveClub } from "@/lib/club-context";
 
 const STATUS_ORDER: Record<string, number> = { live: 0, open: 1, draft: 2, complete: 3 };
 
 export default function ResultsPage() {
-  const { user } = useUser();
-
-  const memberships = useQuery(
-    api.clubMembers.listByUser,
-    user ? { userId: user.id } : "skip"
-  );
-  const activeMembership = memberships?.find(m => m.status === "active");
+  const { activeMembership, club } = useActiveClub();
   const isAdmin = activeMembership?.role === "admin";
-  const club = useQuery(
-    api.clubs.get,
-    activeMembership ? { clubId: activeMembership.clubId } : "skip"
-  );
   const competitions = useQuery(
     api.competitions.listByClub,
     club ? { clubId: club._id } : "skip"

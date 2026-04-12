@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
 import { Search, Wallet, TrendingUp, TrendingDown, Plus, ChevronLeft, X, RefreshCw } from "lucide-react";
@@ -193,10 +193,7 @@ function MemberDetail({
 }
 
 export default function AccountsPage() {
-  const { user } = useUser();
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
+  const { activeMembership, club } = useActiveClub();
   const members = useQuery(api.memberAccounts.listBalances, club ? { clubId: club._id } : "skip");
 
   const [search, setSearch] = useState("");

@@ -2,9 +2,9 @@
 
 import { useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import { ArrowLeft, Plus, X, Check, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -221,10 +221,7 @@ function MatchRow({
 
 export default function FixturePage({ params }: { params: Promise<{ leagueId: string; fixtureId: string }> }) {
   const { leagueId, fixtureId } = use(params);
-  const { user } = useUser();
-
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
+  const { activeMembership } = useActiveClub();
   const isAdmin = activeMembership?.role === "admin";
 
   const fixture = useQuery(api.interclub.getFixture, { fixtureId: fixtureId as Id<"interclubFixtures"> });

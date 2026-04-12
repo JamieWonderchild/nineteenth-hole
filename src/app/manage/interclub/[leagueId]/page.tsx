@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, use } from "react";
-import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import { ArrowLeft, Plus, X, Calendar, Shield, Search, MapPin, PlusCircle, Pencil, Check, Settings } from "lucide-react";
 import Link from "next/link";
@@ -336,11 +336,8 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function LeaguePage({ params }: { params: Promise<{ leagueId: string }> }) {
   const { leagueId } = use(params);
-  const { user } = useUser();
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
+  const { activeMembership, club } = useActiveClub();
   const isAdmin = activeMembership?.role === "admin";
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
 
   const league = useQuery(api.interclub.getLeague, { leagueId: leagueId as Id<"interclubLeagues"> });
   const teams = useQuery(api.interclub.listTeams, { leagueId: leagueId as Id<"interclubLeagues"> });

@@ -3,7 +3,6 @@
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
-import type { Id } from "convex/_generated/dataModel";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -14,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { useClubContext, useActiveClub } from "@/lib/club-context";
 
 function NavItem({
   href, icon, label, active, onClick
@@ -49,40 +49,23 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
   const { signOut } = useClerk();
   const pathname = usePathname();
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const superAdmin = useQuery(api.clubs.isSuperAdmin);
-  const myClubs = useQuery(api.clubMembers.myActiveClubs);
-
-  // Persist selected club across page loads
-  const [selectedClubId, setSelectedClubId] = useState<Id<"clubs"> | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("selectedClubId") as Id<"clubs"> | null;
-    if (stored) setSelectedClubId(stored);
-  }, []);
+  const superAdmin = useQuery(api.clubs.isSuperAdmin);
+  const { activeMembership, club, myClubs, selectedClubId } = useActiveClub();
+  const { setSelectedClubId } = useClubContext();
 
   // Close dropdown on outside click
   useEffect(() => {
+    if (!switcherOpen) return;
     function handleClick(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setSwitcherOpen(false);
       }
     }
-    if (switcherOpen) document.addEventListener("mousedown", handleClick);
+    document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [switcherOpen]);
-
-  const activeMembership = (() => {
-    if (!myClubs?.length) return undefined;
-    if (selectedClubId) {
-      const match = myClubs.find(c => c.club._id === selectedClubId);
-      if (match) return match.membership;
-    }
-    return myClubs[0].membership;
-  })();
-
-  const club = myClubs?.find(c => c.membership._id === activeMembership?._id)?.club ?? null;
 
   const isAdmin = activeMembership?.role === "admin" || superAdmin === true;
   const isStaff = activeMembership?.role === "staff" || isAdmin;
@@ -102,11 +85,10 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
 
   const is = (path: string) => pathname === path;
 
-  const multiClub = (myClubs?.length ?? 0) > 1;
+  const multiClub = myClubs.length > 1;
 
-  function selectClub(clubId: Id<"clubs">) {
+  function selectClub(clubId: typeof myClubs[0]["club"]["_id"]) {
     setSelectedClubId(clubId);
-    localStorage.setItem("selectedClubId", clubId);
     setSwitcherOpen(false);
   }
 
@@ -135,7 +117,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
 
         {switcherOpen && multiClub && (
           <div className="absolute top-full left-0 right-0 z-50 bg-card border border-border rounded-b-lg shadow-lg overflow-hidden">
-            {myClubs!.map(({ membership, club: c }) => (
+            {myClubs.map(({ membership, club: c }) => (
               <button
                 key={c._id}
                 onClick={() => selectClub(c._id)}

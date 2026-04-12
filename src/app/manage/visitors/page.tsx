@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import { formatCurrency } from "@/lib/format";
 import { Plus, X, Check, UserCheck } from "lucide-react";
 
@@ -132,9 +133,7 @@ function LogVisitorModal({
 
 export default function VisitorsPage() {
   const { user } = useUser();
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
+  const { club } = useActiveClub();
   const visitors = useQuery(api.visitors.listByClub, club ? { clubId: club._id } : "skip");
   const markPaid = useMutation(api.visitors.markPaid);
   const removeVisitor = useMutation(api.visitors.remove);

@@ -1,8 +1,6 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
-import { useQuery } from "convex/react";
-import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 import { CheckCircle, AlertTriangle, XCircle, CreditCard, Mail } from "lucide-react";
 
 const PLAN_FEATURES: Record<string, string[]> = {
@@ -47,10 +45,7 @@ function statusInfo(status: string) {
 }
 
 export default function BillingPage() {
-  const { user } = useUser();
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
+  const { club } = useActiveClub();
 
   if (!club) {
     return (

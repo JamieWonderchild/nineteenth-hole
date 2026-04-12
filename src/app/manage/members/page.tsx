@@ -5,6 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const clubMembersApi = api.clubMembers as any;
 import type { Id } from "convex/_generated/dataModel";
@@ -467,11 +468,9 @@ export default function MembersPage() {
   const router = useRouter();
 
   const superAdmin = useQuery(api.clubs.isSuperAdmin);
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
+  const { activeMembership, club } = useActiveClub();
   const isAdmin = activeMembership?.role === "admin" || superAdmin === true;
   const isSuperAdmin = superAdmin === true;
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
   const members = useQuery(api.clubMembers.listByClub, club ? { clubId: club._id } : "skip") as Member[] | undefined;
   const pending = useQuery(api.clubMembers.listPending, (club && isAdmin) ? { clubId: club._id } : "skip");
   const categories = (useQuery(api.membershipCategories.listByClub, club ? { clubId: club._id } : "skip") ?? []) as Category[];
