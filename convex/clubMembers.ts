@@ -17,6 +17,26 @@ export const listByUser = query({
   },
 });
 
+export const myActiveClubs = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const memberships = await ctx.db
+      .query("clubMembers")
+      .withIndex("by_user", q => q.eq("userId", identity.subject))
+      .collect();
+    const active = memberships.filter(m => m.status === "active");
+    const results = await Promise.all(
+      active.map(async (m) => {
+        const club = await ctx.db.get(m.clubId);
+        return club ? { membership: m, club } : null;
+      })
+    );
+    return results.filter((r): r is NonNullable<typeof r> => r !== null);
+  },
+});
+
 export const getByClubAndUser = query({
   args: { clubId: v.id("clubs"), userId: v.string() },
   handler: async (ctx, { clubId, userId }) => {
