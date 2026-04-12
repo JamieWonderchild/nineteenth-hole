@@ -18,8 +18,12 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Play The Pool",
-  description: "Golf sweepstake pools for every competition",
+  title: "The 19th Hole",
+  description: "The modern platform for golf clubs and players.",
+  openGraph: {
+    siteName: "The 19th Hole",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
