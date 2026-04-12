@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, LogOut,
   Globe, ChevronRight, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered, Clock, MapPin,
-  MessageSquare, BookUser, Mail, Swords, UserCheck, ShoppingCart, Shield, CreditCard, UserCircle, BarChart2, Wallet
+  MessageSquare, Mail, Swords, UserCheck, ShoppingCart, Shield, CreditCard, UserCircle, BarChart2, Wallet
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -136,16 +136,13 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
 
             {/* Club */}
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-3 pt-4 pb-1">Club</p>
-            {isAdmin && (
-              <NavItem
-                href="/manage/members"
-                icon={<Users size={16} />}
-                label={pending?.length ? `Members (${pending.length})` : "Members"}
-                active={is("/manage/members")}
-                onClick={onNav}
-              />
-            )}
-            <NavItem href="/manage/directory" icon={<BookUser size={16} />} label="Member Directory" active={pathname.startsWith("/manage/directory")} onClick={onNav} />
+            <NavItem
+              href="/manage/members"
+              icon={<Users size={16} />}
+              label={isAdmin && pending?.length ? `Members (${pending.length})` : "Members"}
+              active={is("/manage/members")}
+              onClick={onNav}
+            />
             {isAdmin ? (
               <NavItem href="/manage/tee-times" icon={<Clock size={16} />} label="Tee Times" active={pathname.startsWith("/manage/tee-times")} onClick={onNav} />
             ) : (

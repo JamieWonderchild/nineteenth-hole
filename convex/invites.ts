@@ -44,12 +44,16 @@ async function sendInviteEmail(opts: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: `${opts.clubName} <noreply@nineteenth.golf>`,
+      from: `${opts.clubName} <noreply@playthepool.golf>`,
       to: opts.to,
       subject: `You've been invited to join ${opts.clubName}`,
       html,
     }),
   });
+  if (!res.ok) {
+    const body = await res.text();
+    console.error("Resend error", res.status, body);
+  }
   return res.ok;
 }
 
@@ -137,8 +141,9 @@ export const send = action({
       expiresAt,
     });
 
-    const inviteUrl = `https://the19thhole.golf/invite/${token}`;
-    await sendInviteEmail({ to: email, clubName: club.name, inviteUrl });
+    const inviteUrl = `https://playthepool.golf/invite/${token}`;
+    const sent = await sendInviteEmail({ to: email, clubName: club.name, inviteUrl });
+    if (!sent) throw new Error("Invite saved but email failed to send — check RESEND_API_KEY in Convex env vars");
   },
 });
 

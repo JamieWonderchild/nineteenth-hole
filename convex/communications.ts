@@ -30,7 +30,7 @@ async function sendViaResend(opts: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: `${opts.fromName} <noreply@nineteenth.golf>`,
+      from: `${opts.fromName} <noreply@playthepool.golf>`,
       to: opts.to,
       subject: opts.subject,
       html: opts.html,
