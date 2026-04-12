@@ -109,7 +109,11 @@ export const getCompetitions = query({
 });
 
 // Finchley Race to Swinley Forest standings
-// Formula: best-3 Majors + best-4 Medals + best-4 Stablefords×2 + all Knockouts + all Trophies
+// Formula: best-3 Majors + best-4 Medals + best-4 Stablefords + all Knockouts + all Trophies
+//
+// Source tables:
+//   club_comp  → competitionScores (stableford/medal events at Finchley)
+//   pool/sweep → entries (sweepstake draws, e.g. Masters Pool)
 export const computeStandings = query({
   args: { seriesId: v.id("series") },
   handler: async (ctx, { seriesId }) => {
@@ -119,7 +123,7 @@ export const computeStandings = query({
       .collect();
 
     type MemberAccum = {
-      userId: string;
+      userId?: string;         // undefined for guest/display-name-only entries
       displayName: string;
       majorScores: number[];
       medalScores: number[];
@@ -129,46 +133,83 @@ export const computeStandings = query({
       competitionsPlayed: number;
     };
 
+    // Key: userId if present, else displayName
     const memberMap = new Map<string, MemberAccum>();
+
+    function accum(key: string, userId: string | undefined, displayName: string) {
+      if (!memberMap.has(key)) {
+        memberMap.set(key, {
+          userId,
+          displayName,
+          majorScores: [],
+          medalScores: [],
+          stablefordScores: [],
+          knockoutTotal: 0,
+          trophyTotal: 0,
+          competitionsPlayed: 0,
+        });
+      }
+      return memberMap.get(key)!;
+    }
 
     for (const link of links) {
       const comp = await ctx.db.get(link.competitionId);
       if (!comp || comp.status !== "complete") continue;
 
-      const allEntries = await ctx.db
-        .query("entries")
-        .withIndex("by_competition", q => q.eq("competitionId", link.competitionId))
-        .collect();
-
-      const paidEntries = allEntries.filter(e => e.paidAt && e.leaderboardPosition != null);
-      const N = paidEntries.length;
       const category = link.category;
       const isPairsEvent = link.isPairsEvent ?? false;
 
-      for (const entry of paidEntries) {
-        const pos = entry.leaderboardPosition!;
-        const pts = calcPoints(pos, N, category, isPairsEvent);
+      if (comp.type === "club_comp") {
+        // ── Club competition: scores in competitionScores ──────────────────
+        const scores = await ctx.db
+          .query("competitionScores")
+          .withIndex("by_competition", q => q.eq("competitionId", link.competitionId))
+          .collect();
 
-        if (!memberMap.has(entry.userId)) {
-          memberMap.set(entry.userId, {
-            userId: entry.userId,
-            displayName: entry.displayName,
-            majorScores: [],
-            medalScores: [],
-            stablefordScores: [],
-            knockoutTotal: 0,
-            trophyTotal: 0,
-            competitionsPlayed: 0,
-          });
+        // Sort by stablefordPoints desc (or netScore asc for strokeplay) to derive positions
+        const format = comp.scoringFormat ?? "stableford";
+        const sorted = [...scores].sort((a, b) =>
+          format === "stableford"
+            ? (b.stablefordPoints ?? 0) - (a.stablefordPoints ?? 0)
+            : (a.netScore ?? a.grossScore ?? 999) - (b.netScore ?? b.grossScore ?? 999)
+        );
+        const N = sorted.length;
+
+        sorted.forEach((score, idx) => {
+          // Respect pre-stored position if present, else derive from sort order (1-based)
+          const pos = score.position ?? (idx + 1);
+          const pts = calcPoints(pos, N, category, isPairsEvent);
+          const key = score.userId ?? score.displayName;
+          const m = accum(key, score.userId, score.displayName);
+          m.competitionsPlayed++;
+          if (category === "major") m.majorScores.push(pts);
+          else if (category === "medal") m.medalScores.push(pts);
+          else if (category === "stableford") m.stablefordScores.push(pts);
+          else if (category === "knockout") m.knockoutTotal += pts;
+          else if (category === "trophy") m.trophyTotal += pts;
+        });
+
+      } else {
+        // ── Pool/sweep competition: entries table ──────────────────────────
+        const allEntries = await ctx.db
+          .query("entries")
+          .withIndex("by_competition", q => q.eq("competitionId", link.competitionId))
+          .collect();
+
+        const paidEntries = allEntries.filter(e => e.paidAt && e.leaderboardPosition != null);
+        const N = paidEntries.length;
+
+        for (const entry of paidEntries) {
+          const pos = entry.leaderboardPosition!;
+          const pts = calcPoints(pos, N, category, isPairsEvent);
+          const m = accum(entry.userId, entry.userId, entry.displayName);
+          m.competitionsPlayed++;
+          if (category === "major") m.majorScores.push(pts);
+          else if (category === "medal") m.medalScores.push(pts);
+          else if (category === "stableford") m.stablefordScores.push(pts);
+          else if (category === "knockout") m.knockoutTotal += pts;
+          else if (category === "trophy") m.trophyTotal += pts;
         }
-        const m = memberMap.get(entry.userId)!;
-        m.competitionsPlayed++;
-
-        if (category === "major") m.majorScores.push(pts);
-        else if (category === "medal") m.medalScores.push(pts);
-        else if (category === "stableford") m.stablefordScores.push(pts);
-        else if (category === "knockout") m.knockoutTotal += pts;
-        else if (category === "trophy") m.trophyTotal += pts;
       }
     }
 
