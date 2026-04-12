@@ -10,6 +10,8 @@ import { useActiveClub } from "@/lib/club-context";
 const clubMembersApi = api.clubMembers as any;
 import type { Id } from "convex/_generated/dataModel";
 import { Pencil, Check, X, Search, MessageSquare, Edit2, Phone, Mail, User, Tag, Plus, Trash2 } from "lucide-react";
+import { AIAssistant } from "@/components/AIAssistant";
+import type { CapabilityId } from "@/lib/ai-capabilities";
 
 type Category = {
   _id: Id<"membershipCategories">;
@@ -475,6 +477,7 @@ export default function MembersPage() {
   const pending = useQuery(api.clubMembers.listPending, (club && isAdmin) ? { clubId: club._id } : "skip");
   const categories = (useQuery(api.membershipCategories.listByClub, club ? { clubId: club._id } : "skip") ?? []) as Category[];
 
+  const bulkPreRegister = useMutation(api.clubMembers.bulkPreRegister);
   const approveMember = useMutation(api.clubMembers.approveMember);
   const rejectMember = useMutation(api.clubMembers.rejectMember);
   const deleteMember = useMutation(api.clubMembers.deleteMember);
@@ -696,6 +699,35 @@ export default function MembersPage() {
 
       {editingProfile && myMember && (
         <EditProfileModal member={myMember} clubId={club._id} onClose={() => setEditingProfile(false)} />
+      )}
+
+      {isAdmin && club && (
+        <AIAssistant
+          allowedCapabilities={["member-import"]}
+          context={{
+            clubName: club.name,
+            existingMemberCount: members?.length ?? 0,
+          }}
+          onConfirm={async (_capabilityId: CapabilityId, data: Record<string, unknown>) => {
+            const importedMembers = (data as { members?: Array<{ firstName: string; lastName: string; email?: string; handicap?: number; membershipCategory?: string; phone?: string }> }).members ?? [];
+            if (!importedMembers.length) return;
+            try {
+              const result = await bulkPreRegister({
+                clubId: club._id,
+                members: importedMembers.map(m => ({
+                  displayName: `${m.firstName} ${m.lastName}`.trim(),
+                  email: m.email ?? undefined,
+                  handicap: m.handicap ?? undefined,
+                  membershipCategory: m.membershipCategory ?? undefined,
+                  phone: m.phone ?? undefined,
+                })),
+              });
+              alert(`Imported ${result.created} member${result.created === 1 ? "" : "s"}${result.skipped ? `, skipped ${result.skipped} duplicates` : ""}`);
+            } catch (e) {
+              alert("Import failed: " + (e instanceof Error ? e.message : "Unknown error"));
+            }
+          }}
+        />
       )}
     </div>
   );

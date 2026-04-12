@@ -441,6 +441,74 @@ export const listNonMembers = action({
   },
 });
 
+// ── AI bulk member pre-registration ──────────────────────────────────────────
+
+export const bulkPreRegister = mutation({
+  args: {
+    clubId: v.id("clubs"),
+    members: v.array(v.object({
+      displayName: v.string(),
+      email: v.optional(v.string()),
+      handicap: v.optional(v.number()),
+      membershipCategory: v.optional(v.string()),
+      phone: v.optional(v.string()),
+    })),
+  },
+  handler: async (ctx, { clubId, members }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+    if (!isSuperAdmin) {
+      const caller = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", clubId).eq("userId", identity.subject))
+        .unique();
+      if (!caller || caller.role !== "admin") throw new Error("Not authorised");
+    }
+
+    const now = new Date().toISOString();
+    let created = 0;
+    let skipped = 0;
+
+    for (const m of members) {
+      // Skip if a member with this email already exists in the club
+      if (m.email) {
+        const existing = await ctx.db
+          .query("clubMembers")
+          .withIndex("by_club", q => q.eq("clubId", clubId))
+          .filter(q => q.eq(q.field("email"), m.email))
+          .first();
+        if (existing) { skipped++; continue; }
+      }
+
+      // Synthetic userId — replaced when the member redeems an invite and signs in
+      const syntheticUserId = `pre_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+
+      await ctx.db.insert("clubMembers", {
+        clubId,
+        userId: syntheticUserId,
+        displayName: m.displayName,
+        email: m.email,
+        phone: m.phone,
+        handicap: m.handicap,
+        membershipCategory: m.membershipCategory,
+        role: "member",
+        status: "active",
+        totalEntered: 0,
+        totalSpent: 0,
+        totalWon: 0,
+        totalProfit: 0,
+        joinedAt: now,
+        updatedAt: now,
+      });
+      created++;
+    }
+
+    return { created, skipped };
+  },
+});
+
 // Super admin: add a known user (by userId) directly to a club
 export const addMemberById = action({
   args: {

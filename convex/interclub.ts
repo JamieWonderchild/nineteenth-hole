@@ -401,3 +401,40 @@ export const standings = query({
     }).map((s, i) => ({ ...s, position: i + 1, points: s.matchPointsFor }));
   },
 });
+
+// ── AI bulk fixture import ─────────────────────────────────────────────────────
+
+export const bulkCreateFixtures = mutation({
+  args: {
+    leagueId: v.id("interclubLeagues"),
+    fixtures: v.array(v.object({
+      homeTeamId: v.id("interclubTeams"),
+      awayTeamId: v.id("interclubTeams"),
+      date: v.optional(v.string()),
+      time: v.optional(v.string()),
+      venue: v.optional(v.string()),
+    })),
+  },
+  handler: async (ctx, { leagueId, fixtures }) => {
+    const identity = await getIdentity(ctx);
+    if (!isSuperAdmin(identity.email)) {
+      await assertCanManageLeague(ctx, leagueId);
+    }
+    const now = new Date().toISOString();
+    const ids = await Promise.all(
+      fixtures.map(f =>
+        ctx.db.insert("interclubFixtures", {
+          leagueId,
+          homeTeamId: f.homeTeamId,
+          awayTeamId: f.awayTeamId,
+          date: f.date,
+          venue: f.venue ?? (f.time ? `${f.venue ?? ""} ${f.time}`.trim() : undefined),
+          status: "scheduled",
+          createdAt: now,
+          updatedAt: now,
+        })
+      )
+    );
+    return { created: ids.length };
+  },
+});

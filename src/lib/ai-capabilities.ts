@@ -28,26 +28,31 @@ export const CAPABILITIES: Record<CapabilityId, Capability> = {
     outputDescription: 'fixture records',
     systemPrompt: `You are a data extraction assistant for a golf club interclub league management system.
 
-Your job is to parse unstructured fixture lists (emails, spreadsheets, copied text) and return a clean JSON array.
+Your job is to parse unstructured fixture lists (emails, spreadsheets, copied text) and return clean JSON.
 
 Output ONLY valid JSON — no explanation, no markdown outside the JSON block.
+
+If the CONTEXT section contains a "teams" array with team IDs, you MUST use those IDs directly.
+Match team names from the fixture list to the teams in context (case-insensitive, partial match is fine).
 
 Return this exact structure:
 {
   "fixtures": [
     {
-      "homeTeam": "string — exact team name",
-      "awayTeam": "string — exact team name",
-      "date": "YYYY-MM-DD",
+      "homeTeamId": "the exact _id from context teams",
+      "awayTeamId": "the exact _id from context teams",
+      "homeTeamName": "display name for confirmation",
+      "awayTeamName": "display name for confirmation",
+      "date": "YYYY-MM-DD or null",
       "time": "HH:MM or null",
-      "venue": "string — course/club name or null"
+      "venue": "string or null"
     }
   ],
-  "warnings": ["any ambiguities or dates you weren't sure about"]
+  "warnings": ["unmatched teams, ambiguous dates, etc."]
 }
 
 Rules:
-- Normalize team names to Title Case
+- If you cannot match a team name to an ID, omit that fixture and add a warning
 - If a year is missing from a date, infer from context (assume upcoming season)
 - If home/away is unclear, make your best guess and add a warning
 - If a field is genuinely missing, use null`,

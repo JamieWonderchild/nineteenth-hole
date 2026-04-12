@@ -7,6 +7,7 @@ import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import { ArrowLeft, Plus, X, Calendar, Shield, Search, MapPin, PlusCircle, Pencil, Check, Settings } from "lucide-react";
 import Link from "next/link";
+import { AIAssistant } from "@/components/AIAssistant";
 
 type Team = {
   _id: Id<"interclubTeams">;
@@ -345,6 +346,7 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
   const table = useQuery(api.interclub.standings, { leagueId: leagueId as Id<"interclubLeagues"> });
 
   const updateLeague = useMutation(api.interclub.updateLeague);
+  const bulkCreateFixtures = useMutation(api.interclub.bulkCreateFixtures);
   const [tab, setTab] = useState<"fixtures" | "table" | "teams">("fixtures");
   const [showAddTeam, setShowAddTeam] = useState(false);
   const [showNewFixture, setShowNewFixture] = useState(false);
@@ -559,6 +561,39 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
           teams={teams}
           myTeamId={myTeam?._id}
           onClose={() => setShowNewFixture(false)}
+        />
+      )}
+
+      {isAdmin && (
+        <AIAssistant
+          allowedCapabilities={["fixture-import"]}
+          context={{
+            teams: (teams ?? []).map((t: { _id: string; teamName: string; clubName: string }) => ({
+              id: t._id,
+              name: t.teamName,
+              club: t.clubName,
+            })),
+          }}
+          onConfirm={async (capabilityId, data) => {
+            if (capabilityId !== "fixture-import") return;
+            const fixtures = (data as { fixtures?: Array<{ homeTeamId: string; awayTeamId: string; date?: string; time?: string; venue?: string }> }).fixtures ?? [];
+            if (!fixtures.length) return;
+            try {
+              const result = await bulkCreateFixtures({
+                leagueId,
+                fixtures: fixtures.map(f => ({
+                  homeTeamId: f.homeTeamId as Id<"interclubTeams">,
+                  awayTeamId: f.awayTeamId as Id<"interclubTeams">,
+                  date: f.date ?? undefined,
+                  time: f.time ?? undefined,
+                  venue: f.venue ?? undefined,
+                })),
+              });
+              alert(`Created ${result.created} fixture${result.created === 1 ? "" : "s"}`);
+            } catch (e) {
+              alert("Import failed: " + (e instanceof Error ? e.message : "Unknown error"));
+            }
+          }}
         />
       )}
     </div>
