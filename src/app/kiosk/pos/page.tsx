@@ -7,7 +7,8 @@ import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
 import { X, ChevronLeft, Search, UserCircle, Check, Lock, ArrowLeft, Maximize, Minimize } from "lucide-react";
-import { PinPad, HiddenManagerTrigger } from "@/components/kiosk/PinLock";
+
+import { PinPad } from "@/components/kiosk/PinLock";
 import Link from "next/link";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -266,7 +267,11 @@ export default function KioskPOS() {
     api.posLocations.getKioskById,
     kioskId ? { kioskId } : "skip"
   );
+  // locked = kiosk is in staff-only mode (PIN required for manager access)
+  // managerUnlocked = PIN was just entered, manager controls visible
+  const [isLocked, setIsLocked] = useState(false);
   const [showPinPad, setShowPinPad] = useState(false);
+  const [pinMode, setPinMode] = useState<"lock" | "unlock">("unlock");
   const [managerUnlocked, setManagerUnlocked] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -274,34 +279,73 @@ export default function KioskPOS() {
   useEffect(() => {
     function onFsChange() {
       setIsFullscreen(!!document.fullscreenElement);
+      // If user exits fullscreen via Escape, unlock the kiosk
+      if (!document.fullscreenElement) {
+        setIsLocked(false);
+        setManagerUnlocked(false);
+      }
     }
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
 
-  function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
+  function enterFullscreen() {
+    document.documentElement.requestFullscreen().catch(() => {});
   }
+
+  function exitFullscreen() {
+    document.exitFullscreen().catch(() => {});
+  }
+
+  // "Lock & Fullscreen" — go fullscreen then show PIN to confirm lock
+  function handleLockAndFullscreen() {
+    enterFullscreen();
+    setPinMode("lock");
+    setShowPinPad(true);
+  }
+
+  // Manager button — show PIN to unlock manager mode
+  function handleManagerRequest() {
+    setPinMode("unlock");
+    setShowPinPad(true);
+  }
+
+  // PIN verified — behaviour depends on which mode triggered it
+  const handlePinVerified = useCallback(() => {
+    setShowPinPad(false);
+    if (pinMode === "lock") {
+      // Manager confirmed the lock — hand off to staff
+      setIsLocked(true);
+      setManagerUnlocked(false);
+    } else {
+      // Manager unlocked — show manager controls
+      setManagerUnlocked(true);
+      setIsLocked(false);
+    }
+  }, [pinMode]);
+
+  // Lock again (from manager mode)
+  const handleRelock = useCallback(() => {
+    setManagerUnlocked(false);
+    setIsLocked(true);
+  }, []);
+
+  // Fully exit kiosk mode
+  const handleExit = useCallback(() => {
+    setManagerUnlocked(false);
+    setIsLocked(false);
+    exitFullscreen();
+  }, []);
 
   // Auto-relock after 5 minutes of manager mode
   useEffect(() => {
     if (!managerUnlocked) return;
-    const t = setTimeout(() => setManagerUnlocked(false), 5 * 60 * 1000);
+    const t = setTimeout(() => {
+      setManagerUnlocked(false);
+      setIsLocked(true);
+    }, 5 * 60 * 1000);
     return () => clearTimeout(t);
   }, [managerUnlocked]);
-
-  const handleUnlocked = useCallback(() => {
-    setManagerUnlocked(true);
-    setShowPinPad(false);
-  }, []);
-
-  const handleLock = useCallback(() => {
-    setManagerUnlocked(false);
-  }, []);
 
   // ── Active shift for this kiosk's location ──────────────────────────────────
   // Looks up the open shift for the location this kiosk is assigned to.
@@ -427,18 +471,17 @@ export default function KioskPOS() {
   return (
     <div className="flex h-full overflow-hidden relative">
 
-      {/* ── Hidden triple-tap trigger (top-right corner) ─────────────── */}
-      {kioskId && !managerUnlocked && (
-        <HiddenManagerTrigger onTripleTap={() => setShowPinPad(true)} />
-      )}
-
       {/* ── PIN pad overlay ───────────────────────────────────────────── */}
       {kioskId && (
         <PinPad
           kioskId={kioskId}
           visible={showPinPad}
-          onUnlocked={handleUnlocked}
-          onDismiss={() => setShowPinPad(false)}
+          onUnlocked={handlePinVerified}
+          onDismiss={() => {
+            setShowPinPad(false);
+            // If they cancel out of the lock flow, exit fullscreen too
+            if (pinMode === "lock") exitFullscreen();
+          }}
         />
       )}
 
@@ -448,8 +491,8 @@ export default function KioskPOS() {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 bg-gray-900 shrink-0">
           <div className="flex items-center gap-4">
-            {/* Back to manage — only when NOT in locked kiosk mode */}
-            {!kioskId && (
+            {/* Back to manage — only when not locked */}
+            {!isLocked && !managerUnlocked && (
               <Link
                 href="/manage/pos"
                 className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors border border-gray-700"
@@ -464,8 +507,9 @@ export default function KioskPOS() {
               </p>
             </div>
           </div>
+
           <div className="flex items-center gap-3">
-            {/* Shift status indicator — only shown when kiosk is registered */}
+            {/* Shift status */}
             {kioskData && (
               openShift
                 ? <span className="text-[11px] text-green-500 font-medium flex items-center gap-1">
@@ -477,17 +521,39 @@ export default function KioskPOS() {
                     No shift
                   </span>
             )}
-            {/* Fullscreen toggle — always visible (kiosk or not) */}
-            <button
-              onClick={toggleFullscreen}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors border border-gray-700"
-              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-            >
-              {isFullscreen ? <Minimize size={12} /> : <Maximize size={12} />}
-              {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-            </button>
 
-            {/* Manager mode chip — shown when unlocked */}
+            {/* ── STATE 1: Unlocked (just landed on page, no kiosk PIN yet entered) ── */}
+            {kioskId && !isLocked && !managerUnlocked && (
+              <button
+                onClick={handleLockAndFullscreen}
+                className="flex items-center gap-1.5 text-xs px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-semibold transition-colors"
+              >
+                <Lock size={13} /> Lock &amp; Go Fullscreen
+              </button>
+            )}
+
+            {/* Fullscreen button when no kiosk ID (preview/admin mode) */}
+            {!kioskId && (
+              <button
+                onClick={isFullscreen ? exitFullscreen : enterFullscreen}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors border border-gray-700"
+              >
+                {isFullscreen ? <Minimize size={12} /> : <Maximize size={12} />}
+                {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              </button>
+            )}
+
+            {/* ── STATE 2: Locked (staff mode) — show small Manager button ── */}
+            {isLocked && !managerUnlocked && (
+              <button
+                onClick={handleManagerRequest}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 rounded-lg font-medium transition-colors border border-gray-700"
+              >
+                <Lock size={12} /> Manager
+              </button>
+            )}
+
+            {/* ── STATE 3: Manager unlocked — show full manager controls ── */}
             {managerUnlocked && (
               <div className="flex items-center gap-2">
                 <Link
@@ -499,18 +565,26 @@ export default function KioskPOS() {
                 <Link
                   href="/manage/pos"
                   className="text-xs px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium transition-colors border border-gray-600"
+                  onClick={handleExit}
                 >
-                  ← Manage
+                  ← Back to Manage
                 </Link>
                 <button
-                  onClick={handleLock}
+                  onClick={isFullscreen ? exitFullscreen : enterFullscreen}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors border border-gray-700"
-                  title="Lock kiosk"
+                >
+                  {isFullscreen ? <Minimize size={12} /> : <Maximize size={12} />}
+                  {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                </button>
+                <button
+                  onClick={handleRelock}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-semibold transition-colors"
                 >
                   <Lock size={12} /> Lock
                 </button>
               </div>
             )}
+
             {/* Mobile basket toggle */}
             <button
               onClick={() => setShowBasket(v => !v)}
