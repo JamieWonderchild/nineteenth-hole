@@ -6,7 +6,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
-import { X, ChevronLeft, Search, UserCircle, Check, Lock, ArrowLeft } from "lucide-react";
+import { X, ChevronLeft, Search, UserCircle, Check, Lock, ArrowLeft, Maximize, Minimize } from "lucide-react";
 import { PinPad, HiddenManagerTrigger } from "@/components/kiosk/PinLock";
 import Link from "next/link";
 
@@ -268,6 +268,24 @@ export default function KioskPOS() {
   );
   const [showPinPad, setShowPinPad] = useState(false);
   const [managerUnlocked, setManagerUnlocked] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Keep fullscreen state in sync with browser
+  useEffect(() => {
+    function onFsChange() {
+      setIsFullscreen(!!document.fullscreenElement);
+    }
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
 
   // Auto-relock after 5 minutes of manager mode
   useEffect(() => {
@@ -459,6 +477,18 @@ export default function KioskPOS() {
                     No shift
                   </span>
             )}
+            {/* Fullscreen toggle — always visible so staff can enter/exit fullscreen */}
+            {(!kioskId || managerUnlocked) && (
+              <button
+                onClick={toggleFullscreen}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors border border-gray-700"
+                title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              >
+                {isFullscreen ? <Minimize size={12} /> : <Maximize size={12} />}
+                {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              </button>
+            )}
+
             {/* Manager mode chip — shown when unlocked */}
             {managerUnlocked && (
               <div className="flex items-center gap-2">
