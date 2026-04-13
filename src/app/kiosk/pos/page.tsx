@@ -330,13 +330,6 @@ export default function KioskPOS() {
     setIsLocked(true);
   }, []);
 
-  // Fully exit kiosk mode
-  const handleExit = useCallback(() => {
-    setManagerUnlocked(false);
-    setIsLocked(false);
-    exitFullscreen();
-  }, []);
-
   // Auto-relock after 5 minutes of manager mode
   useEffect(() => {
     if (!managerUnlocked) return;
@@ -561,13 +554,6 @@ export default function KioskPOS() {
                   className="text-xs px-3 py-1.5 bg-green-700 hover:bg-green-600 text-green-100 rounded-lg font-medium transition-colors"
                 >
                   Shifts &amp; Reports
-                </Link>
-                <Link
-                  href="/manage/pos"
-                  className="text-xs px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium transition-colors border border-gray-600"
-                  onClick={handleExit}
-                >
-                  ← Back to Manage
                 </Link>
                 <button
                   onClick={isFullscreen ? exitFullscreen : enterFullscreen}
