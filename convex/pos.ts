@@ -161,6 +161,10 @@ export const recordSale = mutation({
     currency: v.string(),
     paymentMethod: v.string(),
     notes: v.optional(v.string()),
+    // Shift & location context
+    shiftId:    v.optional(v.id("posShifts")),
+    locationId: v.optional(v.id("posLocations")),
+    isGuest:    v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await assertMember(ctx, args.clubId);
@@ -190,6 +194,9 @@ export const recordSale = mutation({
         paymentMethod: "account",
         notes: args.notes,
         servedBy: userId,
+        shiftId:    args.shiftId,
+        locationId: args.locationId,
+        isGuest:    args.isGuest,
         createdAt: new Date().toISOString(),
       });
 
@@ -229,6 +236,9 @@ export const recordSale = mutation({
       paymentMethod: args.paymentMethod,
       notes: args.notes,
       servedBy: userId,
+      shiftId:    args.shiftId,
+      locationId: args.locationId,
+      isGuest:    args.isGuest,
       createdAt: new Date().toISOString(),
     });
     // Decrement tracked stock
