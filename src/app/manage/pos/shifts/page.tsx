@@ -306,7 +306,7 @@ function ShiftCard({
   products,
   onClose,
 }: {
-  shift: { _id: Id<"posShifts">; locationName: string; status: string; openedAt: string; closedAt?: string };
+  shift: { _id: Id<"posShifts">; clubId: Id<"clubs">; locationId: Id<"posLocations">; locationName: string; status: string; openedAt: string; closedAt?: string };
   currency: string;
   products: { _id: Id<"posProducts">; name: string; trackStock?: boolean }[];
   onClose: (shiftId: Id<"posShifts">) => void;
@@ -329,9 +329,9 @@ function ShiftCard({
     setSaving(true);
     try {
       await recordStockTake({
-        clubId:     shift._id, // will be fixed by passing real clubId
+        clubId:     shift.clubId,
         shiftId:    shift._id,
-        locationId: shift._id as unknown as Id<"posLocations">, // placeholder — see note below
+        locationId: shift.locationId,
         type:       showStockTake,
         counts,
         notes:      notes || undefined,
