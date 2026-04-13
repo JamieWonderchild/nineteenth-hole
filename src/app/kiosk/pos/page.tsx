@@ -477,17 +477,15 @@ export default function KioskPOS() {
                     No shift
                   </span>
             )}
-            {/* Fullscreen toggle — always visible so staff can enter/exit fullscreen */}
-            {(!kioskId || managerUnlocked) && (
-              <button
-                onClick={toggleFullscreen}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors border border-gray-700"
-                title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-              >
-                {isFullscreen ? <Minimize size={12} /> : <Maximize size={12} />}
-                {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-              </button>
-            )}
+            {/* Fullscreen toggle — always visible (kiosk or not) */}
+            <button
+              onClick={toggleFullscreen}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors border border-gray-700"
+              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            >
+              {isFullscreen ? <Minimize size={12} /> : <Maximize size={12} />}
+              {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            </button>
 
             {/* Manager mode chip — shown when unlocked */}
             {managerUnlocked && (
