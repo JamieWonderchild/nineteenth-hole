@@ -760,8 +760,8 @@ export function KioskShiftModal({
   kioskId:      Id<"posKiosks">;
   onClose:      () => void;
 }) {
-  const rawProducts = useQuery(api.pos.listProducts, { clubId });
-  const categories  = useQuery(api.pos.listCategories, { clubId });
+  const rawProducts = useQuery(api.pos.listProducts, { clubId, locationId });
+  const categories  = useQuery(api.pos.listCategories, { clubId, locationId });
   const openShift   = useQuery(api.posShifts.getOpenShift, { clubId, locationId });
 
   // Join category names onto products
