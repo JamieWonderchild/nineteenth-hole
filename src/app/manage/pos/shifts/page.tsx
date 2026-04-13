@@ -532,12 +532,10 @@ function ShiftReportPanel({ shiftId, currency }: { shiftId: Id<"posShifts">; cur
 function ShiftCard({
   shift,
   currency,
-  products,
   onClose,
 }: {
   shift: { _id: Id<"posShifts">; clubId: Id<"clubs">; locationId: Id<"posLocations">; locationName: string; status: string; openedAt: string; closedAt?: string };
   currency: string;
-  products: ProductForTake[];
   onClose: (shiftId: Id<"posShifts">) => void;
 }) {
   const [expanded, setExpanded] = useState(shift.status === "open");
@@ -546,8 +544,20 @@ function ShiftCard({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const stockTakes = useQuery(api.posShifts.getStockTakes, { shiftId: shift._id });
+  const stockTakes    = useQuery(api.posShifts.getStockTakes, { shiftId: shift._id });
+  const rawProducts   = useQuery(api.pos.listProducts,   { clubId: shift.clubId, locationId: shift.locationId });
+  const categories    = useQuery(api.pos.listCategories, { clubId: shift.clubId, locationId: shift.locationId });
   const recordStockTake = useMutation(api.posShifts.recordStockTake);
+
+  // Join category names onto location-filtered products
+  const products = useMemo<ProductForTake[]>(() => {
+    if (!rawProducts || !categories) return [];
+    const catMap = new Map(categories.map((c) => [c._id, c.name]));
+    return rawProducts.map((p) => ({
+      ...p,
+      categoryName: p.categoryId ? catMap.get(p.categoryId) : undefined,
+    }));
+  }, [rawProducts, categories]);
 
   const openingTake = stockTakes?.find((t) => t.type === "opening");
   const closingTake = stockTakes?.find((t) => t.type === "closing");
@@ -730,25 +740,6 @@ export default function ShiftsPage() {
     api.posShifts.listShifts,
     club ? { clubId: club._id } : "skip"
   );
-  const rawProducts = useQuery(
-    api.pos.listProducts,
-    club ? { clubId: club._id } : "skip"
-  );
-  const categories = useQuery(
-    api.pos.listCategories,
-    club ? { clubId: club._id } : "skip"
-  );
-
-  // Join category names onto products for the StockTakeForm
-  const products = useMemo<ProductForTake[] | undefined>(() => {
-    if (!rawProducts || !categories) return undefined;
-    const catMap = new Map(categories.map((c) => [c._id, c.name]));
-    return rawProducts.map((p) => ({
-      ...p,
-      categoryName: p.categoryId ? catMap.get(p.categoryId) : undefined,
-    }));
-  }, [rawProducts, categories]);
-
   const openShift  = useMutation(api.posShifts.openShift);
   const closeShift = useMutation(api.posShifts.closeShift);
 
@@ -804,7 +795,7 @@ export default function ShiftsPage() {
     }
   }
 
-  if (!club || !locations || !shifts || !products || !categories) {
+  if (!club || !locations || !shifts) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
@@ -926,7 +917,6 @@ export default function ShiftsPage() {
                 key={shift._id}
                 shift={shift}
                 currency={currency}
-                products={products}
                 onClose={handleCloseShift}
               />
             ))}
@@ -962,7 +952,6 @@ export default function ShiftsPage() {
                 key={shift._id}
                 shift={shift}
                 currency={currency}
-                products={products}
                 onClose={handleCloseShift}
               />
             ))}
