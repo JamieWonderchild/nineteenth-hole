@@ -80,6 +80,15 @@ function StockTakeForm({
   const [notes, setNotes] = useState("");
   const [takenByName, setTakenByName] = useState("");
   const [search, setSearch] = useState("");
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  function toggleGroup(label: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(label) ? next.delete(label) : next.add(label);
+      return next;
+    });
+  }
 
   function setCount(productId: Id<"posProducts">, value: string) {
     const n = Math.max(0, parseInt(value, 10) || 0);
@@ -194,43 +203,65 @@ function StockTakeForm({
       </div>
 
       {/* Product rows grouped by category */}
-      <div className="mb-4 space-y-4 max-h-72 overflow-y-auto pr-1">
+      <div className="mb-4 space-y-1 max-h-72 overflow-y-auto pr-1">
         {filtered.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">No products match "{search}"</p>
         ) : (
-          groups.map(({ label, rows }) => (
-            <div key={label}>
-              {groups.length > 1 && (
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 pl-0.5">{label}</p>
-              )}
-              <div className="space-y-2">
-                {rows.map((row) => (
-                  <div key={row.productId} className="flex items-center gap-3">
-                    <span className="flex-1 text-sm text-gray-800 font-medium">{row.productName}</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setCount(row.productId, String(Math.max(0, row.countedUnits - 1)))}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-bold"
-                      >−</button>
-                      <input
-                        type="number"
-                        min="0"
-                        value={row.countedUnits}
-                        onChange={(e) => setCount(row.productId, e.target.value)}
-                        className={`w-16 text-center border border-gray-200 rounded-lg py-1.5 text-sm font-mono font-bold focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${ringClass}`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setCount(row.productId, String(row.countedUnits + 1))}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-bold"
-                      >+</button>
-                    </div>
+          groups.map(({ label, rows }) => {
+            // When searching, always show all groups open
+            const isCollapsed = !needle && collapsedGroups.has(label);
+            const counted = rows.filter((r) => r.countedUnits > 0).length;
+            return (
+              <div key={label}>
+                {groups.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(label)}
+                    className="w-full flex items-center gap-2 py-1.5 pl-0.5 pr-1 text-left group"
+                  >
+                    <ChevronRight
+                      size={12}
+                      className={`text-gray-400 transition-transform shrink-0 ${isCollapsed ? "" : "rotate-90"}`}
+                    />
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 group-hover:text-gray-600 transition-colors flex-1">
+                      {label}
+                    </span>
+                    <span className="text-[10px] text-gray-400">
+                      {counted > 0 ? `${counted}/${rows.length}` : rows.length}
+                    </span>
+                  </button>
+                ) : null}
+                {!isCollapsed && (
+                  <div className="space-y-2 mb-3">
+                    {rows.map((row) => (
+                      <div key={row.productId} className="flex items-center gap-3">
+                        <span className="flex-1 text-sm text-gray-800 font-medium">{row.productName}</span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setCount(row.productId, String(Math.max(0, row.countedUnits - 1)))}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-bold"
+                          >−</button>
+                          <input
+                            type="number"
+                            min="0"
+                            value={row.countedUnits}
+                            onChange={(e) => setCount(row.productId, e.target.value)}
+                            className={`w-16 text-center border border-gray-200 rounded-lg py-1.5 text-sm font-mono font-bold focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${ringClass}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setCount(row.productId, String(row.countedUnits + 1))}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-bold"
+                          >+</button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
