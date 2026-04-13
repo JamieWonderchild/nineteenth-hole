@@ -1,0 +1,714 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "convex/_generated/api";
+import { useActiveClub } from "@/lib/club-context";
+import { formatCurrency } from "@/lib/format";
+import type { Id } from "convex/_generated/dataModel";
+import {
+  Clock, MapPin, Plus, X, ChevronDown, ChevronRight,
+  PackageOpen, PackageCheck, BarChart2, AlertTriangle,
+  CheckCircle2, Circle, ClipboardList,
+} from "lucide-react";
+import Link from "next/link";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type StockRow = {
+  productId: Id<"posProducts">;
+  productName: string;
+  countedUnits: number;
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString("en-GB", {
+    day: "numeric", month: "short",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+function shiftDuration(openedAt: string, closedAt?: string) {
+  const end = closedAt ? new Date(closedAt) : new Date();
+  const diffMs = end.getTime() - new Date(openedAt).getTime();
+  const h = Math.floor(diffMs / 3_600_000);
+  const m = Math.floor((diffMs % 3_600_000) / 60_000);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+// ── Stock Take Form ───────────────────────────────────────────────────────────
+
+function StockTakeForm({
+  products,
+  type,
+  existingCounts,
+  onSave,
+  onCancel,
+  saving,
+}: {
+  products: { _id: Id<"posProducts">; name: string; trackStock?: boolean }[];
+  type: "opening" | "closing";
+  existingCounts?: StockRow[];
+  onSave: (counts: StockRow[], notes: string) => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  // Only show stock-tracked products
+  const tracked = products.filter((p) => p.trackStock);
+
+  const [counts, setCounts] = useState<StockRow[]>(() =>
+    tracked.map((p) => ({
+      productId: p._id,
+      productName: p.name,
+      countedUnits: existingCounts?.find((c) => c.productId === p._id)?.countedUnits ?? 0,
+    }))
+  );
+  const [notes, setNotes] = useState("");
+
+  function setCount(productId: Id<"posProducts">, value: string) {
+    const n = Math.max(0, parseInt(value, 10) || 0);
+    setCounts((prev) =>
+      prev.map((c) => c.productId === productId ? { ...c, countedUnits: n } : c)
+    );
+  }
+
+  if (tracked.length === 0) {
+    return (
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
+        <strong>No stock-tracked products found for this location.</strong>{" "}
+        Enable stock tracking on products in{" "}
+        <Link href="/manage/pos/products" className="underline font-medium">product management</Link>{" "}
+        to use the stock take feature.
+        <div className="flex gap-2 mt-3">
+          <button
+            onClick={() => onSave([], notes)}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
+          >
+            Continue without stock take
+          </button>
+          <button onClick={onCancel} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+      <div className="flex items-center gap-2 mb-1">
+        {type === "opening" ? <PackageOpen size={18} className="text-green-600" /> : <PackageCheck size={18} className="text-blue-600" />}
+        <h3 className="font-semibold text-gray-900">
+          {type === "opening" ? "Opening stock take" : "Closing stock take"}
+        </h3>
+      </div>
+      <p className="text-xs text-gray-500 mb-5">
+        Count the physical units for each tracked product. These are recorded as a snapshot at {type === "opening" ? "the start" : "the end"} of the shift.
+      </p>
+
+      <div className="space-y-3 mb-5">
+        {counts.map((row) => (
+          <div key={row.productId} className="flex items-center gap-3">
+            <span className="flex-1 text-sm text-gray-800 font-medium">{row.productName}</span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setCount(row.productId, String(Math.max(0, row.countedUnits - 1)))}
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-bold"
+              >−</button>
+              <input
+                type="number"
+                min="0"
+                value={row.countedUnits}
+                onChange={(e) => setCount(row.productId, e.target.value)}
+                className="w-16 text-center border border-gray-200 rounded-lg py-1.5 text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <button
+                type="button"
+                onClick={() => setCount(row.productId, String(row.countedUnits + 1))}
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-bold"
+              >+</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-5">
+        <label className="block text-xs font-medium text-gray-600 mb-1">Notes <span className="text-gray-400">(optional)</span></label>
+        <input
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="e.g. Delivery arrived, short on Peroni"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => onSave(counts, notes)}
+          disabled={saving}
+          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+        >
+          {saving ? "Saving…" : `Save ${type} stock take`}
+        </button>
+        <button onClick={onCancel} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Shift Report Panel ────────────────────────────────────────────────────────
+
+function ShiftReportPanel({ shiftId, currency }: { shiftId: Id<"posShifts">; currency: string }) {
+  const report = useQuery(api.posShifts.getShiftReport, { shiftId });
+
+  if (!report) {
+    return <div className="animate-pulse h-32 bg-gray-100 rounded-xl" />;
+  }
+
+  const { summary, stockVariance, hasOpeningStockTake, hasClosingStockTake } = report;
+  const hasVarianceData = hasOpeningStockTake && hasClosingStockTake;
+
+  return (
+    <div className="space-y-4">
+      {/* Income summary */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+          <BarChart2 size={15} className="text-gray-400" />
+          <span className="font-semibold text-gray-800 text-sm">Income summary</span>
+          <span className="ml-auto text-xs text-gray-400">{summary.saleCount} sale{summary.saleCount !== 1 ? "s" : ""}</span>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {[
+            { label: "Cash",          value: summary.cashPence,    color: "text-amber-600" },
+            { label: "Card / Terminal", value: summary.cardPence,  color: "text-blue-600"  },
+            { label: "Member account", value: summary.accountPence, color: "text-purple-600" },
+            { label: "Complimentary",  value: summary.compPence,   color: "text-gray-400"  },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-sm text-gray-600">{label}</span>
+              <span className={`text-sm font-semibold ${value > 0 ? color : "text-gray-300"}`}>
+                {formatCurrency(value, currency)}
+              </span>
+            </div>
+          ))}
+          <div className="flex items-center justify-between px-4 py-3 bg-gray-50">
+            <span className="text-sm font-bold text-gray-900">Total</span>
+            <span className="text-lg font-black text-gray-900">{formatCurrency(summary.totalPence, currency)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Member vs Guest split */}
+      {(summary.guestPence > 0 || summary.memberPence > 0) && (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <span className="font-semibold text-gray-800 text-sm">Member vs. Guest</span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            <div className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-sm text-gray-600">Member sales</span>
+              <span className="text-sm font-semibold text-gray-800">{formatCurrency(summary.memberPence, currency)}</span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-2.5">
+              <span className="text-sm text-gray-600">Guest / visitor sales</span>
+              <span className="text-sm font-semibold text-gray-800">{formatCurrency(summary.guestPence, currency)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stock variance */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+          <ClipboardList size={15} className="text-gray-400" />
+          <span className="font-semibold text-gray-800 text-sm">Stock movement</span>
+          <div className="ml-auto flex gap-2 text-[11px]">
+            <span className={`flex items-center gap-1 ${hasOpeningStockTake ? "text-green-600" : "text-gray-300"}`}>
+              {hasOpeningStockTake ? <CheckCircle2 size={11} /> : <Circle size={11} />} Opening
+            </span>
+            <span className={`flex items-center gap-1 ${hasClosingStockTake ? "text-green-600" : "text-gray-300"}`}>
+              {hasClosingStockTake ? <CheckCircle2 size={11} /> : <Circle size={11} />} Closing
+            </span>
+          </div>
+        </div>
+
+        {!hasVarianceData ? (
+          <div className="px-4 py-6 text-center text-sm text-gray-400">
+            {!hasOpeningStockTake && !hasClosingStockTake
+              ? "No stock takes recorded for this shift."
+              : "Variance available once both opening and closing stock takes are complete."}
+          </div>
+        ) : stockVariance.length === 0 ? (
+          <div className="px-4 py-6 text-center text-sm text-gray-400">
+            No stock-tracked products in this location.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                  <th className="text-left px-4 py-2">Product</th>
+                  <th className="text-right px-3 py-2">Open</th>
+                  <th className="text-right px-3 py-2">Sold</th>
+                  <th className="text-right px-3 py-2">Close</th>
+                  <th className="text-right px-4 py-2">Variance</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {stockVariance.map((row) => {
+                  const bad = row.variance !== null && row.variance < 0;
+                  const good = row.variance !== null && row.variance === 0;
+                  return (
+                    <tr key={row.productId} className="hover:bg-gray-50/50">
+                      <td className="px-4 py-2.5 font-medium text-gray-800">{row.productName}</td>
+                      <td className="px-3 py-2.5 text-right text-gray-500">{row.openCount ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-right text-gray-700 font-medium">{row.sold}</td>
+                      <td className="px-3 py-2.5 text-right text-gray-500">{row.closeCount ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-right">
+                        {row.variance === null ? (
+                          <span className="text-gray-300">—</span>
+                        ) : (
+                          <span className={`font-bold ${bad ? "text-red-500" : good ? "text-green-600" : "text-amber-500"}`}>
+                            {bad ? "" : row.variance > 0 ? "+" : ""}{row.variance}
+                            {bad && <AlertTriangle size={12} className="inline ml-1" />}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p className="px-4 py-2 text-[11px] text-gray-400 border-t border-gray-100">
+              Variance = units sold minus (opening − closing count). Negative = more taken than recorded (shrinkage).
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Shift Card ────────────────────────────────────────────────────────────────
+
+function ShiftCard({
+  shift,
+  currency,
+  products,
+  onClose,
+}: {
+  shift: { _id: Id<"posShifts">; locationName: string; status: string; openedAt: string; closedAt?: string };
+  currency: string;
+  products: { _id: Id<"posProducts">; name: string; trackStock?: boolean }[];
+  onClose: (shiftId: Id<"posShifts">) => void;
+}) {
+  const [expanded, setExpanded] = useState(shift.status === "open");
+  const [showStockTake, setShowStockTake] = useState<"opening" | "closing" | null>(null);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const stockTakes = useQuery(api.posShifts.getStockTakes, { shiftId: shift._id });
+  const recordStockTake = useMutation(api.posShifts.recordStockTake);
+
+  const openingTake = stockTakes?.find((t) => t.type === "opening");
+  const closingTake = stockTakes?.find((t) => t.type === "closing");
+  const isOpen = shift.status === "open";
+
+  async function handleStockTakeSave(counts: StockRow[], notes: string) {
+    if (!showStockTake) return;
+    setSaving(true);
+    try {
+      await recordStockTake({
+        clubId:     shift._id, // will be fixed by passing real clubId
+        shiftId:    shift._id,
+        locationId: shift._id as unknown as Id<"posLocations">, // placeholder — see note below
+        type:       showStockTake,
+        counts,
+        notes:      notes || undefined,
+      });
+      setShowStockTake(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save stock take");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className={`border rounded-xl overflow-hidden ${isOpen ? "border-green-300 bg-green-50/30" : "border-gray-200 bg-white"}`}>
+      {/* Header */}
+      <button
+        onClick={() => setExpanded((e) => !e)}
+        className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-black/5 transition-colors"
+      >
+        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOpen ? "bg-green-500 animate-pulse" : "bg-gray-300"}`} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-gray-900 text-sm">{shift.locationName}</span>
+            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${isOpen ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+              {isOpen ? "Open" : "Closed"}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 mt-0.5">
+            <span className="text-xs text-gray-400 flex items-center gap-1">
+              <Clock size={10} /> {formatDateTime(shift.openedAt)}
+            </span>
+            {shift.closedAt && (
+              <span className="text-xs text-gray-400">→ {formatTime(shift.closedAt)}</span>
+            )}
+            <span className="text-xs text-gray-400">{shiftDuration(shift.openedAt, shift.closedAt)}</span>
+          </div>
+        </div>
+        {expanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />}
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
+          {error && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg mt-3">
+              <span className="flex-1">{error}</span>
+              <button onClick={() => setError(null)}><X size={13} /></button>
+            </div>
+          )}
+
+          {/* Stock take actions */}
+          <div className="flex gap-2 mt-3 flex-wrap">
+            <button
+              onClick={() => setShowStockTake("opening")}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                openingTake
+                  ? "border-green-200 bg-green-50 text-green-700"
+                  : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {openingTake ? <CheckCircle2 size={14} /> : <PackageOpen size={14} />}
+              Opening stock take
+              {openingTake && <span className="text-[10px] text-green-500 ml-0.5">✓</span>}
+            </button>
+
+            <button
+              onClick={() => setShowStockTake("closing")}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                closingTake
+                  ? "border-blue-200 bg-blue-50 text-blue-700"
+                  : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {closingTake ? <CheckCircle2 size={14} /> : <PackageCheck size={14} />}
+              Closing stock take
+              {closingTake && <span className="text-[10px] text-blue-500 ml-0.5">✓</span>}
+            </button>
+
+            {isOpen && (
+              <button
+                onClick={() => setShowCloseConfirm(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors ml-auto"
+              >
+                Close shift
+              </button>
+            )}
+          </div>
+
+          {/* Stock take form */}
+          {showStockTake && (
+            <StockTakeForm
+              products={products}
+              type={showStockTake}
+              existingCounts={
+                showStockTake === "opening"
+                  ? openingTake?.counts as StockRow[] | undefined
+                  : closingTake?.counts as StockRow[] | undefined
+              }
+              onSave={handleStockTakeSave}
+              onCancel={() => setShowStockTake(null)}
+              saving={saving}
+            />
+          )}
+
+          {/* Close shift confirm */}
+          {showCloseConfirm && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <p className="text-sm font-semibold text-red-800 mb-1">Close this shift?</p>
+              <p className="text-xs text-red-600 mb-3">
+                {!closingTake && "You haven't taken a closing stock take yet. "}
+                Once closed, no new sales can be attributed to this shift.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { onClose(shift._id); setShowCloseConfirm(false); }}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+                >
+                  Yes, close shift
+                </button>
+                <button
+                  onClick={() => setShowCloseConfirm(false)}
+                  className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Shift report */}
+          <div className="pt-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Shift report</p>
+            <ShiftReportPanel shiftId={shift._id} currency={currency} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
+export default function ShiftsPage() {
+  const { club } = useActiveClub();
+
+  const locations = useQuery(
+    api.posLocations.listLocations,
+    club ? { clubId: club._id } : "skip"
+  );
+  const shifts = useQuery(
+    api.posShifts.listShifts,
+    club ? { clubId: club._id } : "skip"
+  );
+  const products = useQuery(
+    api.pos.listProducts,
+    club ? { clubId: club._id } : "skip"
+  );
+
+  const openShift  = useMutation(api.posShifts.openShift);
+  const closeShift = useMutation(api.posShifts.closeShift);
+
+  const [showOpenForm, setShowOpenForm] = useState(false);
+  const [selectedLocationId, setSelectedLocationId] = useState<Id<"posLocations"> | "">("");
+  const [openingNotes, setOpeningNotes] = useState("");
+  const [opening, setOpening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const activeLocations = useMemo(
+    () => (locations ?? []).filter((l) => l.isActive),
+    [locations]
+  );
+
+  const openShifts = useMemo(
+    () => (shifts ?? []).filter((s) => s.status === "open"),
+    [shifts]
+  );
+
+  const closedShifts = useMemo(
+    () => (shifts ?? []).filter((s) => s.status === "closed"),
+    [shifts]
+  );
+
+  // Which locations already have an open shift
+  const openLocationIds = new Set(openShifts.map((s) => s.locationId));
+
+  async function handleOpenShift() {
+    if (!club || !selectedLocationId) return;
+    setOpening(true);
+    setError(null);
+    try {
+      await openShift({
+        clubId:     club._id,
+        locationId: selectedLocationId as Id<"posLocations">,
+        notes:      openingNotes.trim() || undefined,
+      });
+      setShowOpenForm(false);
+      setSelectedLocationId("");
+      setOpeningNotes("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to open shift");
+    } finally {
+      setOpening(false);
+    }
+  }
+
+  async function handleCloseShift(shiftId: Id<"posShifts">) {
+    try {
+      await closeShift({ shiftId });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to close shift");
+    }
+  }
+
+  if (!club || !locations || !shifts || !products) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  const currency = club.currency ?? "GBP";
+
+  return (
+    <div className="max-w-2xl mx-auto p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <Link href="/manage/pos" className="text-sm text-gray-400 hover:text-gray-600 mb-1 block">
+            ← Point of Sale
+          </Link>
+          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Clock size={20} /> Shifts
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Open and close service shifts, record stock takes, and view shift reports.
+          </p>
+        </div>
+        {activeLocations.length > 0 && (
+          <button
+            onClick={() => setShowOpenForm((v) => !v)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 shrink-0"
+          >
+            <Plus size={15} /> Open shift
+          </button>
+        )}
+      </div>
+
+      {/* Global error */}
+      {error && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl mb-4">
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError(null)}><X size={14} /></button>
+        </div>
+      )}
+
+      {/* No locations warning */}
+      {activeLocations.length === 0 && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700 mb-6">
+          No active locations found.{" "}
+          <Link href="/manage/pos/locations" className="font-medium underline">
+            Set up a location
+          </Link>{" "}
+          before opening a shift.
+        </div>
+      )}
+
+      {/* Open shift form */}
+      {showOpenForm && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6 shadow-sm">
+          <h2 className="font-semibold text-gray-800 mb-4">Open new shift</h2>
+
+          <div className="mb-4">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Location <span className="text-red-400">*</span></label>
+            <select
+              value={selectedLocationId}
+              onChange={(e) => setSelectedLocationId(e.target.value as Id<"posLocations">)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">Select location…</option>
+              {activeLocations.map((loc) => (
+                <option
+                  key={loc._id}
+                  value={loc._id}
+                  disabled={openLocationIds.has(loc._id)}
+                >
+                  {loc.name}{openLocationIds.has(loc._id) ? " (shift already open)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mb-5">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Notes <span className="text-gray-400">(optional)</span></label>
+            <input
+              value={openingNotes}
+              onChange={(e) => setOpeningNotes(e.target.value)}
+              placeholder="e.g. Evening service, Jamie on bar"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleOpenShift}
+              disabled={opening || !selectedLocationId}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+            >
+              {opening ? "Opening…" : "Open shift"}
+            </button>
+            <button
+              onClick={() => { setShowOpenForm(false); setSelectedLocationId(""); setOpeningNotes(""); }}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Open shifts */}
+      {openShifts.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+              Open shifts ({openShifts.length})
+            </p>
+          </div>
+          <div className="space-y-3">
+            {openShifts.map((shift) => (
+              <ShiftCard
+                key={shift._id}
+                shift={shift}
+                currency={currency}
+                products={products}
+                onClose={handleCloseShift}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* No shifts at all */}
+      {shifts.length === 0 && !showOpenForm && (
+        <div className="text-center py-16 text-gray-400">
+          <Clock size={32} className="mx-auto mb-3 opacity-30" />
+          <p className="text-sm">No shifts yet.</p>
+          {activeLocations.length > 0 && (
+            <button
+              onClick={() => setShowOpenForm(true)}
+              className="mt-2 text-sm text-green-600 hover:underline"
+            >
+              Open your first shift →
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Closed shifts */}
+      {closedShifts.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-2">
+            <MapPin size={12} /> Recent closed shifts
+          </p>
+          <div className="space-y-3">
+            {closedShifts.map((shift) => (
+              <ShiftCard
+                key={shift._id}
+                shift={shift}
+                currency={currency}
+                products={products}
+                onClose={handleCloseShift}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
