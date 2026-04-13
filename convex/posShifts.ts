@@ -308,15 +308,7 @@ export const recordStockTake = mutation({
         .first();
 
       if (existing) {
-        // Allow overwrite — patch the existing record
-        await ctx.db.patch(existing._id, {
-          counts,
-          notes,
-          takenBy:     userId,
-          takenByName,
-          takenAt:     now,
-        });
-        return existing._id;
+        throw new Error(`A ${type} stock take has already been recorded for this shift and cannot be overwritten`);
       }
     }
 
