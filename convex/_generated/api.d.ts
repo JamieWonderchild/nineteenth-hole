@@ -33,6 +33,7 @@ import type * as quickGames from "../quickGames.js";
 import type * as resultsImport from "../resultsImport.js";
 import type * as scores from "../scores.js";
 import type * as scoring from "../scoring.js";
+import type * as seedMasters2026 from "../seedMasters2026.js";
 import type * as series from "../series.js";
 import type * as squadMembers from "../squadMembers.js";
 import type * as teeTimes from "../teeTimes.js";
@@ -72,6 +73,7 @@ declare const fullApi: ApiFromModules<{
   resultsImport: typeof resultsImport;
   scores: typeof scores;
   scoring: typeof scoring;
+  seedMasters2026: typeof seedMasters2026;
   series: typeof series;
   squadMembers: typeof squadMembers;
   teeTimes: typeof teeTimes;
