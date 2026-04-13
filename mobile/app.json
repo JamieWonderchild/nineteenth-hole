@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.nineteenth-hole"
+      "bundleIdentifier": "golf.the19thhole.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -40,7 +40,15 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#16a34a",
+          "sounds": []
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
