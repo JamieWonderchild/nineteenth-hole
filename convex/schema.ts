@@ -720,59 +720,133 @@ export default defineSchema({
   // Point of Sale — Pro Shop & Bar
   // ============================================================================
 
-  posCategories: defineTable({
-    clubId: v.id("clubs"),
-    name: v.string(),                     // "Bar", "Pro Shop", "Food"
-    icon: v.optional(v.string()),         // emoji e.g. "🍺"
-    sortOrder: v.number(),
-    createdAt: v.string(),
+  // Physical areas of the club (Bar, Pro Shop, Restaurant, Halfway House, etc.)
+  // Sits above posCategories in the hierarchy: Location → Category → Product
+  posLocations: defineTable({
+    clubId:      v.id("clubs"),
+    name:        v.string(),              // "Bar", "Pro Shop", "Halfway House"
+    description: v.optional(v.string()),
+    isActive:    v.boolean(),
+    sortOrder:   v.number(),
+    createdAt:   v.string(),
   })
     .index("by_club", ["clubId"]),
 
-  posProducts: defineTable({
-    clubId: v.id("clubs"),
-    categoryId: v.optional(v.id("posCategories")),
-    name: v.string(),
-    sku: v.optional(v.string()),
-    description: v.optional(v.string()),
-    pricePence: v.number(),               // always stored in smallest currency unit
-    currency: v.string(),
-    imageUrl: v.optional(v.string()),
-    trackStock: v.optional(v.boolean()),  // if true, stockCount is maintained
-    stockCount: v.optional(v.number()),
-    isActive: v.boolean(),
-    createdAt: v.string(),
-    updatedAt: v.string(),
+  // Named physical devices (tills/tablets) registered to a club and location
+  // Device identity is fixed — multiple staff share the same kiosk login
+  posKiosks: defineTable({
+    clubId:     v.id("clubs"),
+    locationId: v.id("posLocations"),
+    name:       v.string(),              // "Bar Till 1", "Pro Shop Counter"
+    pinHash:    v.optional(v.string()),  // SHA-256 hash of manager PIN for lock screen
+    isActive:   v.boolean(),
+    lastSeenAt: v.optional(v.string()), // ISO — updated on heartbeat or each sale
+    createdAt:  v.string(),
   })
-    .index("by_club", ["clubId"])
-    .index("by_club_and_category", ["clubId", "categoryId"]),
+    .index("by_club",     ["clubId"])
+    .index("by_location", ["locationId"]),
+
+  // A shift represents one period of service at a location
+  // Contains opening and closing stock takes, and scopes all sales within it
+  posShifts: defineTable({
+    clubId:     v.id("clubs"),
+    locationId: v.id("posLocations"),
+    kioskId:    v.optional(v.id("posKiosks")), // which device opened the shift
+    openedBy:   v.string(),              // userId
+    closedBy:   v.optional(v.string()), // userId
+    status:     v.string(),             // "open" | "closed"
+    openedAt:   v.string(),             // ISO datetime
+    closedAt:   v.optional(v.string()),
+    notes:      v.optional(v.string()),
+    createdAt:  v.string(),
+  })
+    .index("by_club",            ["clubId"])
+    .index("by_location",        ["locationId"])
+    .index("by_club_and_status", ["clubId", "status"]),
+
+  // A snapshot of physical stock counts taken at the start or end of a shift
+  // Two per shift: opening + closing. Delta vs units sold = variance.
+  posStockTakes: defineTable({
+    clubId:     v.id("clubs"),
+    locationId: v.id("posLocations"),
+    shiftId:    v.id("posShifts"),
+    type:       v.string(),             // "opening" | "closing"
+    takenBy:    v.string(),             // userId
+    takenAt:    v.string(),             // ISO datetime
+    counts:     v.array(v.object({
+      productId:    v.id("posProducts"),
+      productName:  v.string(),         // denormalised — survives product deletion/rename
+      countedUnits: v.number(),
+    })),
+    notes:      v.optional(v.string()),
+    createdAt:  v.string(),
+  })
+    .index("by_club",     ["clubId"])
+    .index("by_shift",    ["shiftId"])
+    .index("by_location", ["locationId"]),
+
+  posCategories: defineTable({
+    clubId:     v.id("clubs"),
+    name:       v.string(),               // "Pints", "Spirits", "Soft Drinks", "Clothing"
+    icon:       v.optional(v.string()),   // emoji e.g. "🍺"
+    sortOrder:  v.number(),
+    locationId: v.optional(v.id("posLocations")), // which location this category belongs to
+    createdAt:  v.string(),
+  })
+    .index("by_club",     ["clubId"])
+    .index("by_location", ["locationId"]),
+
+  posProducts: defineTable({
+    clubId:      v.id("clubs"),
+    categoryId:  v.optional(v.id("posCategories")),
+    locationId:  v.optional(v.id("posLocations")), // which location this product belongs to
+    name:        v.string(),
+    sku:         v.optional(v.string()),
+    description: v.optional(v.string()),
+    pricePence:  v.number(),              // always stored in smallest currency unit
+    currency:    v.string(),
+    imageUrl:    v.optional(v.string()),
+    trackStock:  v.optional(v.boolean()), // if true, stockCount is maintained
+    stockCount:  v.optional(v.number()),
+    isActive:    v.boolean(),
+    createdAt:   v.string(),
+    updatedAt:   v.string(),
+  })
+    .index("by_club",             ["clubId"])
+    .index("by_club_and_category",["clubId", "categoryId"])
+    .index("by_location",         ["locationId"]),
 
   posSales: defineTable({
-    clubId: v.id("clubs"),
-    memberId: v.optional(v.string()),     // Clerk userId if sold to a member
-    clubMemberId: v.optional(v.id("clubMembers")), // linked member record (for account charges)
-    memberName: v.optional(v.string()),
+    clubId:          v.id("clubs"),
+    memberId:        v.optional(v.string()),            // Clerk userId if sold to a member
+    clubMemberId:    v.optional(v.id("clubMembers")),   // linked member record (for account charges)
+    memberName:      v.optional(v.string()),
     items: v.array(v.object({
-      productId: v.optional(v.id("posProducts")),
-      productName: v.string(),           // denormalised in case product deleted
-      quantity: v.number(),
+      productId:      v.optional(v.id("posProducts")),
+      productName:    v.string(),                       // denormalised in case product deleted
+      quantity:       v.number(),
       unitPricePence: v.number(),
-      subtotalPence: v.number(),
+      subtotalPence:  v.number(),
     })),
-    subtotalPence: v.number(),           // sum of line items
-    totalPence: v.number(),              // subtotal (no tax split yet)
-    currency: v.string(),
+    subtotalPence:   v.number(),                        // sum of line items
+    totalPence:      v.number(),                        // subtotal (no tax split yet)
+    currency:        v.string(),
     // 'cash' | 'card' | 'account' | 'terminal' | 'complimentary'
-    paymentMethod: v.string(),
-    paymentIntentId: v.optional(v.id("paymentIntents")), // set when terminal payment
-    notes: v.optional(v.string()),
-    voidedAt: v.optional(v.string()),
-    servedBy: v.string(),               // userId
-    createdAt: v.string(),
+    paymentMethod:   v.string(),
+    paymentIntentId: v.optional(v.id("paymentIntents")),// set when terminal payment
+    notes:           v.optional(v.string()),
+    voidedAt:        v.optional(v.string()),
+    servedBy:        v.string(),                        // userId
+    // Shift & location context — populated for all new sales
+    shiftId:         v.optional(v.id("posShifts")),    // which shift this sale belongs to
+    locationId:      v.optional(v.id("posLocations")), // which location (bar / pro shop)
+    isGuest:         v.optional(v.boolean()),           // true = visitor / non-member sale
+    createdAt:       v.string(),
   })
-    .index("by_club", ["clubId"])
-    .index("by_club_and_date", ["clubId", "createdAt"])
-    .index("by_club_member", ["clubMemberId"]),
+    .index("by_club",         ["clubId"])
+    .index("by_club_and_date",["clubId", "createdAt"])
+    .index("by_club_member",  ["clubMemberId"])
+    .index("by_shift",        ["shiftId"]),
 
   // ============================================================================
   // Payment Intents — provider-agnostic record of each payment (Dojo, Square, …)
