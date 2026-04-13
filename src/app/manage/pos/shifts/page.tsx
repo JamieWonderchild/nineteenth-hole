@@ -9,7 +9,7 @@ import type { Id } from "convex/_generated/dataModel";
 import {
   Clock, MapPin, Plus, X, ChevronDown, ChevronRight,
   PackageOpen, PackageCheck, BarChart2, AlertTriangle,
-  CheckCircle2, Circle, ClipboardList, ScanSearch, User,
+  CheckCircle2, Circle, ClipboardList, ScanSearch, User, Search,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -19,6 +19,14 @@ type StockRow = {
   productId: Id<"posProducts">;
   productName: string;
   countedUnits: number;
+};
+
+type ProductForTake = {
+  _id: Id<"posProducts">;
+  name: string;
+  trackStock?: boolean;
+  categoryId?: Id<"posCategories">;
+  categoryName?: string;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -52,7 +60,7 @@ function StockTakeForm({
   onCancel,
   saving,
 }: {
-  products: { _id: Id<"posProducts">; name: string; trackStock?: boolean }[];
+  products: ProductForTake[];
   type: "opening" | "closing" | "spot";
   existingCounts?: StockRow[];
   onSave: (counts: StockRow[], notes: string, takenByName: string) => void;
@@ -71,12 +79,35 @@ function StockTakeForm({
   );
   const [notes, setNotes] = useState("");
   const [takenByName, setTakenByName] = useState("");
+  const [search, setSearch] = useState("");
 
   function setCount(productId: Id<"posProducts">, value: string) {
     const n = Math.max(0, parseInt(value, 10) || 0);
     setCounts((prev) =>
       prev.map((c) => c.productId === productId ? { ...c, countedUnits: n } : c)
     );
+  }
+
+  // Build a map from productId → product (for categoryId/categoryName lookup)
+  const productMap = new Map(tracked.map((p) => [p._id, p]));
+
+  // Filter by search, then group by category
+  const needle = search.trim().toLowerCase();
+  const filtered = counts.filter((row) =>
+    !needle || row.productName.toLowerCase().includes(needle)
+  );
+
+  // Group: build ordered list of [categoryLabel, rows[]]
+  const groups: { label: string; rows: StockRow[] }[] = [];
+  const seen = new Map<string, StockRow[]>();
+  for (const row of filtered) {
+    const cat = productMap.get(row.productId);
+    const label = cat?.categoryName ?? "Uncategorised";
+    if (!seen.has(label)) {
+      seen.set(label, []);
+      groups.push({ label, rows: seen.get(label)! });
+    }
+    seen.get(label)!.push(row);
   }
 
   const typeLabel  = type === "opening" ? "Opening stock take" : type === "closing" ? "Closing stock take" : "Spot stock take";
@@ -118,6 +149,7 @@ function StockTakeForm({
       <div className="flex items-center gap-2 mb-1">
         {typeIcon}
         <h3 className="font-semibold text-gray-900">{typeLabel}</h3>
+        <span className="ml-auto text-[11px] text-gray-400">{tracked.length} product{tracked.length !== 1 ? "s" : ""}</span>
       </div>
       <p className="text-xs text-gray-500 mb-4">
         {type === "opening"
@@ -128,7 +160,7 @@ function StockTakeForm({
       </p>
 
       {/* Staff name */}
-      <div className="mb-4">
+      <div className="mb-3">
         <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1">
           <User size={11} /> Your name <span className="text-red-400 ml-0.5">*</span>
         </label>
@@ -141,31 +173,65 @@ function StockTakeForm({
         />
       </div>
 
-      <div className="space-y-3 mb-4">
-        {counts.map((row) => (
-          <div key={row.productId} className="flex items-center gap-3">
-            <span className="flex-1 text-sm text-gray-800 font-medium">{row.productName}</span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setCount(row.productId, String(Math.max(0, row.countedUnits - 1)))}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-bold"
-              >−</button>
-              <input
-                type="number"
-                min="0"
-                value={row.countedUnits}
-                onChange={(e) => setCount(row.productId, e.target.value)}
-                className={`w-16 text-center border border-gray-200 rounded-lg py-1.5 text-sm font-mono font-bold focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${ringClass}`}
-              />
-              <button
-                type="button"
-                onClick={() => setCount(row.productId, String(row.countedUnits + 1))}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-bold"
-              >+</button>
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={`Search ${tracked.length} product${tracked.length !== 1 ? "s" : ""}…`}
+          className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          >
+            <X size={13} />
+          </button>
+        )}
+      </div>
+
+      {/* Product rows grouped by category */}
+      <div className="mb-4 space-y-4 max-h-72 overflow-y-auto pr-1">
+        {filtered.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">No products match "{search}"</p>
+        ) : (
+          groups.map(({ label, rows }) => (
+            <div key={label}>
+              {groups.length > 1 && (
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2 pl-0.5">{label}</p>
+              )}
+              <div className="space-y-2">
+                {rows.map((row) => (
+                  <div key={row.productId} className="flex items-center gap-3">
+                    <span className="flex-1 text-sm text-gray-800 font-medium">{row.productName}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setCount(row.productId, String(Math.max(0, row.countedUnits - 1)))}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-bold"
+                      >−</button>
+                      <input
+                        type="number"
+                        min="0"
+                        value={row.countedUnits}
+                        onChange={(e) => setCount(row.productId, e.target.value)}
+                        className={`w-16 text-center border border-gray-200 rounded-lg py-1.5 text-sm font-mono font-bold focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${ringClass}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setCount(row.productId, String(row.countedUnits + 1))}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-bold"
+                      >+</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       <div className="mb-4">
@@ -406,7 +472,7 @@ function ShiftCard({
 }: {
   shift: { _id: Id<"posShifts">; clubId: Id<"clubs">; locationId: Id<"posLocations">; locationName: string; status: string; openedAt: string; closedAt?: string };
   currency: string;
-  products: { _id: Id<"posProducts">; name: string; trackStock?: boolean }[];
+  products: ProductForTake[];
   onClose: (shiftId: Id<"posShifts">) => void;
 }) {
   const [expanded, setExpanded] = useState(shift.status === "open");
@@ -599,10 +665,24 @@ export default function ShiftsPage() {
     api.posShifts.listShifts,
     club ? { clubId: club._id } : "skip"
   );
-  const products = useQuery(
+  const rawProducts = useQuery(
     api.pos.listProducts,
     club ? { clubId: club._id } : "skip"
   );
+  const categories = useQuery(
+    api.pos.listCategories,
+    club ? { clubId: club._id } : "skip"
+  );
+
+  // Join category names onto products for the StockTakeForm
+  const products = useMemo<ProductForTake[] | undefined>(() => {
+    if (!rawProducts || !categories) return undefined;
+    const catMap = new Map(categories.map((c) => [c._id, c.name]));
+    return rawProducts.map((p) => ({
+      ...p,
+      categoryName: p.categoryId ? catMap.get(p.categoryId) : undefined,
+    }));
+  }, [rawProducts, categories]);
 
   const openShift  = useMutation(api.posShifts.openShift);
   const closeShift = useMutation(api.posShifts.closeShift);
@@ -659,7 +739,7 @@ export default function ShiftsPage() {
     }
   }
 
-  if (!club || !locations || !shifts || !products) {
+  if (!club || !locations || !shifts || !products || !categories) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
