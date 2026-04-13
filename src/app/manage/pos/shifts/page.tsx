@@ -624,18 +624,18 @@ function ShiftCard({
 
           {/* Stock take actions */}
           <div className="flex gap-2 mt-3 flex-wrap">
-            <button
-              onClick={() => setShowStockTake("opening")}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                openingTake
-                  ? "border-green-200 bg-green-50 text-green-700"
-                  : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              {openingTake ? <CheckCircle2 size={14} /> : <PackageOpen size={14} />}
-              Opening stock take
-              {openingTake && <span className="text-[10px] text-green-500 ml-0.5">✓</span>}
-            </button>
+            {openingTake ? (
+              <span className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-green-200 bg-green-50 text-green-700 cursor-default">
+                <CheckCircle2 size={14} /> Opening stock take ✓
+              </span>
+            ) : (
+              <button
+                onClick={() => setShowStockTake("opening")}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                <PackageOpen size={14} /> Opening stock take
+              </button>
+            )}
 
             {isOpen && (
               <button
@@ -652,18 +652,18 @@ function ShiftCard({
               </button>
             )}
 
-            <button
-              onClick={() => setShowStockTake("closing")}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                closingTake
-                  ? "border-blue-200 bg-blue-50 text-blue-700"
-                  : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              {closingTake ? <CheckCircle2 size={14} /> : <PackageCheck size={14} />}
-              Closing stock take
-              {closingTake && <span className="text-[10px] text-blue-500 ml-0.5">✓</span>}
-            </button>
+            {closingTake ? (
+              <span className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-blue-200 bg-blue-50 text-blue-700 cursor-default">
+                <CheckCircle2 size={14} /> Closing stock take ✓
+              </span>
+            ) : (
+              <button
+                onClick={() => setShowStockTake("closing")}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                <PackageCheck size={14} /> Closing stock take
+              </button>
+            )}
 
             {isOpen && (
               <button
