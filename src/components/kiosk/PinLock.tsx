@@ -71,7 +71,6 @@ interface PinLockProps {
 }
 
 export function PinPad({ kioskId, onUnlocked, visible, onDismiss }: PinLockProps) {
-  const kiosk = useQuery(api.posLocations.listKiosks, { clubId: "skip" as unknown as Id<"clubs"> }); // loaded via kioskId directly
   const kioskData = useQuery(api.posLocations.getKioskById, { kioskId });
 
   const [digits, setDigits] = useState("");
