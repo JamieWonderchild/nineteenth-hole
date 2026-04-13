@@ -158,28 +158,42 @@ export default function PoolPage({ params }: { params: Promise<{ slug: string }>
         {/* My entry */}
         {myEntry?.paidAt && myEntry.drawnPlayerIds && (
           <div className="bg-green-50 border border-green-200 rounded-xl p-5">
-            <div className="text-xs text-green-700 font-semibold uppercase tracking-wide mb-3">Your drawn players</div>
+            <div className="text-xs text-green-700 font-semibold uppercase tracking-wide mb-3">
+              {pool.drawType === "pick" ? "Your picks" : "Your drawn players"}
+            </div>
             <div className="grid grid-cols-3 gap-3">
               {myEntry.drawnPlayerIds.map(pid => {
                 const player = playerMap.get(pid);
                 if (!player) return null;
                 return (
                   <div key={pid} className="bg-white rounded-lg p-3 text-center border border-green-100">
-                    <div className={`text-xs font-medium mb-1 ${
-                      player.tier === 1 ? "text-amber-600" :
-                      player.tier === 2 ? "text-blue-600" : "text-gray-500"
-                    }`}>
-                      Tier {player.tier}
-                    </div>
-                    <div className="font-semibold text-gray-900 text-sm leading-tight">{player.name}</div>
-                    <div className="text-xs text-gray-400">{player.country}</div>
-                    {player.scoreToPar !== undefined && (
-                      <div className={`text-sm font-bold mt-1 ${player.scoreToPar < 0 ? "text-green-700" : player.scoreToPar > 0 ? "text-red-600" : "text-gray-700"}`}>
-                        {scoreLabel(player.scoreToPar)}
+                    {pool.drawType !== "pick" && (
+                      <div className={`text-xs font-medium mb-1 ${
+                        player.tier === 1 ? "text-amber-600" :
+                        player.tier === 2 ? "text-blue-600" : "text-gray-500"
+                      }`}>
+                        Tier {player.tier}
                       </div>
                     )}
-                    {player.position && (
-                      <div className="text-xs text-gray-500">T{player.position}</div>
+                    <div className="font-semibold text-gray-900 text-sm leading-tight">{player.name}</div>
+                    <div className="text-xs text-gray-400">{player.country}</div>
+                    {pool.drawType === "pick" ? (
+                      player.prizeMoney !== undefined ? (
+                        <div className={`text-xs font-semibold mt-1 ${player.prizeMoney > 0 ? "text-green-700" : "text-red-500"}`}>
+                          {player.prizeMoney > 0 ? `$${(player.prizeMoney / 100).toLocaleString("en-US")}` : "MC"}
+                        </div>
+                      ) : null
+                    ) : (
+                      <>
+                        {player.scoreToPar !== undefined && (
+                          <div className={`text-sm font-bold mt-1 ${player.scoreToPar < 0 ? "text-green-700" : player.scoreToPar > 0 ? "text-red-600" : "text-gray-700"}`}>
+                            {scoreLabel(player.scoreToPar)}
+                          </div>
+                        )}
+                        {player.position && (
+                          <div className="text-xs text-gray-500">T{player.position}</div>
+                        )}
+                      </>
                     )}
                   </div>
                 );
@@ -187,7 +201,9 @@ export default function PoolPage({ params }: { params: Promise<{ slug: string }>
             </div>
             {myEntry.leaderboardPosition && (
               <div className="mt-3 text-center text-sm text-green-800 font-medium">
-                You&apos;re currently {ordinal(myEntry.leaderboardPosition)} in the pool
+                {pool.status === "complete"
+                  ? `You finished ${ordinal(myEntry.leaderboardPosition)}`
+                  : `You're currently ${ordinal(myEntry.leaderboardPosition)} in the pool`}
               </div>
             )}
           </div>
@@ -222,7 +238,11 @@ export default function PoolPage({ params }: { params: Promise<{ slug: string }>
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        {entry.bestPlayerScore !== undefined ? (
+                        {pool.drawType === "pick" && entry.totalPrizeMoney !== undefined ? (
+                          <div className="font-bold text-sm text-green-700">
+                            ${(entry.totalPrizeMoney / 100).toLocaleString("en-US")}
+                          </div>
+                        ) : entry.bestPlayerScore !== undefined ? (
                           <div className={`font-bold text-base ${entry.bestPlayerScore < 0 ? "text-green-700" : entry.bestPlayerScore > 0 ? "text-red-600" : "text-gray-700"}`}>
                             {scoreLabel(entry.bestPlayerScore)}
                           </div>
@@ -251,8 +271,42 @@ export default function PoolPage({ params }: { params: Promise<{ slug: string }>
           </div>
         ) : null}
 
-        {/* Tournament leaderboard */}
-        {(players ?? []).some(p => p.scoreToPar !== undefined) && (
+        {/* Tournament leaderboard — pick format shows prize money */}
+        {pool.drawType === "pick" && (players ?? []).some(p => p.prizeMoney !== undefined) ? (
+          <section>
+            <h2 className="text-base font-semibold text-gray-900 mb-3">Tournament prize money</h2>
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left text-xs text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-3">Player</th>
+                    <th className="px-4 py-3 text-right">Prize money</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...(players ?? [])]
+                    .sort((a, b) => (b.prizeMoney ?? 0) - (a.prizeMoney ?? 0))
+                    .map(player => (
+                      <tr key={player._id} className="border-b border-gray-50 last:border-0">
+                        <td className="px-4 py-2.5">
+                          <div className="font-medium text-gray-900">{player.name}</div>
+                          {player.madeCut === false && (
+                            <div className="text-xs text-red-500">Missed cut</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-semibold">
+                          {(player.prizeMoney ?? 0) > 0
+                            ? <span className="text-gray-900">${((player.prizeMoney ?? 0) / 100).toLocaleString("en-US")}</span>
+                            : <span className="text-red-500 text-xs font-medium">MC</span>
+                          }
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : (players ?? []).some(p => p.scoreToPar !== undefined) ? (
           <section>
             <h2 className="text-base font-semibold text-gray-900 mb-3">Tournament leaderboard</h2>
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -304,7 +358,7 @@ export default function PoolPage({ params }: { params: Promise<{ slug: string }>
               </table>
             </div>
           </section>
-        )}
+        ) : null}
     </div>
   );
 }

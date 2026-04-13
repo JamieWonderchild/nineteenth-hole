@@ -47,6 +47,9 @@ export function useActiveClub() {
   const { selectedClubId } = useClubContext();
   const myClubs = useQuery(api.clubMembers.myActiveClubs);
 
+  // undefined = query still loading; [] = loaded but no clubs
+  const isLoading = myClubs === undefined;
+
   const entry = (() => {
     if (!myClubs?.length) return undefined;
     if (selectedClubId) {
@@ -61,5 +64,6 @@ export function useActiveClub() {
     club: entry?.club ?? null,
     myClubs: myClubs ?? [],
     selectedClubId,
+    isLoading,
   };
 }

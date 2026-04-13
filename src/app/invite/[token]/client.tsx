@@ -5,12 +5,14 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "convex/_generated/api";
+import { useClubContext } from "@/lib/club-context";
 
 export default function InvitePageClient({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
   const { user } = useUser();
   const { openSignIn } = useClerk();
   const router = useRouter();
+  const { setSelectedClubId } = useClubContext();
   const [redeeming, setRedeeming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -26,7 +28,8 @@ export default function InvitePageClient({ params }: { params: Promise<{ token: 
     setRedeeming(true);
     setError(null);
     try {
-      await redeemInvite({ token });
+      const { clubId } = await redeemInvite({ token });
+      setSelectedClubId(clubId);
       setDone(true);
       setTimeout(() => router.replace("/manage"), 1500);
     } catch (e: unknown) {

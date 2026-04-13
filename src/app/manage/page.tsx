@@ -19,7 +19,7 @@ export default function ManagePage() {
     api.clubMembers.listByUser,
     user ? { userId: user.id } : "skip"
   );
-  const { activeMembership, club } = useActiveClub();
+  const { activeMembership, club, isLoading: clubsLoading } = useActiveClub();
   const pendingMembership = memberships?.find(m => m.status === "pending");
   const isAdmin = activeMembership?.role === "admin" || superAdmin === true;
   const competitions = useQuery(
@@ -63,7 +63,7 @@ export default function ManagePage() {
     }
   }, [superAdmin, activeMembership, memberships, router]);
 
-  if (superAdmin === undefined || memberships === undefined) return <Spinner />;
+  if (superAdmin === undefined || memberships === undefined || clubsLoading) return <Spinner />;
 
   if (!activeMembership) {
     if (pendingMembership) {
