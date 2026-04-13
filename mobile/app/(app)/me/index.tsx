@@ -16,7 +16,6 @@ import { useQuery, useMutation } from "convex/react";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../../../lib/convex";
 import {
-  Card,
   HandicapBadge,
   LoadingSpinner,
   SectionHeader,

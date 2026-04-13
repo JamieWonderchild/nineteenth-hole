@@ -47,11 +47,7 @@ function ScoreEntryModal({
   const format = competition?.scoringFormat ?? "stableford";
   const handicap = membership?.handicap ?? 0;
 
-  // Use submitScoreHoleByHole — members are authorised to submit for themselves.
-  // We pass a synthetic single-hole entry with the total gross score so the
-  // server can auto-compute net and stableford (if course is linked).
-  // If you want hole-by-hole entry, navigate to a dedicated screen.
-  const submitScoreHoleByHole = useMutation(api.scoring.submitScoreHoleByHole);
+  const submitOwnScore = useMutation(api.scoring.submitOwnScore);
 
   const netScore =
     grossInput && !isNaN(Number(grossInput))
@@ -66,13 +62,9 @@ function ScoreEntryModal({
 
     setSubmitting(true);
     try {
-      // submitScoreHoleByHole accepts memberId (the clubMembers._id)
-      await submitScoreHoleByHole({
+      await submitOwnScore({
         competitionId: competition._id,
-        clubId: competition.clubId,
-        memberId: membership._id,
-        // Pass total as a single synthetic hole so the server can compute net
-        holeScores: [{ hole: 1, gross: Number(grossInput) }],
+        grossScore: Number(grossInput),
       });
       Alert.alert("Score submitted!", "Your score has been recorded.");
       onClose();
