@@ -15,7 +15,7 @@ import { useUser } from "@clerk/clerk-expo";
 import { useQuery, useMutation } from "convex/react";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../../../../lib/convex";
-import { Badge, Card, LoadingSpinner, SectionHeader } from "../../../../components/ui";
+import { Badge, LoadingSpinner, SectionHeader } from "../../../../components/ui";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -28,18 +28,6 @@ function formatDate(dateStr: string) {
   });
 }
 
-function ordinal(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
-
-function statusVariant(status: string): "success" | "warning" | "muted" {
-  if (status === "live" || status === "open") return "success";
-  if (status === "draft") return "warning";
-  return "muted";
-}
-
 // ── score entry modal ──────────────────────────────────────────────────────────
 
 function ScoreEntryModal({
@@ -47,25 +35,23 @@ function ScoreEntryModal({
   onClose,
   competition,
   membership,
-  userId,
-  displayName,
 }: {
   visible: boolean;
   onClose: () => void;
   competition: any;
   membership: any;
-  userId: string;
-  displayName: string;
 }) {
   const [grossInput, setGrossInput] = useState("");
-  const [stablefordInput, setStablefordInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const format = competition?.scoringFormat ?? "stableford";
   const handicap = membership?.handicap ?? 0;
 
-  // Use the submitScore mutation from api.scoring
-  const submitScore = useMutation(api.scoring.submitScore);
+  // Use submitScoreHoleByHole — members are authorised to submit for themselves.
+  // We pass a synthetic single-hole entry with the total gross score so the
+  // server can auto-compute net and stableford (if course is linked).
+  // If you want hole-by-hole entry, navigate to a dedicated screen.
+  const submitScoreHoleByHole = useMutation(api.scoring.submitScoreHoleByHole);
 
   const netScore =
     grossInput && !isNaN(Number(grossInput))
@@ -73,27 +59,20 @@ function ScoreEntryModal({
       : null;
 
   async function handleSubmit() {
-    if (format === "stableford" && !stablefordInput) {
-      Alert.alert("Missing score", "Please enter your Stableford points.");
-      return;
-    }
-    if (format !== "stableford" && !grossInput) {
+    if (!grossInput || isNaN(Number(grossInput))) {
       Alert.alert("Missing score", "Please enter your gross score.");
       return;
     }
 
     setSubmitting(true);
     try {
-      await submitScore({
+      // submitScoreHoleByHole accepts memberId (the clubMembers._id)
+      await submitScoreHoleByHole({
         competitionId: competition._id,
         clubId: competition.clubId,
-        userId,
-        displayName,
-        handicap,
-        grossScore:
-          grossInput ? Number(grossInput) : undefined,
-        stablefordPoints:
-          stablefordInput ? Number(stablefordInput) : undefined,
+        memberId: membership._id,
+        // Pass total as a single synthetic hole so the server can compute net
+        holeScores: [{ hole: 1, gross: Number(grossInput) }],
       });
       Alert.alert("Score submitted!", "Your score has been recorded.");
       onClose();
@@ -153,25 +132,6 @@ function ScoreEntryModal({
               </Text>
             )}
           </View>
-
-          {/* Stableford points — show when format is stableford */}
-          {format === "stableford" && (
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-gray-700 mb-1">
-                Stableford Points
-              </Text>
-              <View className="border border-gray-200 rounded-xl px-4 py-3 bg-gray-50">
-                <TextInput
-                  className="text-lg text-gray-900"
-                  placeholder="e.g. 36"
-                  placeholderTextColor="#9ca3af"
-                  keyboardType="number-pad"
-                  value={stablefordInput}
-                  onChangeText={setStablefordInput}
-                />
-              </View>
-            </View>
-          )}
         </ScrollView>
 
         <View className="px-4 pb-10 pt-4 border-t border-gray-100">
@@ -439,8 +399,6 @@ export default function CompetitionLeaderboardScreen() {
           onClose={() => setScoreModalVisible(false)}
           competition={competition}
           membership={membership}
-          userId={userId}
-          displayName={user?.fullName ?? user?.firstName ?? "Player"}
         />
       )}
     </>
