@@ -13,6 +13,8 @@ const isPublicRoute = createRouteMatcher([
   // Club pool pages — public leaderboard & entry
   "/:clubSlug/:competitionSlug",
   "/:clubSlug/:competitionSlug/enter",
+  // Kiosk POS — accessed by staff on dedicated devices, no login required
+  "/kiosk/pos",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

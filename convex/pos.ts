@@ -165,9 +165,21 @@ export const recordSale = mutation({
     shiftId:    v.optional(v.id("posShifts")),
     locationId: v.optional(v.id("posLocations")),
     isGuest:    v.optional(v.boolean()),
+    // Kiosk identity — when present, authenticates the sale as a kiosk
+    // device rather than a logged-in user (no Clerk session required)
+    kioskId:    v.optional(v.id("posKiosks")),
   },
   handler: async (ctx, args) => {
-    const userId = await assertMember(ctx, args.clubId);
+    // Auth: kiosk sales are authenticated by device identity (kioskId);
+    // admin-panel sales require a logged-in club member.
+    let userId: string;
+    if (args.kioskId) {
+      const kiosk = await ctx.db.get(args.kioskId);
+      if (!kiosk || kiosk.clubId !== args.clubId) throw new Error("Invalid kiosk");
+      userId = `kiosk:${args.kioskId}`;
+    } else {
+      userId = await assertMember(ctx, args.clubId);
+    }
     const subtotalPence = args.items.reduce((s, i) => s + i.subtotalPence, 0);
 
     // Account charge — check and deduct atomically before writing the sale

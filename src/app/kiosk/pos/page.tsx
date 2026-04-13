@@ -254,20 +254,32 @@ function useKioskId(): Id<"posKiosks"> | null {
 }
 
 export default function KioskPOS() {
-  const { user } = useUser();
-  const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
-  const activeMembership = memberships?.find(m => m.status === "active");
-  const club = useQuery(api.clubs.get, activeMembership ? { clubId: activeMembership.clubId } : "skip");
-  const categories = useQuery(api.pos.listCategories, club ? { clubId: club._id } : "skip");
-  const products = useQuery(api.pos.listProducts, club ? { clubId: club._id } : "skip");
-  const recordSale = useMutation(api.pos.recordSale);
-
-  // ── PIN lock & kiosk identity ───────────────────────────────────────────────
+  // ── Kiosk identity (from URL param) ────────────────────────────────────────
+  // When a kioskId is present we resolve clubId from the kiosk record itself,
+  // so no Clerk login is required for staff using the kiosk.
   const kioskId = useKioskId();
   const kioskData = useQuery(
     api.posLocations.getKioskById,
     kioskId ? { kioskId } : "skip"
   );
+
+  // Kiosk mode: clubId comes from the kiosk document — no login needed.
+  // Admin preview mode (no kioskId): fall back to the logged-in user's club.
+  const { user } = useUser();
+  const memberships = useQuery(
+    api.clubMembers.listByUser,
+    !kioskId && user ? { userId: user.id } : "skip"
+  );
+  const activeMembership = memberships?.find(m => m.status === "active");
+
+  // Resolve which clubId to use: kiosk's own club, or the logged-in user's club
+  const clubId: Id<"clubs"> | null =
+    kioskData?.clubId ?? activeMembership?.clubId ?? null;
+
+  const club = useQuery(api.clubs.get, clubId ? { clubId } : "skip");
+  const categories = useQuery(api.pos.listCategories, clubId ? { clubId } : "skip");
+  const products = useQuery(api.pos.listProducts, clubId ? { clubId } : "skip");
+  const recordSale = useMutation(api.pos.recordSale);
   // locked = kiosk is in staff-only mode (PIN required for manager access)
   // managerUnlocked = PIN was just entered, manager controls visible
   const [isLocked, setIsLocked] = useState(false);
@@ -442,6 +454,8 @@ export default function KioskPOS() {
         shiftId:    openShift?._id,
         locationId: kioskData?.locationId,
         isGuest:    !selectedMember, // no member selected = walk-in / guest
+        // Kiosk auth — allows sale without a logged-in Clerk session
+        kioskId:    kioskId ?? undefined,
       });
       setLastTotal(total);
       setBasket([]);
