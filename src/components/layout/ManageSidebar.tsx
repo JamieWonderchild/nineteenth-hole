@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, LogOut,
   Globe, ChevronRight, ChevronDown, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered, Clock, MapPin,
-  MessageSquare, Mail, Swords, UserCheck, ShoppingCart, Shield, CreditCard, UserCircle, BarChart2, Wallet, Check
+  MessageSquare, Mail, Swords, UserCheck, ShoppingCart, Shield, CreditCard, UserCircle, BarChart2, Wallet, Check, Monitor
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
@@ -214,6 +214,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
                 <NavItem href="/manage/analytics" icon={<BarChart2 size={16} />} label="Analytics" active={pathname.startsWith("/manage/analytics")} onClick={onNav} />
                 <NavItem href="/manage/comms" icon={<Mail size={16} />} label="Communications" active={pathname.startsWith("/manage/comms")} onClick={onNav} />
                 <NavItem href="/manage/courses" icon={<MapPin size={16} />} label="Course Card" active={pathname.startsWith("/manage/courses")} onClick={onNav} />
+                <NavItem href="/manage/pos/locations" icon={<Monitor size={16} />} label="Locations &amp; Kiosks" active={pathname.startsWith("/manage/pos/locations")} onClick={onNav} />
               </>
             )}
 
