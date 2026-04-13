@@ -9,6 +9,7 @@ import { formatCurrency } from "@/lib/format";
 import { X, ChevronLeft, Search, UserCircle, Check, Lock, ArrowLeft, Maximize, Minimize } from "lucide-react";
 
 import { PinPad } from "@/components/kiosk/PinLock";
+import { KioskShiftModal } from "@/components/kiosk/ShiftModal";
 import Link from "next/link";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -274,6 +275,7 @@ export default function KioskPOS() {
   const [pinMode, setPinMode] = useState<"lock" | "unlock">("unlock");
   const [managerUnlocked, setManagerUnlocked] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showShiftModal, setShowShiftModal] = useState(false);
 
   // Keep fullscreen state in sync with browser
   useEffect(() => {
@@ -549,12 +551,12 @@ export default function KioskPOS() {
             {/* ── STATE 3: Manager unlocked — show full manager controls ── */}
             {managerUnlocked && (
               <div className="flex items-center gap-2">
-                <Link
-                  href="/manage/pos/shifts"
+                <button
+                  onClick={() => setShowShiftModal(true)}
                   className="text-xs px-3 py-1.5 bg-green-700 hover:bg-green-600 text-green-100 rounded-lg font-medium transition-colors"
                 >
                   Shifts &amp; Reports
-                </Link>
+                </button>
                 <button
                   onClick={isFullscreen ? exitFullscreen : enterFullscreen}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors border border-gray-700"
@@ -739,6 +741,17 @@ export default function KioskPOS() {
           </div>
         </div>
       </div>
+
+      {/* ── Shift modal ────────────────────────────────────────────── */}
+      {showShiftModal && club && kioskData?.locationId && (
+        <KioskShiftModal
+          clubId={club._id}
+          locationId={kioskData.locationId}
+          locationName={kioskData.name}
+          currency={currency}
+          onClose={() => setShowShiftModal(false)}
+        />
+      )}
 
       {/* ── Overlays ───────────────────────────────────────────────── */}
 
