@@ -217,7 +217,7 @@ export function PinPad({ kioskId, onUnlocked, visible, onDismiss }: PinLockProps
               const isDelete = key === "⌫";
               return (
                 <button
-                  key={key}
+                  key={i}
                   onClick={() => handleKey(key)}
                   disabled={cooldown > 0}
                   className={`
