@@ -6,7 +6,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
-import { X, ChevronLeft, Search, UserCircle, Check, Lock } from "lucide-react";
+import { X, ChevronLeft, Search, UserCircle, Check, Lock, ArrowLeft } from "lucide-react";
 import { PinPad, HiddenManagerTrigger } from "@/components/kiosk/PinLock";
 import Link from "next/link";
 
@@ -429,9 +429,22 @@ export default function KioskPOS() {
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 bg-gray-900 shrink-0">
-          <div>
-            <p className="font-bold text-white text-lg">{club.name}</p>
-            <p className="text-xs text-gray-500">Bar &amp; Pro Shop</p>
+          <div className="flex items-center gap-4">
+            {/* Back to manage — only when NOT in locked kiosk mode */}
+            {!kioskId && (
+              <Link
+                href="/manage/pos"
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors border border-gray-700"
+              >
+                <ArrowLeft size={13} /> Back
+              </Link>
+            )}
+            <div>
+              <p className="font-bold text-white text-lg">{club.name}</p>
+              <p className="text-xs text-gray-500">
+                {kioskData ? kioskData.name : "Point of Sale"}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             {/* Shift status indicator — only shown when kiosk is registered */}
@@ -454,6 +467,12 @@ export default function KioskPOS() {
                   className="text-xs px-3 py-1.5 bg-green-700 hover:bg-green-600 text-green-100 rounded-lg font-medium transition-colors"
                 >
                   Shifts &amp; Reports
+                </Link>
+                <Link
+                  href="/manage/pos"
+                  className="text-xs px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium transition-colors border border-gray-600"
+                >
+                  ← Manage
                 </Link>
                 <button
                   onClick={handleLock}
