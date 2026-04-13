@@ -152,8 +152,18 @@ export const getShiftReport = query({
       .withIndex("by_shift", (q) => q.eq("shiftId", shiftId))
       .collect();
 
-    const opening = stockTakes.find((t) => t.type === "opening");
-    const closing = stockTakes.find((t) => t.type === "closing");
+    const opening   = stockTakes.find((t) => t.type === "opening");
+    const closing   = stockTakes.find((t) => t.type === "closing");
+    const spotTakes = stockTakes
+      .filter((t) => t.type === "spot")
+      .sort((a, b) => a.takenAt.localeCompare(b.takenAt))
+      .map((t) => ({
+        _id:         t._id,
+        takenAt:     t.takenAt,
+        takenByName: t.takenByName,
+        notes:       t.notes,
+        counts:      t.counts,
+      }));
 
     // Build variance table (only products present in at least one stock take)
     const productIds = new Set([
@@ -187,8 +197,13 @@ export const getShiftReport = query({
         memberPence,
         saleCount: sales.length,
       },
-      hasOpeningStockTake: !!opening,
-      hasClosingStockTake: !!closing,
+      hasOpeningStockTake:  !!opening,
+      hasClosingStockTake:  !!closing,
+      openingTakenByName:   opening?.takenByName,
+      openingTakenAt:       opening?.takenAt,
+      closingTakenByName:   closing?.takenByName,
+      closingTakenAt:       closing?.takenAt,
+      spotTakes,
       stockVariance,
     };
   },
@@ -258,13 +273,14 @@ export const closeShift = mutation({
   },
 });
 
-/** Record a stock take (opening or closing) for a shift. */
+/** Record a stock take (opening, closing, or mid-shift spot) for a shift. */
 export const recordStockTake = mutation({
   args: {
-    clubId:     v.id("clubs"),
-    shiftId:    v.id("posShifts"),
-    locationId: v.id("posLocations"),
-    type:       v.string(), // "opening" | "closing"
+    clubId:      v.id("clubs"),
+    shiftId:     v.id("posShifts"),
+    locationId:  v.id("posLocations"),
+    type:        v.string(), // "opening" | "closing" | "spot"
+    takenByName: v.string(), // human-entered staff name
     counts: v.array(v.object({
       productId:    v.id("posProducts"),
       productName:  v.string(),
@@ -273,42 +289,48 @@ export const recordStockTake = mutation({
     notes:   v.optional(v.string()),
     kioskId: v.optional(v.id("posKiosks")),
   },
-  handler: async (ctx, { clubId, shiftId, locationId, type, counts, notes, kioskId }) => {
+  handler: async (ctx, { clubId, shiftId, locationId, type, takenByName, counts, notes, kioskId }) => {
     const userId = await assertAdminOrKiosk(ctx, clubId, kioskId);
 
     const shift = await ctx.db.get(shiftId);
     if (!shift) throw new Error("Shift not found");
     if (shift.clubId !== clubId) throw new Error("Shift does not belong to this club");
 
-    // Prevent duplicate stock takes of same type
-    const existing = await ctx.db
-      .query("posStockTakes")
-      .withIndex("by_shift", (q) => q.eq("shiftId", shiftId))
-      .filter((q) => q.eq(q.field("type"), type))
-      .first();
+    const now = new Date().toISOString();
 
-    if (existing) {
-      // Allow overwrite — patch the existing record
-      await ctx.db.patch(existing._id, {
-        counts,
-        notes,
-        takenBy: userId,
-        takenAt: new Date().toISOString(),
-      });
-      return existing._id;
+    // Spot takes are always inserted (multiple allowed per shift).
+    // Opening and closing takes allow overwrite — only one of each per shift.
+    if (type !== "spot") {
+      const existing = await ctx.db
+        .query("posStockTakes")
+        .withIndex("by_shift", (q) => q.eq("shiftId", shiftId))
+        .filter((q) => q.eq(q.field("type"), type))
+        .first();
+
+      if (existing) {
+        // Allow overwrite — patch the existing record
+        await ctx.db.patch(existing._id, {
+          counts,
+          notes,
+          takenBy:     userId,
+          takenByName,
+          takenAt:     now,
+        });
+        return existing._id;
+      }
     }
 
-    const now = new Date().toISOString();
     return ctx.db.insert("posStockTakes", {
       clubId,
       locationId,
       shiftId,
       type,
-      takenBy: userId,
-      takenAt: now,
+      takenBy:     userId,
+      takenByName,
+      takenAt:     now,
       counts,
       notes,
-      createdAt: now,
+      createdAt:   now,
     });
   },
 });

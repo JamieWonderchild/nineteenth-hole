@@ -277,8 +277,20 @@ function KioskPOS() {
     kioskData?.clubId ?? activeMembership?.clubId ?? null;
 
   const club = useQuery(api.clubs.get, clubId ? { clubId } : "skip");
-  const categories = useQuery(api.pos.listCategories, clubId ? { clubId } : "skip");
-  const products = useQuery(api.pos.listProducts, clubId ? { clubId } : "skip");
+  const categories = useQuery(
+    api.pos.listCategories,
+    clubId
+      ? { clubId, ...(kioskData?.locationId ? { locationId: kioskData.locationId } : {}) }
+      : "skip"
+  );
+  // When running as a kiosk, filter products by the kiosk's assigned location so
+  // only that location's items (and global/unassigned items) appear on the till.
+  const products = useQuery(
+    api.pos.listProducts,
+    clubId
+      ? { clubId, ...(kioskData?.locationId ? { locationId: kioskData.locationId } : {}) }
+      : "skip"
+  );
   const recordSale = useMutation(api.pos.recordSale);
   // locked = kiosk is in staff-only mode (PIN required for manager access)
   // managerUnlocked = PIN was just entered, manager controls visible

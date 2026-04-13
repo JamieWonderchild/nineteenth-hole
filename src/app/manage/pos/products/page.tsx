@@ -9,20 +9,23 @@ import { formatCurrency } from "@/lib/format";
 import { Plus, X, Pencil, ArrowLeft, Package, Tag } from "lucide-react";
 import Link from "next/link";
 
-type Category = { _id: Id<"posCategories">; name: string; icon?: string; sortOrder: number };
+type Category = { _id: Id<"posCategories">; name: string; icon?: string; sortOrder: number; locationId?: Id<"posLocations"> };
+type Location = { _id: Id<"posLocations">; name: string; isActive: boolean };
 type Product = {
   _id: Id<"posProducts">;
   name: string; sku?: string; description?: string;
   pricePence: number; currency: string;
   categoryId?: Id<"posCategories">;
+  locationId?: Id<"posLocations">;
   trackStock?: boolean; stockCount?: number;
   isActive: boolean;
 };
 
 function CategoryModal({
-  clubId, category, onClose,
+  clubId, locations, category, onClose,
 }: {
   clubId: Id<"clubs">;
+  locations: Location[];
   category?: Category;
   onClose: () => void;
 }) {
@@ -30,13 +33,20 @@ function CategoryModal({
   const deleteCategory = useMutation(api.pos.deleteCategory);
   const [name, setName] = useState(category?.name ?? "");
   const [icon, setIcon] = useState(category?.icon ?? "");
+  const [locationId, setLocationId] = useState(category?.locationId ?? "" as string);
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
     if (!name.trim()) return;
     setSaving(true);
     try {
-      await saveCategory({ clubId, categoryId: category?._id, name: name.trim(), icon: icon.trim() || undefined });
+      await saveCategory({
+        clubId,
+        categoryId: category?._id,
+        name: name.trim(),
+        icon: icon.trim() || undefined,
+        locationId: locationId ? locationId as Id<"posLocations"> : undefined,
+      });
       onClose();
     } finally { setSaving(false); }
   }
@@ -58,7 +68,7 @@ function CategoryModal({
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Name *</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-              placeholder="e.g. Bar, Pro Shop, Food"
+              placeholder="e.g. Pints, Spirits, Food"
               className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
           </div>
           <div>
@@ -67,6 +77,21 @@ function CategoryModal({
               placeholder="🍺"
               className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
           </div>
+          {locations.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Location</label>
+              <select value={locationId} onChange={e => setLocationId(e.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option value="">All locations (no restriction)</option>
+                {locations.filter(l => l.isActive).map(l => (
+                  <option key={l._id} value={l._id}>{l.name}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Restrict this category to a specific location, or leave blank to show everywhere.
+              </p>
+            </div>
+          )}
         </div>
         <div className="flex justify-between gap-3 px-6 py-4 border-t border-gray-100">
           {category && (
@@ -86,11 +111,12 @@ function CategoryModal({
 }
 
 function ProductModal({
-  clubId, currency, categories, product, onClose,
+  clubId, currency, categories, locations, product, onClose,
 }: {
   clubId: Id<"clubs">;
   currency: string;
   categories: Category[];
+  locations: Location[];
   product?: Product;
   onClose: () => void;
 }) {
@@ -101,6 +127,7 @@ function ProductModal({
     description: product?.description ?? "",
     price: product ? (product.pricePence / 100).toFixed(2) : "",
     categoryId: product?.categoryId ?? "" as string,
+    locationId: product?.locationId ?? "" as string,
     trackStock: product?.trackStock ?? false,
     stockCount: product?.stockCount?.toString() ?? "",
     isActive: product?.isActive ?? true,
@@ -120,6 +147,7 @@ function ProductModal({
         pricePence: Math.round(parseFloat(form.price) * 100),
         currency,
         categoryId: form.categoryId ? form.categoryId as Id<"posCategories"> : undefined,
+        locationId: form.locationId ? form.locationId as Id<"posLocations"> : undefined,
         trackStock: form.trackStock || undefined,
         stockCount: form.trackStock && form.stockCount ? parseInt(form.stockCount) : undefined,
         isActive: form.isActive,
@@ -164,6 +192,21 @@ function ProductModal({
                 ))}
               </select>
             </div>
+            {locations.length > 0 && (
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Location</label>
+                <select value={form.locationId} onChange={e => setForm(f => ({ ...f, locationId: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                  <option value="">All locations (no restriction)</option>
+                  {locations.filter(l => l.isActive).map(l => (
+                    <option key={l._id} value={l._id}>{l.name}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Restrict this product to a specific till location, or leave blank to show everywhere.
+                </p>
+              </div>
+            )}
             <div className="col-span-2">
               <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
               <input type="text" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
@@ -214,14 +257,15 @@ export default function POSProductsPage() {
   const { club } = useActiveClub();
 
   const categories = useQuery(api.pos.listCategories, club ? { clubId: club._id } : "skip");
-  const products = useQuery(api.pos.listProducts, club ? { clubId: club._id, includeInactive: true } : "skip");
+  const products   = useQuery(api.pos.listProducts,   club ? { clubId: club._id, includeInactive: true } : "skip");
+  const locations  = useQuery(api.posLocations.listLocations, club ? { clubId: club._id } : "skip");
 
   const [showCatModal, setShowCatModal] = useState(false);
   const [editCat, setEditCat] = useState<Category | undefined>();
   const [showProductModal, setShowProductModal] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | undefined>();
 
-  if (!club || !categories || !products) {
+  if (!club || !categories || !products || !locations) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
@@ -230,6 +274,7 @@ export default function POSProductsPage() {
   }
 
   const catMap = new Map<string, Category>(categories.map(c => [c._id as string, c]));
+  const locMap = new Map<string, Location>(locations.map(l => [l._id as string, l]));
 
   // Group products by category
   const grouped: Record<string, Product[]> = { "": [] };
@@ -271,6 +316,11 @@ export default function POSProductsPage() {
             <button key={cat._id} onClick={() => { setEditCat(cat); setShowCatModal(true); }}
               className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-full text-sm text-gray-600 hover:bg-gray-50">
               {cat.icon} {cat.name}
+              {cat.locationId && locMap.get(cat.locationId as string) && (
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
+                  {locMap.get(cat.locationId as string)!.name}
+                </span>
+              )}
               <Pencil size={11} className="text-gray-300" />
             </button>
           ))}
@@ -298,7 +348,14 @@ export default function POSProductsPage() {
                     {catProducts.map((p, idx) => (
                       <tr key={p._id} className={`${idx < catProducts.length - 1 ? "border-b border-gray-50" : ""} hover:bg-gray-50/50`}>
                         <td className="px-5 py-3">
-                          <p className={`font-medium ${p.isActive ? "text-gray-900" : "text-gray-400 line-through"}`}>{p.name}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className={`font-medium ${p.isActive ? "text-gray-900" : "text-gray-400 line-through"}`}>{p.name}</p>
+                            {p.locationId && locMap.get(p.locationId as string) && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
+                                {locMap.get(p.locationId as string)!.name}
+                              </span>
+                            )}
+                          </div>
                           {p.sku && <p className="text-xs text-gray-400">SKU: {p.sku}</p>}
                         </td>
                         <td className="px-5 py-3 text-gray-500 text-xs">
@@ -330,6 +387,7 @@ export default function POSProductsPage() {
       {showCatModal && (
         <CategoryModal
           clubId={club._id}
+          locations={locations}
           category={editCat}
           onClose={() => { setShowCatModal(false); setEditCat(undefined); }}
         />
@@ -339,6 +397,7 @@ export default function POSProductsPage() {
           clubId={club._id}
           currency={club.currency}
           categories={categories}
+          locations={locations}
           product={editProduct}
           onClose={() => { setShowProductModal(false); setEditProduct(undefined); }}
         />
