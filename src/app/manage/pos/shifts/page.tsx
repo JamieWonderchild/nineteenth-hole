@@ -9,7 +9,7 @@ import type { Id } from "convex/_generated/dataModel";
 import {
   Clock, MapPin, Plus, X, ChevronDown, ChevronRight,
   PackageOpen, PackageCheck, BarChart2, AlertTriangle,
-  CheckCircle2, Circle, ClipboardList,
+  CheckCircle2, Circle, ClipboardList, ScanSearch, User,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -53,9 +53,9 @@ function StockTakeForm({
   saving,
 }: {
   products: { _id: Id<"posProducts">; name: string; trackStock?: boolean }[];
-  type: "opening" | "closing";
+  type: "opening" | "closing" | "spot";
   existingCounts?: StockRow[];
-  onSave: (counts: StockRow[], notes: string) => void;
+  onSave: (counts: StockRow[], notes: string, takenByName: string) => void;
   onCancel: () => void;
   saving: boolean;
 }) {
@@ -70,6 +70,7 @@ function StockTakeForm({
     }))
   );
   const [notes, setNotes] = useState("");
+  const [takenByName, setTakenByName] = useState("");
 
   function setCount(productId: Id<"posProducts">, value: string) {
     const n = Math.max(0, parseInt(value, 10) || 0);
@@ -77,6 +78,18 @@ function StockTakeForm({
       prev.map((c) => c.productId === productId ? { ...c, countedUnits: n } : c)
     );
   }
+
+  const typeLabel  = type === "opening" ? "Opening stock take" : type === "closing" ? "Closing stock take" : "Spot stock take";
+  const typeIcon   = type === "opening"
+    ? <PackageOpen size={18} className="text-green-600" />
+    : type === "closing"
+    ? <PackageCheck size={18} className="text-blue-600" />
+    : <ScanSearch size={18} className="text-amber-600" />;
+  const saveBtnClass = type === "spot"
+    ? "bg-amber-600 text-white hover:bg-amber-700"
+    : "bg-green-600 text-white hover:bg-green-700";
+  const ringClass  = type === "spot" ? "focus:ring-amber-500" : "focus:ring-green-500";
+  const canSave    = takenByName.trim().length > 0;
 
   if (tracked.length === 0) {
     return (
@@ -87,7 +100,7 @@ function StockTakeForm({
         to use the stock take feature.
         <div className="flex gap-2 mt-3">
           <button
-            onClick={() => onSave([], notes)}
+            onClick={() => { if (takenByName.trim()) onSave([], notes, takenByName.trim()); }}
             className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
           >
             Continue without stock take
@@ -103,16 +116,32 @@ function StockTakeForm({
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
-        {type === "opening" ? <PackageOpen size={18} className="text-green-600" /> : <PackageCheck size={18} className="text-blue-600" />}
-        <h3 className="font-semibold text-gray-900">
-          {type === "opening" ? "Opening stock take" : "Closing stock take"}
-        </h3>
+        {typeIcon}
+        <h3 className="font-semibold text-gray-900">{typeLabel}</h3>
       </div>
-      <p className="text-xs text-gray-500 mb-5">
-        Count the physical units for each tracked product. These are recorded as a snapshot at {type === "opening" ? "the start" : "the end"} of the shift.
+      <p className="text-xs text-gray-500 mb-4">
+        {type === "opening"
+          ? "Count the physical units for each tracked product at the start of the shift."
+          : type === "closing"
+          ? "Count the physical units for each tracked product at the end of the shift."
+          : "Mid-shift spot count. You can run multiple spot counts during a shift."}
       </p>
 
-      <div className="space-y-3 mb-5">
+      {/* Staff name */}
+      <div className="mb-4">
+        <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1">
+          <User size={11} /> Your name <span className="text-red-400 ml-0.5">*</span>
+        </label>
+        <input
+          value={takenByName}
+          onChange={(e) => setTakenByName(e.target.value)}
+          placeholder="e.g. Jamie"
+          autoFocus
+          className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${ringClass}`}
+        />
+      </div>
+
+      <div className="space-y-3 mb-4">
         {counts.map((row) => (
           <div key={row.productId} className="flex items-center gap-3">
             <span className="flex-1 text-sm text-gray-800 font-medium">{row.productName}</span>
@@ -127,7 +156,7 @@ function StockTakeForm({
                 min="0"
                 value={row.countedUnits}
                 onChange={(e) => setCount(row.productId, e.target.value)}
-                className="w-16 text-center border border-gray-200 rounded-lg py-1.5 text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-green-500"
+                className={`w-16 text-center border border-gray-200 rounded-lg py-1.5 text-sm font-mono font-bold focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${ringClass}`}
               />
               <button
                 type="button"
@@ -139,23 +168,23 @@ function StockTakeForm({
         ))}
       </div>
 
-      <div className="mb-5">
+      <div className="mb-4">
         <label className="block text-xs font-medium text-gray-600 mb-1">Notes <span className="text-gray-400">(optional)</span></label>
         <input
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="e.g. Delivery arrived, short on Peroni"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${ringClass}`}
         />
       </div>
 
       <div className="flex gap-2">
         <button
-          onClick={() => onSave(counts, notes)}
-          disabled={saving}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+          onClick={() => onSave(counts, notes, takenByName.trim())}
+          disabled={saving || !canSave}
+          className={`px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 ${saveBtnClass}`}
         >
-          {saving ? "Saving…" : `Save ${type} stock take`}
+          {saving ? "Saving…" : typeLabel}
         </button>
         <button onClick={onCancel} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
           Cancel
@@ -174,7 +203,13 @@ function ShiftReportPanel({ shiftId, currency }: { shiftId: Id<"posShifts">; cur
     return <div className="animate-pulse h-32 bg-gray-100 rounded-xl" />;
   }
 
-  const { summary, stockVariance, hasOpeningStockTake, hasClosingStockTake } = report;
+  const {
+    summary, stockVariance,
+    hasOpeningStockTake, hasClosingStockTake,
+    openingTakenByName, openingTakenAt,
+    closingTakenByName, closingTakenAt,
+    spotTakes,
+  } = report;
   const hasVarianceData = hasOpeningStockTake && hasClosingStockTake;
 
   return (
@@ -235,11 +270,40 @@ function ShiftReportPanel({ shiftId, currency }: { shiftId: Id<"posShifts">; cur
             <span className={`flex items-center gap-1 ${hasOpeningStockTake ? "text-green-600" : "text-gray-300"}`}>
               {hasOpeningStockTake ? <CheckCircle2 size={11} /> : <Circle size={11} />} Opening
             </span>
+            {(spotTakes?.length ?? 0) > 0 && (
+              <span className="flex items-center gap-1 text-amber-600">
+                <ScanSearch size={11} /> {spotTakes!.length} spot
+              </span>
+            )}
             <span className={`flex items-center gap-1 ${hasClosingStockTake ? "text-green-600" : "text-gray-300"}`}>
               {hasClosingStockTake ? <CheckCircle2 size={11} /> : <Circle size={11} />} Closing
             </span>
           </div>
         </div>
+
+        {/* Who did the opening / closing takes */}
+        {(hasOpeningStockTake || hasClosingStockTake) && (
+          <div className="px-4 py-2 border-b border-gray-100 flex flex-wrap gap-x-4 gap-y-1">
+            {hasOpeningStockTake && openingTakenByName && (
+              <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                <User size={9} className="text-green-600" />
+                Opening: <span className="text-gray-700 font-medium ml-0.5">{openingTakenByName}</span>
+                {openingTakenAt && (
+                  <span className="text-gray-400 ml-1">{new Date(openingTakenAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span>
+                )}
+              </span>
+            )}
+            {hasClosingStockTake && closingTakenByName && (
+              <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                <User size={9} className="text-blue-600" />
+                Closing: <span className="text-gray-700 font-medium ml-0.5">{closingTakenByName}</span>
+                {closingTakenAt && (
+                  <span className="text-gray-400 ml-1">{new Date(closingTakenAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span>
+                )}
+              </span>
+            )}
+          </div>
+        )}
 
         {!hasVarianceData ? (
           <div className="px-4 py-6 text-center text-sm text-gray-400">
@@ -294,6 +358,40 @@ function ShiftReportPanel({ shiftId, currency }: { shiftId: Id<"posShifts">; cur
           </div>
         )}
       </div>
+
+      {/* Spot takes log */}
+      {(spotTakes?.length ?? 0) > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+            <ScanSearch size={15} className="text-amber-600" />
+            <span className="font-semibold text-gray-800 text-sm">Spot stock takes ({spotTakes!.length})</span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {spotTakes!.map((spot) => (
+              <div key={spot._id} className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <User size={11} className="text-amber-600" />
+                  <span className="text-xs font-semibold text-gray-800">{spot.takenByName}</span>
+                  <span className="text-xs text-gray-400">
+                    {new Date(spot.takenAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  {spot.notes && (
+                    <span className="text-xs text-gray-400 italic ml-auto truncate">"{spot.notes}"</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                  {spot.counts.map((c) => (
+                    <div key={c.productId} className="flex justify-between text-xs">
+                      <span className="text-gray-500 truncate">{c.productName}</span>
+                      <span className="text-gray-800 font-mono font-semibold ml-2 shrink-0">{c.countedUnits}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -312,7 +410,7 @@ function ShiftCard({
   onClose: (shiftId: Id<"posShifts">) => void;
 }) {
   const [expanded, setExpanded] = useState(shift.status === "open");
-  const [showStockTake, setShowStockTake] = useState<"opening" | "closing" | null>(null);
+  const [showStockTake, setShowStockTake] = useState<"opening" | "closing" | "spot" | null>(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -322,19 +420,21 @@ function ShiftCard({
 
   const openingTake = stockTakes?.find((t) => t.type === "opening");
   const closingTake = stockTakes?.find((t) => t.type === "closing");
+  const spotCount   = stockTakes?.filter((t) => t.type === "spot").length ?? 0;
   const isOpen = shift.status === "open";
 
-  async function handleStockTakeSave(counts: StockRow[], notes: string) {
+  async function handleStockTakeSave(counts: StockRow[], notes: string, takenByName: string) {
     if (!showStockTake) return;
     setSaving(true);
     try {
       await recordStockTake({
-        clubId:     shift.clubId,
-        shiftId:    shift._id,
-        locationId: shift.locationId,
-        type:       showStockTake,
+        clubId:      shift.clubId,
+        shiftId:     shift._id,
+        locationId:  shift.locationId,
+        type:        showStockTake,
+        takenByName,
         counts,
-        notes:      notes || undefined,
+        notes:       notes || undefined,
       });
       setShowStockTake(null);
     } catch (err) {
@@ -395,6 +495,21 @@ function ShiftCard({
               Opening stock take
               {openingTake && <span className="text-[10px] text-green-500 ml-0.5">✓</span>}
             </button>
+
+            {isOpen && (
+              <button
+                onClick={() => setShowStockTake("spot")}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+              >
+                <ScanSearch size={14} />
+                Spot count
+                {spotCount > 0 && (
+                  <span className="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full font-semibold">
+                    {spotCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             <button
               onClick={() => setShowStockTake("closing")}

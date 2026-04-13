@@ -764,22 +764,23 @@ export default defineSchema({
     .index("by_location",        ["locationId"])
     .index("by_club_and_status", ["clubId", "status"]),
 
-  // A snapshot of physical stock counts taken at the start or end of a shift
-  // Two per shift: opening + closing. Delta vs units sold = variance.
+  // A snapshot of physical stock counts taken at the start, end, or mid-shift (spot).
+  // Opening + closing enables variance calc; spot takes are mid-shift checks.
   posStockTakes: defineTable({
-    clubId:     v.id("clubs"),
-    locationId: v.id("posLocations"),
-    shiftId:    v.id("posShifts"),
-    type:       v.string(),             // "opening" | "closing"
-    takenBy:    v.string(),             // userId
-    takenAt:    v.string(),             // ISO datetime
-    counts:     v.array(v.object({
+    clubId:       v.id("clubs"),
+    locationId:   v.id("posLocations"),
+    shiftId:      v.id("posShifts"),
+    type:         v.string(),             // "opening" | "closing" | "spot"
+    takenBy:      v.string(),             // userId / kiosk actor
+    takenByName:  v.string(),             // human-entered staff name
+    takenAt:      v.string(),             // ISO datetime
+    counts:       v.array(v.object({
       productId:    v.id("posProducts"),
-      productName:  v.string(),         // denormalised — survives product deletion/rename
+      productName:  v.string(),           // denormalised — survives product deletion/rename
       countedUnits: v.number(),
     })),
-    notes:      v.optional(v.string()),
-    createdAt:  v.string(),
+    notes:        v.optional(v.string()),
+    createdAt:    v.string(),
   })
     .index("by_club",     ["clubId"])
     .index("by_shift",    ["shiftId"])

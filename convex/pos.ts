@@ -33,32 +33,42 @@ async function assertMember(ctx: MutationCtx | QueryCtx, clubId: Id<"clubs">) {
 // ── Categories ────────────────────────────────────────────────────────────────
 
 export const listCategories = query({
-  args: { clubId: v.id("clubs") },
-  handler: async (ctx, { clubId }) => {
-    return ctx.db
+  args: {
+    clubId:     v.id("clubs"),
+    locationId: v.optional(v.id("posLocations")),
+  },
+  handler: async (ctx, { clubId, locationId }) => {
+    const all = await ctx.db
       .query("posCategories")
       .withIndex("by_club", q => q.eq("clubId", clubId))
       .collect();
+    // When filtering by location: include categories for that location + global categories
+    if (locationId) {
+      return all.filter(c => !c.locationId || c.locationId === locationId);
+    }
+    return all;
   },
 });
 
 export const saveCategory = mutation({
   args: {
-    clubId: v.id("clubs"),
+    clubId:     v.id("clubs"),
     categoryId: v.optional(v.id("posCategories")),
-    name: v.string(),
-    icon: v.optional(v.string()),
-    sortOrder: v.optional(v.number()),
+    locationId: v.optional(v.id("posLocations")),
+    name:       v.string(),
+    icon:       v.optional(v.string()),
+    sortOrder:  v.optional(v.number()),
   },
-  handler: async (ctx, { clubId, categoryId, name, icon, sortOrder }) => {
+  handler: async (ctx, { clubId, categoryId, name, icon, sortOrder, locationId }) => {
     await assertAdmin(ctx, clubId);
     if (categoryId) {
-      await ctx.db.patch(categoryId, { name, icon: icon ?? undefined });
+      await ctx.db.patch(categoryId, { name, icon: icon ?? undefined, locationId: locationId ?? undefined });
       return categoryId;
     }
     const existing = await ctx.db.query("posCategories").withIndex("by_club", q => q.eq("clubId", clubId)).collect();
     return ctx.db.insert("posCategories", {
       clubId, name, icon: icon ?? undefined,
+      locationId: locationId ?? undefined,
       sortOrder: sortOrder ?? existing.length,
       createdAt: new Date().toISOString(),
     });
@@ -78,29 +88,42 @@ export const deleteCategory = mutation({
 // ── Products ──────────────────────────────────────────────────────────────────
 
 export const listProducts = query({
-  args: { clubId: v.id("clubs"), includeInactive: v.optional(v.boolean()) },
-  handler: async (ctx, { clubId, includeInactive }) => {
+  args: {
+    clubId:          v.id("clubs"),
+    includeInactive: v.optional(v.boolean()),
+    locationId:      v.optional(v.id("posLocations")),
+  },
+  handler: async (ctx, { clubId, includeInactive, locationId }) => {
     const all = await ctx.db
       .query("posProducts")
       .withIndex("by_club", q => q.eq("clubId", clubId))
       .collect();
-    return includeInactive ? all : all.filter(p => p.isActive);
+    let results = includeInactive ? all : all.filter(p => p.isActive);
+    // When a locationId filter is supplied, include products that either
+    // belong to that location OR have no location set (global/all-locations products).
+    if (locationId) {
+      results = results.filter(
+        p => !p.locationId || p.locationId === locationId
+      );
+    }
+    return results;
   },
 });
 
 export const saveProduct = mutation({
   args: {
-    clubId: v.id("clubs"),
-    productId: v.optional(v.id("posProducts")),
+    clubId:     v.id("clubs"),
+    productId:  v.optional(v.id("posProducts")),
     categoryId: v.optional(v.id("posCategories")),
-    name: v.string(),
-    sku: v.optional(v.string()),
+    locationId: v.optional(v.id("posLocations")),
+    name:        v.string(),
+    sku:         v.optional(v.string()),
     description: v.optional(v.string()),
-    pricePence: v.number(),
-    currency: v.string(),
-    trackStock: v.optional(v.boolean()),
-    stockCount: v.optional(v.number()),
-    isActive: v.optional(v.boolean()),
+    pricePence:  v.number(),
+    currency:    v.string(),
+    trackStock:  v.optional(v.boolean()),
+    stockCount:  v.optional(v.number()),
+    isActive:    v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { clubId, productId, ...fields } = args;
