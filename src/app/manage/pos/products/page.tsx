@@ -128,7 +128,7 @@ function ProductModal({
     price: product ? (product.pricePence / 100).toFixed(2) : "",
     categoryId: product?.categoryId ?? "" as string,
     locationId: product?.locationId ?? "" as string,
-    trackStock: product?.trackStock ?? false,
+    trackStock: product?.trackStock ?? true,
     stockCount: product?.stockCount?.toString() ?? "",
     isActive: product?.isActive ?? true,
   });
