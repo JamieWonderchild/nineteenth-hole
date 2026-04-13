@@ -18,8 +18,11 @@ import Link from "next/link";
 type StockRow = {
   productId: Id<"posProducts">;
   productName: string;
-  countedUnits: number;
+  countedUnits: number | null; // null = not yet counted (excluded from save)
 };
+
+// Rows that have been counted — safe to send to Convex
+type CountedRow = { productId: Id<"posProducts">; productName: string; countedUnits: number };
 
 type ProductForTake = {
   _id: Id<"posProducts">;
@@ -62,8 +65,8 @@ function StockTakeForm({
 }: {
   products: ProductForTake[];
   type: "opening" | "closing" | "spot";
-  existingCounts?: StockRow[];
-  onSave: (counts: StockRow[], notes: string, takenByName: string) => void;
+  existingCounts?: CountedRow[];
+  onSave: (counts: CountedRow[], notes: string, takenByName: string) => void;
   onCancel: () => void;
   saving: boolean;
 }) {
@@ -71,11 +74,14 @@ function StockTakeForm({
   const tracked = products.filter((p) => p.trackStock);
 
   const [counts, setCounts] = useState<StockRow[]>(() =>
-    tracked.map((p) => ({
-      productId: p._id,
-      productName: p.name,
-      countedUnits: existingCounts?.find((c) => c.productId === p._id)?.countedUnits ?? 0,
-    }))
+    tracked.map((p) => {
+      const existing = existingCounts?.find((c) => c.productId === p._id);
+      return {
+        productId: p._id,
+        productName: p.name,
+        countedUnits: existing != null ? existing.countedUnits : null,
+      };
+    })
   );
   const [notes, setNotes] = useState("");
   const [takenByName, setTakenByName] = useState("");
@@ -91,9 +97,22 @@ function StockTakeForm({
   }
 
   function setCount(productId: Id<"posProducts">, value: string) {
-    const n = Math.max(0, parseInt(value, 10) || 0);
+    const n = value === "" ? null : Math.max(0, parseInt(value, 10) || 0);
     setCounts((prev) =>
       prev.map((c) => c.productId === productId ? { ...c, countedUnits: n } : c)
+    );
+  }
+
+  function increment(productId: Id<"posProducts">, current: number | null) {
+    setCounts((prev) =>
+      prev.map((c) => c.productId === productId ? { ...c, countedUnits: (current ?? 0) + 1 } : c)
+    );
+  }
+
+  function decrement(productId: Id<"posProducts">, current: number | null) {
+    const next = Math.max(0, (current ?? 0) - 1);
+    setCounts((prev) =>
+      prev.map((c) => c.productId === productId ? { ...c, countedUnits: next } : c)
     );
   }
 
@@ -210,7 +229,7 @@ function StockTakeForm({
           groups.map(({ label, rows }) => {
             // When searching, always show all groups open
             const isCollapsed = !needle && collapsedGroups.has(label);
-            const counted = rows.filter((r) => r.countedUnits > 0).length;
+            const counted = rows.filter((r) => r.countedUnits !== null).length;
             return (
               <div key={label}>
                 {groups.length > 1 ? (
@@ -235,23 +254,26 @@ function StockTakeForm({
                   <div className="space-y-2 mb-3">
                     {rows.map((row) => (
                       <div key={row.productId} className="flex items-center gap-3">
-                        <span className="flex-1 text-sm text-gray-800 font-medium">{row.productName}</span>
+                        <span className={`flex-1 text-sm font-medium ${row.countedUnits === null ? "text-gray-400" : "text-gray-800"}`}>
+                          {row.productName}
+                        </span>
                         <div className="flex items-center gap-1 shrink-0">
                           <button
                             type="button"
-                            onClick={() => setCount(row.productId, String(Math.max(0, row.countedUnits - 1)))}
+                            onClick={() => decrement(row.productId, row.countedUnits)}
                             className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-bold"
                           >−</button>
                           <input
                             type="number"
                             min="0"
-                            value={row.countedUnits}
+                            value={row.countedUnits ?? ""}
+                            placeholder="—"
                             onChange={(e) => setCount(row.productId, e.target.value)}
-                            className={`w-16 text-center border border-gray-200 rounded-lg py-1.5 text-sm font-mono font-bold focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${ringClass}`}
+                            className={`w-16 text-center rounded-lg py-1.5 text-sm font-mono font-bold focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${row.countedUnits === null ? "border border-dashed border-gray-300 text-gray-400 placeholder-gray-300" : "border border-gray-200"} ${ringClass}`}
                           />
                           <button
                             type="button"
-                            onClick={() => setCount(row.productId, String(row.countedUnits + 1))}
+                            onClick={() => increment(row.productId, row.countedUnits)}
                             className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-bold"
                           >+</button>
                         </div>
@@ -275,9 +297,21 @@ function StockTakeForm({
         />
       </div>
 
+      {/* Uncounted hint */}
+      {counts.some((c) => c.countedUnits === null) && (
+        <p className="text-[11px] text-gray-400 mb-3">
+          {counts.filter((c) => c.countedUnits === null).length} product{counts.filter((c) => c.countedUnits === null).length !== 1 ? "s" : ""} left blank — blank items won't be recorded.
+        </p>
+      )}
+
       <div className="flex gap-2">
         <button
-          onClick={() => onSave(counts, notes, takenByName.trim())}
+          onClick={() => {
+            const recorded = counts.filter(
+              (c): c is CountedRow => c.countedUnits !== null
+            );
+            onSave(recorded, notes, takenByName.trim());
+          }}
           disabled={saving || !canSave}
           className={`px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 ${saveBtnClass}`}
         >
@@ -520,7 +554,7 @@ function ShiftCard({
   const spotCount   = stockTakes?.filter((t) => t.type === "spot").length ?? 0;
   const isOpen = shift.status === "open";
 
-  async function handleStockTakeSave(counts: StockRow[], notes: string, takenByName: string) {
+  async function handleStockTakeSave(counts: CountedRow[], notes: string, takenByName: string) {
     if (!showStockTake) return;
     setSaving(true);
     try {
@@ -638,8 +672,8 @@ function ShiftCard({
               type={showStockTake}
               existingCounts={
                 showStockTake === "opening"
-                  ? openingTake?.counts as StockRow[] | undefined
-                  : closingTake?.counts as StockRow[] | undefined
+                  ? openingTake?.counts as CountedRow[] | undefined
+                  : closingTake?.counts as CountedRow[] | undefined
               }
               onSave={handleStockTakeSave}
               onCancel={() => setShowStockTake(null)}
