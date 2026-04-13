@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
-import { X, ChevronLeft, Search, UserCircle, Check } from "lucide-react";
+import { X, ChevronLeft, Search, UserCircle, Check, Lock } from "lucide-react";
+import { PinPad, HiddenManagerTrigger } from "@/components/kiosk/PinLock";
+import Link from "next/link";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -241,6 +243,14 @@ function SaleCompleteOverlay({ total, currency, member, onDismiss }: {
 
 // ── Main kiosk POS ────────────────────────────────────────────────────────────
 
+// Read kioskId from URL: /kiosk/pos?kiosk=<kioskId>
+function useKioskId(): Id<"posKiosks"> | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("kiosk");
+  return id ? (id as Id<"posKiosks">) : null;
+}
+
 export default function KioskPOS() {
   const { user } = useUser();
   const memberships = useQuery(api.clubMembers.listByUser, user ? { userId: user.id } : "skip");
@@ -250,6 +260,42 @@ export default function KioskPOS() {
   const products = useQuery(api.pos.listProducts, club ? { clubId: club._id } : "skip");
   const recordSale = useMutation(api.pos.recordSale);
 
+  // ── PIN lock & kiosk identity ───────────────────────────────────────────────
+  const kioskId = useKioskId();
+  const kioskData = useQuery(
+    api.posLocations.getKioskById,
+    kioskId ? { kioskId } : "skip"
+  );
+  const [showPinPad, setShowPinPad] = useState(false);
+  const [managerUnlocked, setManagerUnlocked] = useState(false);
+
+  // Auto-relock after 5 minutes of manager mode
+  useEffect(() => {
+    if (!managerUnlocked) return;
+    const t = setTimeout(() => setManagerUnlocked(false), 5 * 60 * 1000);
+    return () => clearTimeout(t);
+  }, [managerUnlocked]);
+
+  const handleUnlocked = useCallback(() => {
+    setManagerUnlocked(true);
+    setShowPinPad(false);
+  }, []);
+
+  const handleLock = useCallback(() => {
+    setManagerUnlocked(false);
+  }, []);
+
+  // ── Active shift for this kiosk's location ──────────────────────────────────
+  // Looks up the open shift for the location this kiosk is assigned to.
+  // Every sale is stamped with shiftId + locationId so shift reports work.
+  const openShift = useQuery(
+    api.posShifts.getOpenShift,
+    club && kioskData?.locationId
+      ? { clubId: club._id, locationId: kioskData.locationId }
+      : "skip"
+  );
+
+  // ── POS state ───────────────────────────────────────────────────────────────
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [basket, setBasket] = useState<BasketItem[]>([]);
   const [showBasket, setShowBasket] = useState(false);
@@ -335,6 +381,10 @@ export default function KioskPOS() {
         chargeAccountMemberId: paymentMethod === "account" && selectedMember ? selectedMember._id : undefined,
         memberId: paymentMethod === "account" && selectedMember ? selectedMember._id as unknown as string : undefined,
         memberName: selectedMember?.displayName,
+        // Stamp shift & location context so this sale appears in shift reports
+        shiftId:    openShift?._id,
+        locationId: kioskData?.locationId,
+        isGuest:    !selectedMember, // no member selected = walk-in / guest
       });
       setLastTotal(total);
       setBasket([]);
@@ -357,7 +407,22 @@ export default function KioskPOS() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden relative">
+
+      {/* ── Hidden triple-tap trigger (top-right corner) ─────────────── */}
+      {kioskId && !managerUnlocked && (
+        <HiddenManagerTrigger onTripleTap={() => setShowPinPad(true)} />
+      )}
+
+      {/* ── PIN pad overlay ───────────────────────────────────────────── */}
+      {kioskId && (
+        <PinPad
+          kioskId={kioskId}
+          visible={showPinPad}
+          onUnlocked={handleUnlocked}
+          onDismiss={() => setShowPinPad(false)}
+        />
+      )}
 
       {/* ── Left: product grid ─────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -366,15 +431,47 @@ export default function KioskPOS() {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 bg-gray-900 shrink-0">
           <div>
             <p className="font-bold text-white text-lg">{club.name}</p>
-            <p className="text-xs text-gray-500">Bar & Pro Shop</p>
+            <p className="text-xs text-gray-500">Bar &amp; Pro Shop</p>
           </div>
-          {/* Mobile basket toggle */}
-          <button
-            onClick={() => setShowBasket(v => !v)}
-            className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-green-600 rounded-xl font-semibold text-sm"
-          >
-            Basket {itemCount > 0 && <span className="bg-white text-green-700 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">{itemCount}</span>}
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Shift status indicator — only shown when kiosk is registered */}
+            {kioskData && (
+              openShift
+                ? <span className="text-[11px] text-green-500 font-medium flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
+                    Shift open
+                  </span>
+                : <span className="text-[11px] text-amber-400 font-medium flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                    No shift
+                  </span>
+            )}
+            {/* Manager mode chip — shown when unlocked */}
+            {managerUnlocked && (
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/manage/pos/shifts"
+                  className="text-xs px-3 py-1.5 bg-green-700 hover:bg-green-600 text-green-100 rounded-lg font-medium transition-colors"
+                >
+                  Shifts &amp; Reports
+                </Link>
+                <button
+                  onClick={handleLock}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors border border-gray-700"
+                  title="Lock kiosk"
+                >
+                  <Lock size={12} /> Lock
+                </button>
+              </div>
+            )}
+            {/* Mobile basket toggle */}
+            <button
+              onClick={() => setShowBasket(v => !v)}
+              className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-green-600 rounded-xl font-semibold text-sm"
+            >
+              Basket {itemCount > 0 && <span className="bg-white text-green-700 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">{itemCount}</span>}
+            </button>
+          </div>
         </div>
 
         {/* Category tabs */}
