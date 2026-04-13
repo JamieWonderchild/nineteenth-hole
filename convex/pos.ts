@@ -136,7 +136,8 @@ export const saveProduct = mutation({
     return ctx.db.insert("posProducts", {
       clubId,
       ...fields,
-      isActive: fields.isActive ?? true,
+      isActive:   fields.isActive   ?? true,
+      trackStock: fields.trackStock ?? true,
       createdAt: now,
       updatedAt: now,
     });
