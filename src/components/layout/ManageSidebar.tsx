@@ -201,7 +201,10 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               <NavItem href="/manage/visitors" icon={<UserCheck size={16} />} label="Visitors" active={pathname.startsWith("/manage/visitors")} onClick={onNav} />
             )}
             {isStaff && (
-              <NavItem href="/manage/pos" icon={<ShoppingCart size={16} />} label="Point of Sale" active={pathname.startsWith("/manage/pos")} onClick={onNav} />
+              <NavItem href="/manage/pos" icon={<ShoppingCart size={16} />} label="Point of Sale" active={pathname === "/manage/pos"} onClick={onNav} />
+            )}
+            {isStaff && (
+              <NavItem href="/manage/pos/shifts" icon={<Clock size={16} />} label="Shifts &amp; Reports" active={pathname.startsWith("/manage/pos/shifts")} onClick={onNav} />
             )}
             {isStaff && (
               <NavItem href="/manage/accounts" icon={<Wallet size={16} />} label="Member Accounts" active={pathname.startsWith("/manage/accounts")} onClick={onNav} />

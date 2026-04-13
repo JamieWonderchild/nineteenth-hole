@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import {
-  MapPin, Monitor, Plus, Trash2, Pencil, X, Eye, EyeOff, KeyRound,
+  MapPin, Monitor, Plus, Trash2, Pencil, X, Eye, EyeOff,
+  GripVertical, Copy, Check, ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -29,14 +30,113 @@ type KioskRow = {
   isActive: boolean;
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Copy-to-clipboard button ───────────────────────────────────────────────────
 
-async function hashPin(pin: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(pin.trim());
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      className="flex items-center gap-1 text-xs text-gray-400 hover:text-green-600 transition-colors"
+      title="Copy URL"
+    >
+      {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+      {copied ? "Copied" : "Copy URL"}
+    </button>
+  );
+}
+
+// ── Draggable location list ────────────────────────────────────────────────────
+
+function DraggableLocations({
+  locations,
+  onReorder,
+  onEdit,
+  onDelete,
+}: {
+  locations: LocationRow[];
+  onReorder: (reordered: LocationRow[]) => void;
+  onEdit: (loc: LocationRow) => void;
+  onDelete: (id: Id<"posLocations">) => void;
+}) {
+  const [items, setItems] = useState(locations);
+  const dragIndex = useRef<number | null>(null);
+  const overIndex = useRef<number | null>(null);
+
+  // Sync when locations prop changes (e.g. after save)
+  useEffect(() => { setItems(locations); }, [locations]);
+
+  function handleDragStart(i: number) { dragIndex.current = i; }
+  function handleDragEnter(i: number) {
+    if (dragIndex.current === null || dragIndex.current === i) return;
+    overIndex.current = i;
+    const next = [...items];
+    const [moved] = next.splice(dragIndex.current, 1);
+    next.splice(i, 0, moved);
+    dragIndex.current = i;
+    setItems(next);
+  }
+  function handleDragEnd() {
+    dragIndex.current = null;
+    overIndex.current = null;
+    onReorder(items);
+  }
+
+  return (
+    <div className="space-y-2">
+      {items.map((loc, i) => (
+        <div
+          key={loc._id}
+          draggable
+          onDragStart={() => handleDragStart(i)}
+          onDragEnter={() => handleDragEnter(i)}
+          onDragEnd={handleDragEnd}
+          onDragOver={e => e.preventDefault()}
+          className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 cursor-default select-none"
+        >
+          {/* Drag handle */}
+          <div className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 shrink-0">
+            <GripVertical size={18} />
+          </div>
+
+          <div className={`p-2 rounded-lg shrink-0 ${loc.isActive ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-400"}`}>
+            <MapPin size={16} />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-gray-900 text-sm">{loc.name}</p>
+            {loc.description && (
+              <p className="text-xs text-gray-400">{loc.description}</p>
+            )}
+            {!loc.isActive && <p className="text-xs text-gray-400">Inactive</p>}
+          </div>
+
+          <div className="flex gap-1 shrink-0">
+            <button
+              onClick={() => onEdit(loc)}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+              title="Edit"
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              onClick={() => onDelete(loc._id)}
+              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+              title="Delete"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -53,20 +153,15 @@ export default function LocationsPage() {
     club ? { clubId: club._id } : "skip"
   );
 
-  const saveLocation  = useMutation(api.posLocations.saveLocation);
+  const saveLocation   = useMutation(api.posLocations.saveLocation);
   const removeLocation = useMutation(api.posLocations.removeLocation);
-  const saveKiosk     = useMutation(api.posLocations.saveKiosk);
-  const removeKiosk   = useMutation(api.posLocations.removeKiosk);
+  const saveKiosk      = useMutation(api.posLocations.saveKiosk);
+  const removeKiosk    = useMutation(api.posLocations.removeKiosk);
 
   // ── Location form state ────────────────────────────────────────────────────
   const [editingLoc, setEditingLoc] = useState<LocationRow | null>(null);
   const [showLocForm, setShowLocForm] = useState(false);
-  const [locForm, setLocForm] = useState({
-    name: "",
-    description: "",
-    isActive: true,
-    sortOrder: 0,
-  });
+  const [locForm, setLocForm] = useState({ name: "", description: "", isActive: true });
   const [savingLoc, setSavingLoc] = useState(false);
   const [locError, setLocError] = useState<string | null>(null);
 
@@ -96,33 +191,24 @@ export default function LocationsPage() {
     return () => clearTimeout(t);
   }, [kioskError]);
 
-  // Default sortOrder to next available when opening new location form
+  // ── Location handlers ──────────────────────────────────────────────────────
+
   function openNewLocation() {
     setEditingLoc(null);
-    setLocForm({
-      name: "",
-      description: "",
-      isActive: true,
-      sortOrder: (locations?.length ?? 0) + 1,
-    });
+    setLocForm({ name: "", description: "", isActive: true });
     setShowLocForm(true);
   }
 
   function openEditLocation(loc: LocationRow) {
     setEditingLoc(loc);
-    setLocForm({
-      name: loc.name,
-      description: loc.description ?? "",
-      isActive: loc.isActive,
-      sortOrder: loc.sortOrder,
-    });
+    setLocForm({ name: loc.name, description: loc.description ?? "", isActive: loc.isActive });
     setShowLocForm(true);
   }
 
   function cancelLocForm() {
     setShowLocForm(false);
     setEditingLoc(null);
-    setLocForm({ name: "", description: "", isActive: true, sortOrder: 0 });
+    setLocForm({ name: "", description: "", isActive: true });
   }
 
   async function handleSaveLocation() {
@@ -135,7 +221,8 @@ export default function LocationsPage() {
         name:        locForm.name.trim(),
         description: locForm.description.trim() || undefined,
         isActive:    locForm.isActive,
-        sortOrder:   locForm.sortOrder,
+        // Assign to end of list if new, keep existing order if editing
+        sortOrder:   editingLoc?.sortOrder ?? (locations?.length ?? 0) + 1,
       });
       cancelLocForm();
     } catch (err) {
@@ -154,13 +241,29 @@ export default function LocationsPage() {
     }
   }
 
+  async function handleReorder(reordered: LocationRow[]) {
+    // Save new sort orders based on array position
+    await Promise.all(
+      reordered.map((loc, i) =>
+        saveLocation({
+          clubId:     club!._id,
+          locationId: loc._id,
+          name:       loc.name,
+          description: loc.description,
+          isActive:   loc.isActive,
+          sortOrder:  i + 1,
+        })
+      )
+    );
+  }
+
   // ── Kiosk handlers ─────────────────────────────────────────────────────────
 
   function openNewKiosk() {
     setEditingKiosk(null);
     setKioskForm({
       name: "",
-      locationId: (locations?.[0]?._id ?? "") as Id<"posLocations"> | "",
+      locationId: (activeLocations[0]?._id ?? "") as Id<"posLocations"> | "",
       pin: "",
       isActive: true,
     });
@@ -170,12 +273,7 @@ export default function LocationsPage() {
 
   function openEditKiosk(k: KioskRow) {
     setEditingKiosk(k);
-    setKioskForm({
-      name: k.name,
-      locationId: k.locationId,
-      pin: "", // never pre-fill PIN
-      isActive: k.isActive,
-    });
+    setKioskForm({ name: k.name, locationId: k.locationId, pin: "", isActive: k.isActive });
     setShowPin(false);
     setShowKioskForm(true);
   }
@@ -188,21 +286,18 @@ export default function LocationsPage() {
 
   async function handleSaveKiosk() {
     if (!club || !kioskForm.name.trim() || !kioskForm.locationId) return;
-    // Require PIN when creating a new kiosk
     if (!editingKiosk && !kioskForm.pin.trim()) {
-      setKioskError("Please set a manager PIN for this kiosk.");
+      setKioskError("A manager PIN is required when registering a kiosk.");
       return;
     }
     setSavingKiosk(true);
     try {
-      // Hash PIN client-side before sending (server also hashes, double protection)
-      const pin = kioskForm.pin.trim() || undefined;
       await saveKiosk({
         clubId:     club._id,
         kioskId:    editingKiosk?._id,
         locationId: kioskForm.locationId as Id<"posLocations">,
         name:       kioskForm.name.trim(),
-        pin,
+        pin:        kioskForm.pin.trim() || undefined,
         isActive:   kioskForm.isActive,
       });
       cancelKioskForm();
@@ -233,6 +328,7 @@ export default function LocationsPage() {
   }
 
   const activeLocations = locations.filter((l) => l.isActive);
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -261,7 +357,6 @@ export default function LocationsPage() {
           </button>
         </div>
 
-        {/* Location error */}
         {locError && (
           <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl mb-4">
             <span className="flex-1">{locError}</span>
@@ -275,26 +370,16 @@ export default function LocationsPage() {
             <h2 className="font-semibold text-gray-800 mb-4">
               {editingLoc ? "Edit location" : "Add location"}
             </h2>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Name <span className="text-red-400">*</span></label>
-                <input
-                  value={locForm.name}
-                  onChange={(e) => setLocForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Bar, Pro Shop, Restaurant"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Sort order</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={locForm.sortOrder}
-                  onChange={(e) => setLocForm((f) => ({ ...f, sortOrder: Number(e.target.value) }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Name <span className="text-red-400">*</span></label>
+              <input
+                autoFocus
+                value={locForm.name}
+                onChange={(e) => setLocForm((f) => ({ ...f, name: e.target.value }))}
+                onKeyDown={e => e.key === "Enter" && handleSaveLocation()}
+                placeholder="e.g. Bar, Pro Shop, Restaurant"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
             </div>
             <div className="mb-4">
               <label className="block text-xs font-medium text-gray-600 mb-1">Description <span className="text-gray-400">(optional)</span></label>
@@ -323,10 +408,7 @@ export default function LocationsPage() {
               >
                 {savingLoc ? "Saving…" : "Save location"}
               </button>
-              <button
-                onClick={cancelLocForm}
-                className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
-              >
+              <button onClick={cancelLocForm} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
                 Cancel
               </button>
             </div>
@@ -343,45 +425,17 @@ export default function LocationsPage() {
             </button>
           </div>
         ) : (
-          <div className="space-y-3">
-            {locations.map((loc) => (
-              <div
-                key={loc._id}
-                className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${loc.isActive ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-400"}`}>
-                    <MapPin size={18} />
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900 text-sm">{loc.name}</p>
-                    {loc.description && (
-                      <p className="text-xs text-gray-400">{loc.description}</p>
-                    )}
-                    <p className="text-xs text-gray-400">
-                      {loc.isActive ? "Active" : "Inactive"} · order {loc.sortOrder}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => openEditLocation(loc as LocationRow)}
-                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
-                    title="Edit"
-                  >
-                    <Pencil size={15} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteLocation(loc._id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                    title="Delete"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <>
+            <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
+              <GripVertical size={11} /> Drag to reorder
+            </p>
+            <DraggableLocations
+              locations={locations as LocationRow[]}
+              onReorder={handleReorder}
+              onEdit={openEditLocation}
+              onDelete={handleDeleteLocation}
+            />
+          </>
         )}
       </section>
 
@@ -393,7 +447,8 @@ export default function LocationsPage() {
               <Monitor size={18} /> Kiosks
             </h2>
             <p className="text-sm text-gray-500 mt-0.5">
-              Named devices assigned to a location. Each kiosk has its own manager PIN to lock/unlock the POS screen.
+              A kiosk is a named device (iPad, tablet, till) assigned to a location.
+              Each gets its own URL and manager PIN.
             </p>
           </div>
           <button
@@ -412,7 +467,6 @@ export default function LocationsPage() {
           </div>
         )}
 
-        {/* Kiosk error */}
         {kioskError && (
           <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl mb-4">
             <span className="flex-1">{kioskError}</span>
@@ -430,6 +484,7 @@ export default function LocationsPage() {
               <div className="col-span-2 sm:col-span-1">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Kiosk name <span className="text-red-400">*</span></label>
                 <input
+                  autoFocus
                   value={kioskForm.name}
                   onChange={(e) => setKioskForm((f) => ({ ...f, name: e.target.value }))}
                   placeholder="e.g. Bar Till 1, Pro Shop Counter"
@@ -454,7 +509,10 @@ export default function LocationsPage() {
             {/* PIN field */}
             <div className="mb-4">
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                Manager PIN {editingKiosk ? <span className="text-gray-400">(leave blank to keep current)</span> : <span className="text-red-400">*</span>}
+                Manager PIN{" "}
+                {editingKiosk
+                  ? <span className="text-gray-400">(leave blank to keep current)</span>
+                  : <span className="text-red-400">*</span>}
               </label>
               <div className="relative">
                 <input
@@ -476,7 +534,7 @@ export default function LocationsPage() {
                 </button>
               </div>
               <p className="text-[11px] text-gray-400 mt-1">
-                Staff must enter this PIN to exit full-screen POS mode.
+                Staff use this PIN to exit full-screen POS and access manager options.
               </p>
             </div>
 
@@ -499,10 +557,7 @@ export default function LocationsPage() {
               >
                 {savingKiosk ? "Saving…" : "Save kiosk"}
               </button>
-              <button
-                onClick={cancelKioskForm}
-                className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
-              >
+              <button onClick={cancelKioskForm} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
                 Cancel
               </button>
             </div>
@@ -522,53 +577,66 @@ export default function LocationsPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {kiosks.map((k) => (
-              <div
-                key={k._id}
-                className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${k.isActive ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-400"}`}>
-                    <Monitor size={18} />
+            {kiosks.map((k) => {
+              const kioskUrl = `${origin}/kiosk/pos?kiosk=${k._id}`;
+              return (
+                <div
+                  key={k._id}
+                  className="bg-white border border-gray-200 rounded-xl p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`p-2 rounded-lg shrink-0 ${k.isActive ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-400"}`}>
+                        <Monitor size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900 text-sm">{k.name}</p>
+                        <p className="text-xs text-gray-400">{k.locationName} · {k.isActive ? "Active" : "Inactive"}</p>
+                        {!k.pinHash && (
+                          <p className="text-xs text-amber-500 mt-0.5">⚠ No PIN set — kiosk won&apos;t lock</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        onClick={() => openEditKiosk(k as KioskRow)}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                        title="Edit"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteKiosk(k._id)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                        title="Remove"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900 text-sm">{k.name}</p>
-                    <p className="text-xs text-gray-400">
-                      {k.locationName} · {k.isActive ? "Active" : "Inactive"}
-                    </p>
-                    <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                      <KeyRound size={10} />
-                      {k.pinHash ? "PIN set" : <span className="text-amber-500">No PIN — set one to enable lock screen</span>}
-                    </p>
+
+                  {/* Kiosk URL — the key piece of info */}
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <p className="text-[11px] text-gray-400 mb-1 font-medium uppercase tracking-wide">Kiosk URL — open this on the till device</p>
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                      <code className="text-xs text-gray-600 flex-1 truncate">{kioskUrl}</code>
+                      <CopyButton text={kioskUrl} />
+                      <a
+                        href={kioskUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-400 hover:text-green-600 transition-colors"
+                        title="Open in new tab"
+                      >
+                        <ExternalLink size={12} />
+                      </a>
+                    </div>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => openEditKiosk(k as KioskRow)}
-                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
-                    title="Edit"
-                  >
-                    <Pencil size={15} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteKiosk(k._id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                    title="Remove"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
-
-        {/* Info box */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-xl text-sm text-blue-700">
-          <strong>How kiosks work:</strong> Each kiosk runs in full-screen POS mode and is locked to
-          its assigned location. The manager PIN is required to exit the POS and access shift
-          reports or stock takes. The PIN is stored securely as a one-way hash.
-        </div>
       </section>
     </div>
   );
