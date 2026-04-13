@@ -122,7 +122,6 @@ export function PinPad({ kioskId, onUnlocked, visible, onDismiss }: PinLockProps
         setError(false);
         setAttempts(0);
         onUnlocked();
-        onDismiss();
       } else if (next.length >= 8) {
         // Max digits reached, wrong PIN
         triggerError(next.length);
@@ -139,7 +138,6 @@ export function PinPad({ kioskId, onUnlocked, visible, onDismiss }: PinLockProps
       setError(false);
       setAttempts(0);
       onUnlocked();
-      onDismiss();
     } else {
       triggerError(digits.length);
     }
