@@ -21,10 +21,22 @@ async function assertAdmin(ctx: MutationCtx, clubId: Id<"clubs">) {
   return identity.subject;
 }
 
-async function getCallerUserId(ctx: MutationCtx): Promise<string> {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new Error("Unauthenticated");
-  return identity.subject;
+/**
+ * Authenticate either as a logged-in admin OR as a kiosk device.
+ * Kiosk mutations pass kioskId instead of a Clerk session — we verify
+ * the kiosk belongs to the correct club and return a synthetic actor ID.
+ */
+async function assertAdminOrKiosk(
+  ctx: MutationCtx,
+  clubId: Id<"clubs">,
+  kioskId?: Id<"posKiosks">,
+): Promise<string> {
+  if (kioskId) {
+    const kiosk = await ctx.db.get(kioskId);
+    if (!kiosk || kiosk.clubId !== clubId) throw new Error("Invalid kiosk");
+    return `kiosk:${kioskId}`;
+  }
+  return assertAdmin(ctx, clubId);
 }
 
 // ── Queries ───────────────────────────────────────────────────────────────────
@@ -193,7 +205,7 @@ export const openShift = mutation({
     notes:      v.optional(v.string()),
   },
   handler: async (ctx, { clubId, locationId, kioskId, notes }) => {
-    const userId = await assertAdmin(ctx, clubId);
+    const userId = await assertAdminOrKiosk(ctx, clubId, kioskId);
 
     // Guard: only one open shift per location
     const existing = await ctx.db
@@ -227,13 +239,14 @@ export const closeShift = mutation({
   args: {
     shiftId: v.id("posShifts"),
     notes:   v.optional(v.string()),
+    kioskId: v.optional(v.id("posKiosks")),
   },
-  handler: async (ctx, { shiftId, notes }) => {
+  handler: async (ctx, { shiftId, notes, kioskId }) => {
     const shift = await ctx.db.get(shiftId);
     if (!shift) throw new Error("Shift not found");
     if (shift.status === "closed") throw new Error("Shift is already closed");
 
-    const userId = await assertAdmin(ctx, shift.clubId);
+    const userId = await assertAdminOrKiosk(ctx, shift.clubId, kioskId);
     const now = new Date().toISOString();
 
     await ctx.db.patch(shiftId, {
@@ -257,10 +270,11 @@ export const recordStockTake = mutation({
       productName:  v.string(),
       countedUnits: v.number(),
     })),
-    notes: v.optional(v.string()),
+    notes:   v.optional(v.string()),
+    kioskId: v.optional(v.id("posKiosks")),
   },
-  handler: async (ctx, { clubId, shiftId, locationId, type, counts, notes }) => {
-    const userId = await assertAdmin(ctx, clubId);
+  handler: async (ctx, { clubId, shiftId, locationId, type, counts, notes, kioskId }) => {
+    const userId = await assertAdminOrKiosk(ctx, clubId, kioskId);
 
     const shift = await ctx.db.get(shiftId);
     if (!shift) throw new Error("Shift not found");

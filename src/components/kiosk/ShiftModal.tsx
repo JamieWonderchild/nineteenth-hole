@@ -322,12 +322,14 @@ function ActiveShiftPanel({
   currency,
   products,
   clubId,
+  kioskId,
 }: {
   shift: { _id: Id<"posShifts">; locationId: Id<"posLocations">; status: string; openedAt: string; closedAt?: string };
   locationName: string;
   currency: string;
   products: { _id: Id<"posProducts">; name: string; trackStock?: boolean }[];
   clubId: Id<"clubs">;
+  kioskId: Id<"posKiosks">;
 }) {
   const [showStockTake, setShowStockTake] = useState<"opening" | "closing" | null>(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -353,6 +355,7 @@ function ActiveShiftPanel({
         type:       showStockTake,
         counts,
         notes:      notes || undefined,
+        kioskId,
       });
       setShowStockTake(null);
     } catch (err) {
@@ -360,19 +363,19 @@ function ActiveShiftPanel({
     } finally {
       setSaving(false);
     }
-  }, [showStockTake, recordStockTake, clubId, shift._id]);
+  }, [showStockTake, recordStockTake, clubId, kioskId, shift._id, shift.locationId]);
 
   const handleCloseShift = useCallback(async () => {
     setSaving(true);
     try {
-      await closeShift({ shiftId: shift._id });
+      await closeShift({ shiftId: shift._id, kioskId });
       setShowCloseConfirm(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to close shift");
     } finally {
       setSaving(false);
     }
-  }, [closeShift, shift._id]);
+  }, [closeShift, kioskId, shift._id]);
 
   return (
     <div className="space-y-4">
@@ -499,12 +502,14 @@ export function KioskShiftModal({
   locationId,
   locationName,
   currency,
+  kioskId,
   onClose,
 }: {
   clubId:       Id<"clubs">;
   locationId:   Id<"posLocations">;
   locationName: string;
   currency:     string;
+  kioskId:      Id<"posKiosks">;
   onClose:      () => void;
 }) {
   const products  = useQuery(api.pos.listProducts, { clubId });
@@ -520,14 +525,14 @@ export function KioskShiftModal({
     setOpening(true);
     setOpenError(null);
     try {
-      await openShiftMutation({ clubId, locationId, notes: openingNotes.trim() || undefined });
+      await openShiftMutation({ clubId, locationId, kioskId, notes: openingNotes.trim() || undefined });
       setOpeningNotes("");
     } catch (err) {
       setOpenError(err instanceof Error ? err.message : "Failed to open shift");
     } finally {
       setOpening(false);
     }
-  }, [openShiftMutation, clubId, locationId, openingNotes]);
+  }, [openShiftMutation, clubId, locationId, kioskId, openingNotes]);
 
   // openShift === undefined → still loading; null → no open shift
   const loading = openShift === undefined || products === undefined;
@@ -571,6 +576,7 @@ export function KioskShiftModal({
               currency={currency}
               products={products ?? []}
               clubId={clubId}
+              kioskId={kioskId}
             />
           ) : (
             /* No open shift — offer to open one */

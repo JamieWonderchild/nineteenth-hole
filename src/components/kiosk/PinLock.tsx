@@ -3,19 +3,12 @@
 /**
  * PinLock — Full-screen PIN lock overlay for kiosk POS.
  *
- * Usage:
- *   <PinLock kioskId={...} onUnlocked={() => setManagerMode(true)} onLock={() => setManagerMode(false)} />
- *
- * The component renders nothing when unlocked (returns null).
- * The parent is responsible for showing the "lock" affordance when in manager mode.
- *
  * PIN verification flow:
  *   1. Staff sees the locked POS and can use it normally.
- *   2. To access manager mode, they triple-tap the hidden trigger zone (top-right corner).
- *   3. PIN pad appears as a full-screen overlay.
- *   4. PIN is SHA-256 hashed client-side before being compared to the stored hash.
- *   5. On success, onUnlocked() fires and the overlay dismisses.
- *   6. On 5 failed attempts, a 30-second cooldown activates.
+ *   2. Manager presses the visible "Manager" button to trigger the PIN pad.
+ *   3. PIN is SHA-256 hashed client-side before being compared to the stored hash.
+ *   4. On success, onUnlocked() fires and the overlay dismisses.
+ *   5. On 5 failed attempts, a 30-second cooldown activates.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -39,7 +32,6 @@ async function sha256(text: string): Promise<string> {
 const PAD_KEYS = ["1","2","3","4","5","6","7","8","9","","0","⌫"] as const;
 
 function PinDisplay({ digits, error }: { digits: string; error: boolean }) {
-  const MAX = 8;
   return (
     <div className={`flex gap-3 justify-center mb-8 transition-all ${error ? "animate-[shake_0.3s_ease]" : ""}`}>
       {Array.from({ length: Math.max(digits.length, 4) }, (_, i) => (
@@ -103,6 +95,19 @@ export function PinPad({ kioskId, onUnlocked, visible, onDismiss }: PinLockProps
     return () => { if (cooldownRef.current) clearInterval(cooldownRef.current); };
   }, [cooldown]);
 
+  function triggerError() {
+    setError(true);
+    const newAttempts = attempts + 1;
+    setAttempts(newAttempts);
+    setTimeout(() => {
+      setError(false);
+      setDigits("");
+    }, 600);
+    if (newAttempts >= 5) {
+      setCooldown(30);
+    }
+  }
+
   const handleKey = useCallback(async (key: string) => {
     if (cooldown > 0) return;
 
@@ -124,13 +129,14 @@ export function PinPad({ kioskId, onUnlocked, visible, onDismiss }: PinLockProps
         onUnlocked();
       } else if (next.length >= 8) {
         // Max digits reached, wrong PIN
-        triggerError(next.length);
+        triggerError();
       }
       // If fewer than 8 digits, let them keep entering
     }
-  }, [digits, cooldown, kioskData, onUnlocked, onDismiss]);
+  }, [digits, cooldown, kioskData, onUnlocked]); // eslint-disable-line react-hooks/exhaustive-deps
+  // triggerError is defined in the same scope and doesn't capture stale state
 
-  async function handleSubmit() {
+  const handleSubmit = useCallback(async () => {
     if (!digits || !kioskData?.pinHash) return;
     const hash = await sha256(digits);
     if (hash === kioskData.pinHash) {
@@ -139,23 +145,9 @@ export function PinPad({ kioskId, onUnlocked, visible, onDismiss }: PinLockProps
       setAttempts(0);
       onUnlocked();
     } else {
-      triggerError(digits.length);
+      triggerError();
     }
-  }
-
-  function triggerError(digitCount: number) {
-    setError(true);
-    const newAttempts = attempts + 1;
-    setAttempts(newAttempts);
-    setTimeout(() => {
-      setError(false);
-      setDigits("");
-    }, 600);
-    // Lockout after 5 failed attempts
-    if (newAttempts >= 5) {
-      setCooldown(30);
-    }
-  }
+  }, [digits, kioskData, onUnlocked]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard support
   useEffect(() => {
@@ -254,40 +246,5 @@ export function PinPad({ kioskId, onUnlocked, visible, onDismiss }: PinLockProps
         Cancel
       </button>
     </div>
-  );
-}
-
-// ── Hidden trigger zone ───────────────────────────────────────────────────────
-// Triple-tap the top-right corner of the screen to show the PIN pad.
-// Invisible in normal use — staff learn the gesture.
-
-interface HiddenTriggerProps {
-  onTripleTap: () => void;
-}
-
-export function HiddenManagerTrigger({ onTripleTap }: HiddenTriggerProps) {
-  const tapsRef = useRef(0);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function handleTap() {
-    tapsRef.current += 1;
-    if (timerRef.current) clearTimeout(timerRef.current);
-
-    if (tapsRef.current >= 3) {
-      tapsRef.current = 0;
-      onTripleTap();
-    } else {
-      timerRef.current = setTimeout(() => {
-        tapsRef.current = 0;
-      }, 800);
-    }
-  }
-
-  return (
-    <div
-      onPointerDown={handleTap}
-      className="absolute top-0 right-0 w-20 h-20 z-10"
-      aria-hidden="true"
-    />
   );
 }

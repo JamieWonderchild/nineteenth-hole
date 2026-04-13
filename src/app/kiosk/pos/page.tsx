@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
@@ -247,13 +248,12 @@ function SaleCompleteOverlay({ total, currency, member, onDismiss }: {
 
 // Read kioskId from URL: /kiosk/pos?kiosk=<kioskId>
 function useKioskId(): Id<"posKiosks"> | null {
-  if (typeof window === "undefined") return null;
-  const params = new URLSearchParams(window.location.search);
+  const params = useSearchParams();
   const id = params.get("kiosk");
   return id ? (id as Id<"posKiosks">) : null;
 }
 
-export default function KioskPOS() {
+function KioskPOS() {
   // ── Kiosk identity (from URL param) ────────────────────────────────────────
   // When a kioskId is present we resolve clubId from the kiosk record itself,
   // so no Clerk login is required for staff using the kiosk.
@@ -757,12 +757,13 @@ export default function KioskPOS() {
       </div>
 
       {/* ── Shift modal ────────────────────────────────────────────── */}
-      {showShiftModal && club && kioskData?.locationId && (
+      {showShiftModal && club && kioskId && kioskData?.locationId && (
         <KioskShiftModal
           clubId={club._id}
           locationId={kioskData.locationId}
           locationName={kioskData.name}
           currency={currency}
+          kioskId={kioskId}
           onClose={() => setShowShiftModal(false)}
         />
       )}
@@ -800,5 +801,18 @@ export default function KioskPOS() {
         />
       )}
     </div>
+  );
+}
+
+// useSearchParams() requires a Suspense boundary in Next.js App Router
+export default function KioskPOSPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin h-10 w-10 border-4 border-green-500 border-t-transparent rounded-full" />
+      </div>
+    }>
+      <KioskPOS />
+    </Suspense>
   );
 }
