@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
 import { useActiveClub } from "@/lib/club-context";
-import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/format";
 import {
@@ -15,21 +14,21 @@ import Link from "next/link";
 
 export default function ManagePOSPage() {
   const { selectedClubId: activeClubId, activeMembership } = useActiveClub();
-  const { user } = useUser();
+  const superAdmin = useQuery(api.clubs.isSuperAdmin);
   const router = useRouter();
 
-  const superAdmin = user?.publicMetadata?.superAdmin as boolean | undefined;
   const isAdmin =
     activeMembership?.role === "admin" ||
     activeMembership?.role === "manager" ||
     superAdmin === true;
 
   // Staff with no management rights go straight to the till
+  // Wait until both membership and superAdmin have resolved before redirecting
   useEffect(() => {
-    if (activeMembership && !isAdmin) {
+    if (activeMembership && superAdmin !== undefined && !isAdmin) {
       router.replace("/pos");
     }
-  }, [activeMembership, isAdmin, router]);
+  }, [activeMembership, superAdmin, isAdmin, router]);
 
   const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
   const summary = useQuery(
@@ -37,7 +36,7 @@ export default function ManagePOSPage() {
     activeClubId ? { clubId: activeClubId, date: today } : "skip"
   );
 
-  if (!activeClubId || !activeMembership) return null;
+  if (!activeMembership || superAdmin === undefined) return null;
   if (!isAdmin) return null; // will redirect
 
   return (

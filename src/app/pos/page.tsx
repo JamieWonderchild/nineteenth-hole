@@ -9,7 +9,7 @@ import { formatCurrency } from "@/lib/format";
 import {
   Minus, Plus, X, CreditCard, Banknote, User, Terminal,
   Gift, Search, Settings, StickyNote, CheckCircle, AlertCircle,
-  PenLine, MapPin, Maximize2,
+  PenLine, MapPin, Maximize2, ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -224,7 +224,12 @@ function SaleCompleteOverlay({ sale, currency, onDismiss }: {
 // ── Main POS ──────────────────────────────────────────────────────────────────
 
 export default function POSPage() {
-  const { club } = useActiveClub();
+  const { club, activeMembership } = useActiveClub();
+  const superAdmin = useQuery(api.clubs.isSuperAdmin);
+  const isAdmin =
+    activeMembership?.role === "admin" ||
+    activeMembership?.role === "manager" ||
+    superAdmin === true;
 
   // Location & shift context — declared first so it can be used in the products query
   const [selectedLocationId, setSelectedLocationId] = useState<Id<"posLocations"> | null>(null);
@@ -541,6 +546,15 @@ export default function POSPage() {
             )}
           </div>
           <div className="flex items-center gap-1">
+            {isAdmin && (
+              <Link
+                href="/manage/pos"
+                className="flex items-center gap-1 text-xs px-2.5 py-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors mr-1"
+                title="Back to dashboard"
+              >
+                <ArrowLeft size={12} /> Dashboard
+              </Link>
+            )}
             <Link
               href="/manage/pos/shifts"
               className="text-xs px-2.5 py-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
