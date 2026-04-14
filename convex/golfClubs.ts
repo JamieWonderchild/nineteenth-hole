@@ -110,9 +110,13 @@ const ALL_SEED_CLUBS = [
   ...HERTFORDSHIRE_CLUBS,
 ];
 
-export const seed = internalMutation({
+export const seed = mutation({
   args: {},
   handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const emails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    if (!identity?.email || !emails.includes(identity.email)) throw new Error("Super admin only");
+
     // Idempotent — skip if already seeded
     const existing = await ctx.db.query("golfClubs").collect();
     if (existing.length > 0) return { skipped: true, count: existing.length };
