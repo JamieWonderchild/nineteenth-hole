@@ -287,7 +287,7 @@ function ClubDashboard({
             icon="trophy-outline"
             label="Competitions"
             onPress={() =>
-              router.push("/(app)/club/competitions/index" as any)
+              router.push("/(app)/club/competitions" as any)
             }
           />
           <QuickActionButton
@@ -301,7 +301,7 @@ function ClubDashboard({
             icon="chatbubble-ellipses-outline"
             label="Messages"
             onPress={() =>
-              router.push("/(app)/club/messages/index" as any)
+              router.push("/(app)/club/messages" as any)
             }
           />
           <QuickActionButton
@@ -321,7 +321,7 @@ function ClubDashboard({
           action={{
             label: "All",
             onPress: () =>
-              router.push("/(app)/club/competitions/index" as any),
+              router.push("/(app)/club/competitions" as any),
           }}
         />
         {activeComps === undefined ? (

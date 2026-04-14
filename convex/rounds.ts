@@ -81,6 +81,8 @@ export const create = mutation({
   args: {
     golfClubId: v.optional(v.id("golfClubs")),
     courseNameFreetext: v.optional(v.string()),
+    golfCourseId: v.optional(v.id("golfCourses")),
+    teeId: v.optional(v.id("courseTees")),
     tees: v.string(),
     courseRating: v.optional(v.number()),
     slopeRating: v.optional(v.number()),
@@ -107,23 +109,39 @@ export const create = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthenticated");
 
+    // Auto-fill course rating / slope from courseTees when teeId is provided
+    let courseRating = args.courseRating;
+    let slopeRating = args.slopeRating;
+    let scratchScore = args.scratchScore;
+    if (args.teeId) {
+      const tee = await ctx.db.get(args.teeId);
+      if (tee) {
+        courseRating = tee.courseRating ?? courseRating;
+        slopeRating = tee.slopeRating ?? slopeRating;
+        scratchScore = tee.par ?? scratchScore;
+      }
+    }
+
     // Get current handicap for this user
     const profile = await ctx.db
       .query("golferProfiles")
       .withIndex("by_user", q => q.eq("userId", identity.subject))
-      .unique();
+      .first();
     const handicapAtTime = profile?.handicapIndex ?? undefined;
 
     // Compute WHS differential if we have CR and slope
     let differential: number | undefined;
-    if (args.courseRating !== undefined && args.slopeRating !== undefined) {
-      differential = computeDifferential(args.grossScore, args.courseRating, args.slopeRating);
+    if (courseRating !== undefined && slopeRating !== undefined) {
+      differential = computeDifferential(args.grossScore, courseRating, slopeRating);
     }
 
     const now = new Date().toISOString();
     const roundId = await ctx.db.insert("rounds", {
       userId: identity.subject,
       ...args,
+      courseRating,
+      slopeRating,
+      scratchScore,
       handicapAtTime,
       differential,
       createdAt: now,
@@ -184,7 +202,7 @@ async function recomputeHandicap(
   const profile = await ctx.db
     .query("golferProfiles")
     .withIndex("by_user", q => q.eq("userId", userId))
-    .unique();
+    .first();
 
   const previousIndex = profile?.handicapIndex;
   const change = previousIndex !== undefined

@@ -29,10 +29,10 @@ function formatDate(dateStr: string) {
 }
 
 // Simple sparkline: array of heights (0–1 normalised), rendered as vertical bars
-function HandicapSparkline({ history }: { history: Array<{ value: number }> }) {
+function HandicapSparkline({ history }: { history: Array<{ handicapIndex: number }> }) {
   if (!history || history.length < 2) return null;
 
-  const values = history.map((h) => h.value);
+  const values = history.map((h) => h.handicapIndex);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
@@ -172,8 +172,8 @@ export default function RoundsScreen() {
   // Determine direction from handicap history
   let direction: "up" | "down" | "same" | undefined;
   if (handicapHistory && handicapHistory.length >= 2) {
-    const latest = handicapHistory[handicapHistory.length - 1]?.value;
-    const prev = handicapHistory[handicapHistory.length - 2]?.value;
+    const latest = handicapHistory[handicapHistory.length - 1]?.handicapIndex;
+    const prev = handicapHistory[handicapHistory.length - 2]?.handicapIndex;
     if (latest !== undefined && prev !== undefined) {
       direction =
         latest < prev ? "down" : latest > prev ? "up" : "same";
@@ -181,14 +181,14 @@ export default function RoundsScreen() {
   }
 
   const statItems = [
-    { label: "Rounds", value: stats?.roundCount ?? roundCount },
+    { label: "Rounds", value: stats?.totalRounds ?? roundCount },
     {
       label: "Avg Score",
-      value: stats?.avgGrossScore ? stats.avgGrossScore.toFixed(1) : "–",
+      value: stats?.avgGross ? stats.avgGross.toFixed(1) : "–",
     },
     {
       label: "Best Score",
-      value: stats?.bestGrossScore ?? "–",
+      value: stats?.bestGross ?? "–",
     },
   ];
 

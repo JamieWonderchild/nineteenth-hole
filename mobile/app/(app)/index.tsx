@@ -14,6 +14,71 @@ import { useState, useCallback } from "react";
 import { api } from "../../lib/convex";
 import { HandicapBadge, Card, Badge, LoadingSpinner } from "../../components/ui";
 
+// ── Recent Courses pill strip ─────────────────────────────────────────────────
+
+function RecentCoursesStrip({
+  userId,
+  router,
+}: {
+  userId: string;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const recentCourses = useQuery(
+    api.golfCourses.listRecentByUser,
+    userId ? { userId, limit: 6 } : "skip"
+  );
+
+  if (!recentCourses || recentCourses.length === 0) return null;
+
+  return (
+    <View className="px-5 mb-5">
+      <View className="flex-row items-center justify-between mb-3">
+        <Text className="text-base font-bold text-gray-900">Recent Courses</Text>
+        <TouchableOpacity onPress={() => router.push("/(app)/courses" as any)}>
+          <Text className="text-green-600 font-medium text-sm">Browse</Text>
+        </TouchableOpacity>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="-mx-5 px-5"
+      >
+        <View className="flex-row gap-2.5">
+          {recentCourses.map((course: any) => (
+            <TouchableOpacity
+              key={course._id}
+              onPress={() => router.push(`/(app)/courses/${course._id}` as any)}
+              activeOpacity={0.75}
+              className="bg-white border border-gray-100 rounded-xl px-3 py-2.5"
+              style={{
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.05,
+                shadowRadius: 4,
+                elevation: 1,
+                maxWidth: 160,
+              }}
+            >
+              <View className="flex-row items-center gap-1.5 mb-0.5">
+                <Ionicons name="golf" size={12} color="#16a34a" />
+                <Text className="text-xs text-green-700 font-semibold">Course</Text>
+              </View>
+              <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>
+                {course.name}
+              </Text>
+              {course.county && (
+                <Text className="text-xs text-gray-400 mt-0.5" numberOfLines={1}>
+                  {course.county}
+                </Text>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
 function formatDate(dateStr: string) {
   return new Date(dateStr + "T00:00:00").toLocaleDateString("en-GB", {
     weekday: "short",
@@ -155,7 +220,7 @@ function ClubMemberHome({
             {/* Stats row */}
             <View className="flex-row">
               <TouchableOpacity
-                onPress={() => router.push("/(app)/club/competitions/index" as any)}
+                onPress={() => router.push("/(app)/club/competitions" as any)}
                 className="flex-1 px-4 py-3.5"
                 activeOpacity={0.75}
               >
@@ -234,6 +299,9 @@ function ClubMemberHome({
         </TouchableOpacity>
       </View>
 
+      {/* Recent Courses */}
+      <RecentCoursesStrip userId={userId} router={router} />
+
       {/* Recent Rounds */}
       <View className="px-5">
         <View className="flex-row items-center justify-between mb-3">
@@ -298,6 +366,7 @@ function ClubMemberHome({
 function IndividualHome({
   greeting,
   firstName,
+  userId,
   handicap,
   rounds,
   refreshing,
@@ -306,6 +375,7 @@ function IndividualHome({
 }: {
   greeting: string;
   firstName: string;
+  userId: string;
   handicap: number | null | undefined;
   rounds: any[] | undefined;
   refreshing: boolean;
@@ -394,6 +464,9 @@ function IndividualHome({
           </View>
         </TouchableOpacity>
       </View>
+
+      {/* Recent Courses */}
+      <RecentCoursesStrip userId={userId} router={router} />
 
       {/* Recent Rounds */}
       <View className="px-5 mt-5 mb-5">
@@ -556,6 +629,7 @@ export default function HomeScreen() {
         <IndividualHome
           greeting={greeting}
           firstName={firstName}
+          userId={userId}
           handicap={handicap}
           rounds={rounds}
           refreshing={refreshing}

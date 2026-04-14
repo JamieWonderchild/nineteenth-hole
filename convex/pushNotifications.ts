@@ -61,10 +61,10 @@ export const sendToUser = internalAction({
     data: v.optional(v.any()),
   },
   handler: async (ctx, { userId, title, body, data }) => {
-    const tokenRow = await ctx.runQuery(internal.pushNotifications.getToken, { userId });
+    const tokenRow = (await ctx.runQuery(internal.pushNotifications.getToken, { userId })) as { token: string } | null;
     if (!tokenRow) return false;
 
-    const response = await fetch("https://exp.host/--/api/v2/push/send", {
+    const response: Response = await fetch("https://exp.host/--/api/v2/push/send", {
       method: "POST",
       headers: {
         "Accept": "application/json",

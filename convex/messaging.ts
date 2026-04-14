@@ -76,7 +76,7 @@ export const listMessages = query({
       .withIndex("by_conversation_and_user", q =>
         q.eq("conversationId", conversationId).eq("userId", userId)
       )
-      .unique();
+      .first();
     if (!member) return [];
 
     const msgs = await ctx.db
@@ -98,7 +98,7 @@ export const getConversation = query({
       .withIndex("by_conversation_and_user", q =>
         q.eq("conversationId", conversationId).eq("userId", userId)
       )
-      .unique();
+      .first();
     if (!member) return null;
 
     const conversation = await ctx.db.get(conversationId);
@@ -168,7 +168,7 @@ export const getOrCreateDirect = mutation({
         .withIndex("by_conversation_and_user", q =>
           q.eq("conversationId", conv._id).eq("userId", args.otherUserId)
         )
-        .unique();
+        .first();
 
       if (otherMembership) return conv._id;
     }
@@ -271,7 +271,7 @@ export const sendMessage = mutation({
       .withIndex("by_conversation_and_user", q =>
         q.eq("conversationId", args.conversationId).eq("userId", args.senderId)
       )
-      .unique();
+      .first();
     if (!membership) throw new Error("Not a member of this conversation");
 
     const now = new Date().toISOString();
@@ -301,7 +301,7 @@ export const markRead = mutation({
       .withIndex("by_conversation_and_user", q =>
         q.eq("conversationId", conversationId).eq("userId", userId)
       )
-      .unique();
+      .first();
     if (!membership) return;
     await ctx.db.patch(membership._id, { lastReadAt: new Date().toISOString() });
   },
@@ -327,7 +327,7 @@ export const addMembersToGroup = mutation({
       .withIndex("by_conversation_and_user", q =>
         q.eq("conversationId", conversationId).eq("userId", identity.subject)
       )
-      .unique();
+      .first();
     if (!callerMembership) throw new Error("Not a member of this conversation");
 
     const conversation = await ctx.db.get(conversationId);
@@ -340,7 +340,7 @@ export const addMembersToGroup = mutation({
         .withIndex("by_conversation_and_user", q =>
           q.eq("conversationId", conversationId).eq("userId", member.userId)
         )
-        .unique();
+        .first();
       if (existing) continue;
 
       await ctx.db.insert("conversationMembers", {

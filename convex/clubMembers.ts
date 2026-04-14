@@ -439,21 +439,19 @@ async function fetchAllClerkUsers(): Promise<ClerkUser[]> {
 // Super admin: list all Clerk users who are not already active members of this club
 export const listNonMembers = action({
   args: { clubId: v.id("clubs") },
-  handler: async (ctx, { clubId }) => {
+  handler: async (ctx, { clubId }): Promise<Array<{ userId: string; displayName: string; email: string }>> => {
     const identity = await ctx.auth.getUserIdentity();
     const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
     if (!identity?.email || !superAdminEmails.includes(identity.email)) throw new Error("Not authorised");
 
-    const [clerkUsers, allMembers] = await Promise.all([
-      fetchAllClerkUsers(),
-      ctx.runQuery(api.clubMembers.listAllForClub, { clubId }),
-    ]);
+    const clerkUsers: ClerkUser[] = await fetchAllClerkUsers();
+    const allMembers: Array<{ userId: string }> = (await ctx.runQuery(api.clubMembers.listAllForClub, { clubId })) as Array<{ userId: string }>;
 
-    const memberUserIds = new Set((allMembers as Array<{ userId: string }>).map(m => m.userId));
+    const memberUserIds = new Set(allMembers.map(m => m.userId));
 
     return clerkUsers
-      .filter(u => !memberUserIds.has(u.id))
-      .map(u => ({
+      .filter((u: ClerkUser) => !memberUserIds.has(u.id))
+      .map((u: ClerkUser) => ({
         userId: u.id,
         displayName: [u.first_name, u.last_name].filter(Boolean).join(" ") || (u.email_addresses[0]?.email_address ?? u.id),
         email: u.email_addresses[0]?.email_address ?? "",
@@ -542,7 +540,7 @@ export const addMemberById = action({
     const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
     if (!identity?.email || !superAdminEmails.includes(identity.email)) throw new Error("Not authorised");
 
-    const memberId = await ctx.runMutation(api.clubMembers.assignToClub, { userId, clubId, displayName });
+    const memberId = (await ctx.runMutation(api.clubMembers.assignToClub, { userId, clubId, displayName })) as string;
     if (role === "admin") {
       await ctx.runMutation(api.clubMembers.setRole, { memberId: memberId as never, role: "admin" });
     }

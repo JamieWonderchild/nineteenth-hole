@@ -85,6 +85,26 @@ export default function PlayScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Course Directory section */}
+        <View>
+          <SectionHeader title="Course Directory" />
+          <Text className="text-gray-500 text-sm mb-4">Find courses, check tees & ratings</Text>
+          <TouchableOpacity onPress={() => router.push("/(app)/courses" as any)}>
+            <Card className="px-4 py-3 flex-row items-center justify-between">
+              <View className="flex-row items-center gap-3">
+                <View className="w-9 h-9 rounded-full bg-green-100 items-center justify-center">
+                  <Ionicons name="map-outline" size={18} color="#16a34a" />
+                </View>
+                <View>
+                  <Text className="font-semibold text-gray-900">Courses</Text>
+                  <Text className="text-xs text-gray-500">Search & browse golf courses</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
+            </Card>
+          </TouchableOpacity>
+        </View>
+
         {/* Platform Pools section */}
         <View>
           <SectionHeader

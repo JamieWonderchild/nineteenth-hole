@@ -7,7 +7,7 @@ import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MapPin, Plus, Pencil, Trash2, ClipboardPaste, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
+import { MapPin, Plus, Pencil, Trash2, ClipboardPaste, ChevronDown, ChevronUp, CheckCircle2, Search, Link2 } from "lucide-react";
 
 const DEFAULT_PARS = [4, 4, 3, 4, 5, 3, 4, 4, 4, 4, 5, 4, 3, 4, 5, 3, 4, 4];
 const DEFAULT_SI   = [1,11, 5,15, 9,17, 3,13, 7, 4,10, 2,16, 8,12,18, 6,14];
@@ -360,6 +360,137 @@ function CourseForm({
   );
 }
 
+// ── Global DB Linker ──────────────────────────────────────────────────────────
+
+function GlobalDBLinker({ clubId }: { clubId: Id<"clubs"> }) {
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const linkToClub = useMutation(api.golfCourses.linkToClub);
+  const [linking, setLinking] = useState(false);
+  const [linkedId, setLinkedId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const results = useQuery(
+    api.golfCourses.search,
+    debouncedQuery.length >= 2 ? { query: debouncedQuery, limit: 8 } : "skip"
+  );
+
+  const linkedCourse = useQuery(
+    api.golfCourses.get,
+    linkedId ? { courseId: linkedId as Id<"golfCourses"> } : "skip"
+  );
+
+  async function handleLink(courseId: string) {
+    setLinking(true);
+    try {
+      await linkToClub({ courseId: courseId as Id<"golfCourses">, platformClubId: clubId });
+      setLinkedId(courseId);
+      setQuery("");
+      setDebouncedQuery("");
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLinking(false);
+    }
+  }
+
+  async function handleUnlink() {
+    if (!linkedId) return;
+    setLinking(true);
+    try {
+      await linkToClub({ courseId: linkedId as Id<"golfCourses">, platformClubId: undefined });
+      setLinkedId(undefined);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLinking(false);
+    }
+  }
+
+  return (
+    <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <Link2 size={16} className="text-green-700" />
+        <h2 className="font-semibold text-gray-900">Link to Global Database</h2>
+      </div>
+      <p className="text-sm text-gray-500">
+        Link your club to the global golf course database so members can find and use tee ratings when logging rounds.
+      </p>
+
+      {linkedCourse ? (
+        <div className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+          <CheckCircle2 size={16} className="text-green-600 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-green-900">{linkedCourse.name}</p>
+            {(linkedCourse.city || linkedCourse.county) && (
+              <p className="text-xs text-green-700 flex items-center gap-1 mt-0.5">
+                <MapPin size={11} />
+                {[linkedCourse.city, linkedCourse.county].filter(Boolean).join(", ")}
+              </p>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleUnlink}
+            disabled={linking}
+            className="text-gray-500 hover:text-red-600 shrink-0"
+          >
+            Unlink
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <Input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search course database…"
+              className="pl-9"
+            />
+          </div>
+
+          {results && results.length > 0 && (
+            <div className="border border-border rounded-lg divide-y divide-border max-h-48 overflow-y-auto bg-white">
+              {results.map((c: any) => (
+                <button
+                  key={c._id}
+                  type="button"
+                  disabled={linking}
+                  onClick={() => handleLink(c._id)}
+                  className="w-full text-left px-4 py-2.5 hover:bg-accent/50 flex items-center justify-between gap-2"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
+                    {(c.city || c.county) && (
+                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                        <MapPin size={10} />
+                        {[c.city, c.county].filter(Boolean).join(", ")}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-xs text-green-700 font-medium shrink-0">Link</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {debouncedQuery.length >= 2 && results && results.length === 0 && (
+            <p className="text-sm text-gray-400 px-1">No courses found for &quot;{debouncedQuery}&quot;</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 export default function CoursesPage() {
   const superAdmin = useQuery(api.clubs.isSuperAdmin);
   const { activeMembership, club } = useActiveClub();
@@ -539,6 +670,9 @@ export default function CoursesPage() {
           ))}
         </div>
       )}
+
+      {/* Global DB linking */}
+      <GlobalDBLinker clubId={club._id} />
     </div>
   );
 }

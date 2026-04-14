@@ -14,6 +14,8 @@ try {
   Notifications?.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
     }),
@@ -178,6 +180,7 @@ export default function AppLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="courses" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="onboarding" options={{ href: null, headerShown: false }} />
     </Tabs>
   );

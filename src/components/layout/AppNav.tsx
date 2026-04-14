@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { href: "/home", label: "Home" },
   { href: "/pools", label: "Tour Pools" },
   { href: "/games", label: "My Games" },
+  { href: "/courses", label: "Courses" },
 ];
 
 export function AppNav() {

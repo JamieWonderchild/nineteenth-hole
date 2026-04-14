@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../../../lib/convex";
 import { Button, Input, Card, Badge } from "../../../components/ui";
+import { CoursePickerSheet, CourseSelection, CourseHole } from "../../../components/CoursePickerSheet";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,12 +63,13 @@ const CONDITIONS = [
 function computeStableford(
   holeScores: number[],
   pars: number[],
-  playingHandicap: number
+  playingHandicap: number,
+  strokeIndexes: number[] = STANDARD_SI
 ): number {
   // Distribute shots across holes by SI
   const extraShots = new Array(18).fill(0);
   for (let i = 0; i < playingHandicap && i < 18; i++) {
-    const holeIdx = STANDARD_SI.indexOf(i + 1);
+    const holeIdx = strokeIndexes.indexOf(i + 1);
     if (holeIdx >= 0) extraShots[holeIdx] = 1;
   }
   let total = 0;
@@ -127,236 +129,213 @@ function StepIndicator({ current, total }: { current: Step; total: number }) {
 
 // ─── Step 1: Course ───────────────────────────────────────────────────────────
 
-function Step1Course({
-  onNext,
-}: {
-  onNext: (data: {
-    club: GolfClub | null;
-    courseNameFreetext: string;
-    tee: TeeColour;
-    courseRating: string;
-    slopeRating: string;
-    skipRatings: boolean;
-  }) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [selectedClub, setSelectedClub] = useState<GolfClub | null>(null);
+type Step1Data = {
+  golfCourseId?: string;
+  teeId?: string;
+  courseName: string;
+  tee: string;
+  courseRating: string;
+  slopeRating: string;
+  skipRatings: boolean;
+  holes?: CourseHole[];
+  par?: number;
+};
+
+function Step1Course({ onNext }: { onNext: (data: Step1Data) => void }) {
+  const [showPicker, setShowPicker] = useState(false);
+  const [courseSelection, setCourseSelection] = useState<CourseSelection | null>(null);
   const [freetext, setFreetext] = useState("");
   const [useFreetext, setUseFreetext] = useState(false);
-  const [tee, setTee] = useState<TeeColour>("Yellow");
+  const [freeTee, setFreeTee] = useState<TeeColour>("Yellow");
   const [courseRating, setCourseRating] = useState("");
   const [slopeRating, setSlopeRating] = useState("");
   const [skipRatings, setSkipRatings] = useState(false);
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setDebouncedQuery(query), 300);
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [query]);
+  const hasRatings = courseSelection
+    ? !!(courseSelection.courseRating && courseSelection.slopeRating)
+    : !!(courseRating && slopeRating);
 
-  const searchResults = useQuery(
-    api.golfClubs.search,
-    debouncedQuery.length >= 2 ? { term: debouncedQuery } : "skip"
-  );
-
-  const ratingData = useQuery(
-    api.courseRatings.getByClubAndTee,
-    selectedClub && tee
-      ? { golfClubId: selectedClub._id as any, teeName: tee }
-      : "skip"
-  );
-
-  // Auto-fill ratings when available
-  useEffect(() => {
-    if (ratingData) {
-      setCourseRating(ratingData.courseRating?.toString() ?? "");
-      setSlopeRating(ratingData.slopeRating?.toString() ?? "");
-    }
-  }, [ratingData]);
-
-  const canAdvance = useFreetext
-    ? freetext.trim().length > 0
-    : selectedClub !== null;
+  const canAdvance = useFreetext ? freetext.trim().length > 0 : courseSelection !== null;
 
   function handleNext() {
-    onNext({
-      club: selectedClub,
-      courseNameFreetext: useFreetext ? freetext : (selectedClub?.name ?? ""),
-      tee,
-      courseRating,
-      slopeRating,
-      skipRatings,
-    });
+    if (courseSelection) {
+      onNext({
+        golfCourseId: courseSelection.golfCourseId,
+        teeId: courseSelection.teeId,
+        courseName: courseSelection.venueName
+          ? `${courseSelection.venueName} — ${courseSelection.courseName}`
+          : courseSelection.courseName,
+        tee: courseSelection.teeName,
+        courseRating: skipRatings ? "" : (courseSelection.courseRating?.toString() ?? ""),
+        slopeRating: skipRatings ? "" : (courseSelection.slopeRating?.toString() ?? ""),
+        skipRatings,
+        holes: courseSelection.holes,
+        par: courseSelection.par,
+      });
+    } else {
+      onNext({
+        courseName: freetext,
+        tee: freeTee,
+        courseRating: skipRatings ? "" : courseRating,
+        slopeRating: skipRatings ? "" : slopeRating,
+        skipRatings,
+      });
+    }
   }
 
   return (
-    <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
-      <View className="px-4 pt-4 gap-4">
-        <Text className="text-xl font-bold text-gray-900">Course</Text>
+    <>
+      <CoursePickerSheet
+        visible={showPicker}
+        onClose={() => setShowPicker(false)}
+        onSelect={(sel) => {
+          setCourseSelection(sel);
+          setUseFreetext(false);
+          setShowPicker(false);
+        }}
+      />
+      <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+        <View className="px-4 pt-4 gap-4">
+          <Text className="text-xl font-bold text-gray-900">Course</Text>
 
-        {/* Search or freetext toggle */}
-        {!useFreetext ? (
-          <View className="gap-2">
-            <Input
-              label="Search club"
-              placeholder="e.g. Finchley Golf Club"
-              value={query}
-              onChangeText={(t) => {
-                setQuery(t);
-                if (selectedClub) setSelectedClub(null);
-              }}
-              autoCorrect={false}
-            />
-
-            {/* Search results */}
-            {searchResults && searchResults.length > 0 && !selectedClub && (
-              <Card>
-                {searchResults.slice(0, 6).map((club: GolfClub) => (
-                  <TouchableOpacity
-                    key={club._id}
-                    onPress={() => {
-                      setSelectedClub(club);
-                      setQuery(club.name);
-                    }}
-                    className="px-4 py-3 border-b border-gray-50 flex-row items-center gap-2"
-                  >
-                    <Ionicons name="location-outline" size={16} color="#9ca3af" />
-                    <View className="flex-1">
-                      <Text className="text-sm font-medium text-gray-900">
-                        {club.name}
-                      </Text>
-                      <Text className="text-xs text-gray-400">
-                        {[club.county, club.postcode].filter(Boolean).join(" · ")}
-                      </Text>
-                    </View>
+          {!useFreetext ? (
+            <View className="gap-2">
+              {courseSelection ? (
+                <View className="flex-row items-center bg-green-50 border border-green-200 rounded-xl px-3 py-3 gap-2">
+                  <Ionicons name="golf" size={18} color="#16a34a" />
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-green-900">
+                      {courseSelection.courseName}
+                    </Text>
+                    <Text className="text-xs text-green-700">
+                      {courseSelection.teeName} tees · Par {courseSelection.par}
+                      {courseSelection.totalYards ? ` · ${courseSelection.totalYards} yds` : ""}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setCourseSelection(null)} hitSlop={8}>
+                    <Ionicons name="close-circle" size={18} color="#16a34a" />
                   </TouchableOpacity>
-                ))}
-              </Card>
-            )}
-
-            {selectedClub && (
-              <View className="flex-row items-center gap-2 bg-green-50 rounded-xl px-3 py-2">
-                <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
-                <Text className="text-green-800 font-medium text-sm flex-1">
-                  {selectedClub.name}
-                </Text>
-                <TouchableOpacity onPress={() => { setSelectedClub(null); setQuery(""); }}>
-                  <Ionicons name="close" size={16} color="#9ca3af" />
-                </TouchableOpacity>
-              </View>
-            )}
-
-            <TouchableOpacity onPress={() => setUseFreetext(true)}>
-              <Text className="text-green-600 text-sm font-medium">
-                My course isn't listed →
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View className="gap-2">
-            <Input
-              label="Course name"
-              placeholder="e.g. Millfield Golf Club"
-              value={freetext}
-              onChangeText={setFreetext}
-            />
-            <TouchableOpacity onPress={() => { setUseFreetext(false); setFreetext(""); }}>
-              <Text className="text-green-600 text-sm font-medium">← Search instead</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Tee colour */}
-        <View className="gap-2">
-          <Text className="text-sm font-medium text-gray-700">Tees</Text>
-          <View className="flex-row gap-2">
-            {TEE_COLOURS.map((t) => (
-              <TouchableOpacity
-                key={t}
-                onPress={() => setTee(t)}
-                className={`flex-1 py-2.5 rounded-xl items-center border-2 ${
-                  tee === t ? "border-green-500" : "border-gray-200"
-                }`}
-                style={{ backgroundColor: tee === t ? "#f0fdf4" : "#f9fafb" }}
-              >
-                <View
-                  className="w-5 h-5 rounded-full border border-gray-300 mb-1"
-                  style={{ backgroundColor: TEE_HEX[t] }}
-                />
-                <Text
-                  className={`text-xs font-medium ${
-                    tee === t ? "text-green-700" : "text-gray-500"
-                  }`}
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => setShowPicker(true)}
+                  className="flex-row items-center gap-3 border-2 border-dashed border-gray-200 rounded-xl px-4 py-3.5"
                 >
-                  {t}
+                  <Ionicons name="search-outline" size={20} color="#9ca3af" />
+                  <View className="flex-1">
+                    <Text className="text-sm text-gray-500">Search course database</Text>
+                    <Text className="text-xs text-gray-400 mt-0.5">
+                      2,000+ UK courses with ratings
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={() => { setUseFreetext(true); setCourseSelection(null); }}
+              >
+                <Text className="text-green-600 text-sm font-medium">
+                  My course isn't listed →
                 </Text>
               </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Ratings */}
-        {!skipRatings && (
-          <View className="gap-3">
-            <View className="flex-row gap-3">
-              <View className="flex-1">
-                <Input
-                  label="Course Rating"
-                  placeholder="e.g. 71.3"
-                  value={courseRating}
-                  onChangeText={setCourseRating}
-                  keyboardType="decimal-pad"
-                />
-              </View>
-              <View className="flex-1">
-                <Input
-                  label="Slope Rating"
-                  placeholder="e.g. 125"
-                  value={slopeRating}
-                  onChangeText={setSlopeRating}
-                  keyboardType="number-pad"
-                />
-              </View>
             </View>
-            {ratingData && (
-              <View className="flex-row items-center gap-1.5">
-                <Ionicons name="checkmark-circle-outline" size={14} color="#16a34a" />
-                <Text className="text-xs text-green-700">Auto-filled from club data</Text>
+          ) : (
+            <View className="gap-3">
+              <Input
+                label="Course name"
+                placeholder="e.g. Millfield Golf Club"
+                value={freetext}
+                onChangeText={setFreetext}
+              />
+              {/* Manual tee colour when freetext */}
+              <View className="gap-2">
+                <Text className="text-sm font-medium text-gray-700">Tees</Text>
+                <View className="flex-row gap-2">
+                  {TEE_COLOURS.map((t) => (
+                    <TouchableOpacity
+                      key={t}
+                      onPress={() => setFreeTee(t)}
+                      className={`flex-1 py-2.5 rounded-xl items-center border-2 ${
+                        freeTee === t ? "border-green-500" : "border-gray-200"
+                      }`}
+                      style={{ backgroundColor: freeTee === t ? "#f0fdf4" : "#f9fafb" }}
+                    >
+                      <View
+                        className="w-5 h-5 rounded-full border border-gray-300 mb-1"
+                        style={{ backgroundColor: TEE_HEX[t] }}
+                      />
+                      <Text
+                        className={`text-xs font-medium ${
+                          freeTee === t ? "text-green-700" : "text-gray-500"
+                        }`}
+                      >
+                        {t}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            )}
-          </View>
-        )}
+              <TouchableOpacity onPress={() => { setUseFreetext(false); setFreetext(""); }}>
+                <Text className="text-green-600 text-sm font-medium">← Search instead</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-        <TouchableOpacity
-          onPress={() => setSkipRatings(!skipRatings)}
-          className="flex-row items-center gap-2"
-        >
-          <View
-            className={`w-4 h-4 rounded border ${
-              skipRatings ? "bg-gray-400 border-gray-400" : "border-gray-300"
-            }`}
+          {/* Ratings — auto-filled from DB, or manual entry for freetext */}
+          {!skipRatings && (
+            courseSelection?.courseRating ? (
+              <View className="flex-row items-center gap-2 bg-green-50 rounded-xl px-3 py-2.5">
+                <Ionicons name="checkmark-circle-outline" size={14} color="#16a34a" />
+                <Text className="text-xs text-green-700">
+                  CR {courseSelection.courseRating} / Slope {courseSelection.slopeRating} — auto-filled
+                </Text>
+              </View>
+            ) : (
+              <View className="flex-row gap-3">
+                <View className="flex-1">
+                  <Input
+                    label="Course Rating"
+                    placeholder="e.g. 71.3"
+                    value={courseRating}
+                    onChangeText={setCourseRating}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+                <View className="flex-1">
+                  <Input
+                    label="Slope Rating"
+                    placeholder="e.g. 125"
+                    value={slopeRating}
+                    onChangeText={setSlopeRating}
+                    keyboardType="number-pad"
+                  />
+                </View>
+              </View>
+            )
+          )}
+
+          <TouchableOpacity
+            onPress={() => setSkipRatings(!skipRatings)}
+            className="flex-row items-center gap-2"
           >
-            {skipRatings && <Ionicons name="checkmark" size={12} color="#fff" />}
-          </View>
-          <Text className="text-sm text-gray-500">
-            Skip ratings (round won't count to handicap)
-          </Text>
-        </TouchableOpacity>
+            <View
+              className={`w-4 h-4 rounded border ${
+                skipRatings ? "bg-gray-400 border-gray-400" : "border-gray-300"
+              }`}
+            >
+              {skipRatings && <Ionicons name="checkmark" size={12} color="#fff" />}
+            </View>
+            <Text className="text-sm text-gray-500">
+              Skip ratings (round won't count to handicap)
+            </Text>
+          </TouchableOpacity>
 
-        <Button
-          onPress={handleNext}
-          disabled={!canAdvance}
-          size="lg"
-          className="mt-2 mb-8"
-        >
-          Continue
-        </Button>
-      </View>
-    </ScrollView>
+          <Button onPress={handleNext} disabled={!canAdvance} size="lg" className="mt-2 mb-8">
+            Continue
+          </Button>
+        </View>
+      </ScrollView>
+    </>
   );
 }
 
@@ -636,10 +615,12 @@ function Step3Quick({
 function Step3Scorecard({
   format,
   handicap,
+  holes: holesProp,
   onNext,
 }: {
   format: Format;
   handicap: number | null;
+  holes?: CourseHole[];
   onNext: (data: {
     grossScore: string;
     holeScores: number[];
@@ -648,6 +629,14 @@ function Step3Scorecard({
     notes: string;
   }) => void;
 }) {
+  // Use real course hole data when available, fall back to standard layout
+  const pars = holesProp?.length === 18
+    ? holesProp.map(h => h.par)
+    : STANDARD_PARS;
+  const strokeIndexes = holesProp?.length === 18
+    ? holesProp.map(h => h.strokeIndex)
+    : STANDARD_SI;
+
   const [scores, setScores] = useState<(number | null)[]>(new Array(18).fill(null));
   const [playedWith, setPlayedWith] = useState("");
   const [conditions, setConditions] = useState("");
@@ -656,18 +645,18 @@ function Step3Scorecard({
   function updateScore(i: number, delta: number) {
     setScores((prev) => {
       const next = [...prev];
-      const current = next[i] ?? STANDARD_PARS[i];
+      const current = next[i] ?? pars[i];
       next[i] = Math.max(1, current + delta);
       return next;
     });
   }
 
-  const filledScores = scores.map((s, i) => s ?? STANDARD_PARS[i]);
+  const filledScores = scores.map((s, i) => s ?? pars[i]);
   const total = filledScores.reduce((a, b) => a + b, 0);
   const playingHandicap = Math.round(handicap ?? 0);
   const stablefordTotal =
     format === "stableford"
-      ? computeStableford(filledScores, STANDARD_PARS, playingHandicap)
+      ? computeStableford(filledScores, pars, playingHandicap, strokeIndexes)
       : null;
 
   const allEntered = scores.every((s) => s !== null);
@@ -710,7 +699,7 @@ function Step3Scorecard({
             <Text className="text-xs font-bold text-gray-400 w-10">SI</Text>
             <Text className="text-xs font-bold text-gray-400 flex-1 text-center">Score</Text>
           </View>
-          {STANDARD_PARS.map((par, i) => {
+          {pars.map((par, i) => {
             const score = scores[i] ?? par;
             const diff = score - par;
             const diffColor =
@@ -730,7 +719,7 @@ function Step3Scorecard({
               >
                 <Text className="text-sm font-bold text-gray-500 w-8">{i + 1}</Text>
                 <Text className="text-sm text-gray-500 w-10">{par}</Text>
-                <Text className="text-sm text-gray-400 w-10">{STANDARD_SI[i]}</Text>
+                <Text className="text-sm text-gray-400 w-10">{strokeIndexes[i]}</Text>
                 <View className="flex-1 flex-row items-center justify-center gap-3">
                   <TouchableOpacity
                     onPress={() => updateScore(i, -1)}
@@ -817,7 +806,7 @@ function Step4Review({
   summary: {
     courseName: string;
     date: string;
-    tee: TeeColour;
+    tee: string;
     grossScore: string;
     courseRating: string;
     slopeRating: string;
@@ -919,14 +908,7 @@ export default function NewRoundScreen() {
   const [step, setStep] = useState<Step>(1);
 
   // Collected data
-  const [step1Data, setStep1Data] = useState<{
-    club: GolfClub | null;
-    courseNameFreetext: string;
-    tee: TeeColour;
-    courseRating: string;
-    slopeRating: string;
-    skipRatings: boolean;
-  } | null>(null);
+  const [step1Data, setStep1Data] = useState<Step1Data | null>(null);
 
   const [step2Data, setStep2Data] = useState<{
     format: Format;
@@ -968,13 +950,14 @@ export default function NewRoundScreen() {
       const slope = parseFloat(step1Data.slopeRating);
 
       await createRound({
-        ...(step1Data.club ? { golfClubId: step1Data.club._id as any } : {}),
-        courseNameFreetext: step1Data.courseNameFreetext,
+        ...(step1Data.golfCourseId ? { golfCourseId: step1Data.golfCourseId as any } : {}),
+        ...(step1Data.teeId ? { teeId: step1Data.teeId as any } : {}),
+        courseNameFreetext: step1Data.courseName,
         tees: step1Data.tee,
         ...(!step1Data.skipRatings && !isNaN(cr) ? { courseRating: cr } : {}),
         ...(!step1Data.skipRatings && !isNaN(slope) ? { slopeRating: slope } : {}),
         grossScore: gross,
-        ...(step3Data.holeScores ? { holeScores: step3Data.holeScores } : {}),
+        ...(step3Data.holeScores ? { holeScores: step3Data.holeScores as any } : {}),
         date: step2Data.date,
         ...(step3Data.playedWith.trim()
           ? {
@@ -1033,7 +1016,7 @@ export default function NewRoundScreen() {
           <Step3Quick
             format={step2Data.format}
             handicap={handicap ?? null}
-            coursePar={72}
+            coursePar={step1Data?.par ?? 72}
             onNext={handleStep3}
           />
         )}
@@ -1041,13 +1024,14 @@ export default function NewRoundScreen() {
           <Step3Scorecard
             format={step2Data.format}
             handicap={handicap ?? null}
+            holes={step1Data?.holes}
             onNext={handleStep3}
           />
         )}
         {step === 4 && step1Data && step2Data && step3Data && (
           <Step4Review
             summary={{
-              courseName: step1Data.courseNameFreetext,
+              courseName: step1Data.courseName,
               date: step2Data.date,
               tee: step1Data.tee,
               grossScore: step3Data.grossScore,

@@ -10,8 +10,8 @@ type Game = {
   _id: string;
   name: string;
   type: string;
-  date: number;
-  status: "active" | "complete";
+  date: string;
+  status: string;
   stakePerPlayer?: number;
   players: Array<{ id: string; name: string; handicap?: number }>;
   resultSummary?: string;
@@ -27,7 +27,7 @@ function formatType(type: string): string {
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
-function formatDate(ts: number): string {
+function formatDate(ts: string): string {
   return new Date(ts).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",

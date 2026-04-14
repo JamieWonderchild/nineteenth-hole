@@ -16,9 +16,9 @@ type Competition = {
   name: string;
   description?: string;
   status: "open" | "live" | "complete" | string;
-  startDate?: number;
-  endDate?: number;
-  entryDeadline?: number;
+  startDate?: string;
+  endDate?: string;
+  entryDeadline?: string;
   entryFee?: number;
   entryCount?: number;
   prizeStructure?: PrizeRow[];
@@ -28,9 +28,9 @@ type Competition = {
 type Player = {
   _id: string;
   name: string;
-  tier?: string;
+  tier?: number;
   worldRanking?: number;
-  currentPosition?: number;
+  position?: number;
   scoreToPar?: number;
 };
 
@@ -39,7 +39,6 @@ type Entry = {
   userId: string;
   displayName?: string;
   playerIds?: string[];
-  playerNames?: string[];
   totalScore?: number;
   bestPlayerName?: string;
   bestPlayerScore?: number;
@@ -54,7 +53,7 @@ function statusVariant(status: string): "success" | "warning" | "muted" {
   return "muted";
 }
 
-function formatDate(ts?: number): string {
+function formatDate(ts?: string): string {
   if (!ts) return "—";
   return new Date(ts).toLocaleDateString("en-GB", {
     day: "numeric",
@@ -83,9 +82,9 @@ export default function PoolDetailScreen() {
 
   // We need the competition ID from slug — listPlatform and filter
   const allComps = useQuery(api.competitions.listPlatform, {});
-  const competition: Competition | undefined = allComps?.find(
-    (c: Competition) => c.slug === slug
-  );
+  const competition: Competition | undefined = (allComps as any[])?.find(
+    (c: any) => c.slug === slug
+  ) as Competition | undefined;
 
   const competitionId = competition?._id;
 
@@ -209,7 +208,7 @@ export default function PoolDetailScreen() {
 
               {/* Player tiers */}
               {players != null && players.length > 0 && (
-                <PlayerTiersSection players={players} />
+                <PlayerTiersSection players={players as any} />
               )}
 
               {/* Enter button */}
@@ -238,7 +237,7 @@ export default function PoolDetailScreen() {
                   <Ionicons name="person-circle-outline" size={18} color="#16a34a" />
                   <Text className="font-bold text-gray-900">My Squad</Text>
                 </View>
-                {(myEntry.playerNames ?? []).map((name: string, i: number) => {
+                {((myEntry as any).playerNames ?? []).map((name: string, i: number) => {
                   // Find matching player for live score
                   const livePlayer = players?.find(
                     (p: Player) => p.name === name
@@ -249,9 +248,9 @@ export default function PoolDetailScreen() {
                       className="flex-row items-center px-4 py-3 border-b border-gray-50"
                     >
                       <Text className="flex-1 text-gray-900 font-medium text-sm">{name}</Text>
-                      {livePlayer?.currentPosition != null && (
+                      {livePlayer?.position != null && (
                         <Text className="text-xs text-gray-400 mr-2">
-                          {ordinal(livePlayer.currentPosition)}
+                          {ordinal(livePlayer.position)}
                         </Text>
                       )}
                       {livePlayer?.scoreToPar != null && (

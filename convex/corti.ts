@@ -141,7 +141,7 @@ export const generateCompetitionSummary = action({
       ? new Date(competition.startDate).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
       : "";
 
-    const top = leaderboard.slice(0, 5).map((p, i) => {
+    const top = leaderboard.slice(0, 5).map((p: any, i: number) => {
       const score = format === "strokeplay"
         ? `net ${p.netScore} (gross ${p.grossScore})`
         : `${p.stablefordPoints} points`;

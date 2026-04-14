@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "convex/react";
 import { api } from "../../../../lib/convex";
 import { Button, Card } from "../../../../components/ui";
+import { CoursePickerSheet, CourseSelection } from "../../../../components/CoursePickerSheet";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -76,6 +77,8 @@ export default function NewGameScreen() {
   const [withStakes, setWithStakes] = useState(false);
   const [stakeInput, setStakeInput] = useState("");
   const [scoringMode, setScoringMode] = useState<"overall" | "per_hole">("overall");
+  const [courseSelection, setCourseSelection] = useState<CourseSelection | null>(null);
+  const [showCoursePicker, setShowCoursePicker] = useState(false);
 
   // Submit
   const [submitting, setSubmitting] = useState(false);
@@ -134,13 +137,15 @@ export default function NewGameScreen() {
         stakePerPlayer,
         settlementType: "cash",
         scoringMode,
+        golfCourseId: courseSelection?.golfCourseId as any ?? undefined,
+        teeId: courseSelection?.teeId as any ?? undefined,
         players: players.map((p) => ({
           id: p.id,
           name: p.name,
           userId: undefined,
           handicap: p.handicap,
         })),
-        date: new Date(date).getTime(),
+        date: new Date(date).toISOString(),
       });
 
       router.replace(`/play/games/${gameId}` as any);
@@ -155,6 +160,11 @@ export default function NewGameScreen() {
   return (
     <>
       <Stack.Screen options={{ title: stepTitle(step), headerBackVisible: false }} />
+      <CoursePickerSheet
+        visible={showCoursePicker}
+        onClose={() => setShowCoursePicker(false)}
+        onSelect={(sel) => { setCourseSelection(sel); setShowCoursePicker(false); }}
+      />
       <KeyboardAvoidingView
         className="flex-1 bg-gray-50"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -193,7 +203,13 @@ export default function NewGameScreen() {
               stakeInput={stakeInput}
               setStakeInput={setStakeInput}
               scoringMode={scoringMode}
-              setScoringMode={setScoringMode}
+              setScoringMode={(mode) => {
+                setScoringMode(mode);
+                if (mode === "overall") setCourseSelection(null);
+              }}
+              courseSelection={courseSelection}
+              onPickCourse={() => setShowCoursePicker(true)}
+              onClearCourse={() => setCourseSelection(null)}
             />
           )}
           {step === 4 && (
@@ -205,6 +221,7 @@ export default function NewGameScreen() {
               withStakes={withStakes}
               stakeInput={stakeInput}
               scoringMode={scoringMode}
+              courseSelection={courseSelection}
             />
           )}
         </ScrollView>
@@ -390,6 +407,9 @@ function Step3Stakes({
   setStakeInput,
   scoringMode,
   setScoringMode,
+  courseSelection,
+  onPickCourse,
+  onClearCourse,
 }: {
   withStakes: boolean;
   setWithStakes: (v: boolean) => void;
@@ -397,6 +417,9 @@ function Step3Stakes({
   setStakeInput: (v: string) => void;
   scoringMode: "overall" | "per_hole";
   setScoringMode: (v: "overall" | "per_hole") => void;
+  courseSelection: CourseSelection | null;
+  onPickCourse: () => void;
+  onClearCourse: () => void;
 }) {
   return (
     <View className="gap-6">
@@ -491,6 +514,46 @@ function Step3Stakes({
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Course picker — shown when hole-by-hole selected */}
+      {scoringMode === "per_hole" && (
+        <View className="gap-2">
+          <Text className="text-sm font-medium text-gray-700">Course</Text>
+          {courseSelection ? (
+            <View className="flex-row items-center bg-green-50 border border-green-200 rounded-xl px-3 py-3 gap-2">
+              <Ionicons name="golf" size={18} color="#16a34a" />
+              <View className="flex-1">
+                <Text className="text-sm font-semibold text-green-900">
+                  {courseSelection.courseName}
+                </Text>
+                <Text className="text-xs text-green-700">
+                  {courseSelection.teeName} tees
+                  {courseSelection.courseRating
+                    ? ` · CR ${courseSelection.courseRating} / S ${courseSelection.slopeRating}`
+                    : ""}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={onClearCourse} hitSlop={8}>
+                <Ionicons name="close-circle" size={18} color="#16a34a" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={onPickCourse}
+              className="flex-row items-center gap-3 border-2 border-dashed border-gray-200 rounded-xl px-4 py-3.5"
+            >
+              <Ionicons name="search-outline" size={20} color="#9ca3af" />
+              <View className="flex-1">
+                <Text className="text-sm text-gray-500">Select course</Text>
+                <Text className="text-xs text-gray-400 mt-0.5">
+                  Enables auto-scoring with par & stroke index
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -505,6 +568,7 @@ function Step4Review({
   withStakes,
   stakeInput,
   scoringMode,
+  courseSelection,
 }: {
   gameType: GameType;
   gameName: string;
@@ -513,6 +577,7 @@ function Step4Review({
   withStakes: boolean;
   stakeInput: string;
   scoringMode: "overall" | "per_hole";
+  courseSelection: CourseSelection | null;
 }) {
   const format = FORMATS.find((f) => f.type === gameType);
   const stakeDisplay = withStakes && stakeInput
@@ -526,6 +591,9 @@ function Step4Review({
     { label: "Players", value: `${players.length} player${players.length !== 1 ? "s" : ""}` },
     { label: "Stakes", value: stakeDisplay },
     { label: "Scoring", value: scoringMode === "per_hole" ? "Hole by hole" : "Overall score" },
+    ...(courseSelection
+      ? [{ label: "Course", value: `${courseSelection.courseName} (${courseSelection.teeName})` }]
+      : []),
   ];
 
   return (

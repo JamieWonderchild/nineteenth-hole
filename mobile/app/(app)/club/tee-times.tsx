@@ -247,7 +247,7 @@ export default function TeeTimesScreen() {
     (myBookings ?? []).map((b: any) => b.slotId)
   );
 
-  const myBookingsBySlotId = new Map(
+  const myBookingsBySlotId = new Map<string, any>(
     (myBookings ?? []).map((b: any) => [b.slotId, b])
   );
 

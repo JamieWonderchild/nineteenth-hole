@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useQuery, useMutation } from "convex/react";
+import { useAction, useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -51,6 +51,30 @@ function NewGameModal({ open, onClose }: { open: boolean; onClose: () => void })
     activeMembership ? { clubId: activeMembership.clubId } : "skip"
   );
 
+  // Global course search (golfCourses DB)
+  const [globalQuery, setGlobalQuery] = useState("");
+  const [debouncedGlobalQuery, setDebouncedGlobalQuery] = useState("");
+  const [golfCourseId, setGolfCourseId] = useState<string>("");
+  const [selectedGlobalCourseName, setSelectedGlobalCourseName] = useState("");
+  const [teeId, setTeeId] = useState<string>("");
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [fetchingTees, setFetchingTees] = useState(false);
+  const ensureDetail = useAction(api.golfCourses.ensureDetail);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedGlobalQuery(globalQuery), 300);
+    return () => clearTimeout(t);
+  }, [globalQuery]);
+
+  const globalResults = useQuery(
+    api.golfCourses.search,
+    debouncedGlobalQuery.length >= 2 ? { query: debouncedGlobalQuery, limit: 8 } : "skip"
+  );
+  const globalCourseTees = useQuery(
+    api.golfCourses.listTees,
+    golfCourseId ? { courseId: golfCourseId as never } : "skip"
+  );
+
   const today = new Date().toISOString().split("T")[0];
 
   const [step, setStep] = useState<1 | 2>(1);
@@ -82,6 +106,12 @@ function NewGameModal({ open, onClose }: { open: boolean; onClose: () => void })
     setScoringMode("overall");
     setCourseId("");
     setTeeColour("yellow");
+    setGolfCourseId("");
+    setTeeId("");
+    setGlobalQuery("");
+    setDebouncedGlobalQuery("");
+    setSelectedGlobalCourseName("");
+    setShowGlobalSearch(false);
     setDate(today);
     setPlayers([
       { id: generateId(), name: "", handicap: "" },
@@ -137,6 +167,8 @@ function NewGameModal({ open, onClose }: { open: boolean; onClose: () => void })
         scoringMode,
         courseId: (courseId || undefined) as never,
         teeColour: courseId ? teeColour : undefined,
+        golfCourseId: (golfCourseId || undefined) as never,
+        teeId: (teeId || undefined) as never,
         players: filledPlayers.map(p => ({
           id: p.id,
           name: p.name.trim(),
@@ -219,19 +251,15 @@ function NewGameModal({ open, onClose }: { open: boolean; onClose: () => void })
 
               {/* Course picker — only shown for per-hole mode */}
               {scoringMode === "per_hole" && (
-                <div className="mt-2">
-                  {(!clubCourses || clubCourses.length === 0) ? (
-                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
-                      <MapPin size={12} />
-                      No course card set up. Ask your club admin to add one under Course Card for auto-scoring.
-                    </p>
-                  ) : (
+                <div className="mt-2 space-y-3">
+                  {/* Club course (fast path) */}
+                  {clubCourses && clubCourses.length > 0 && !showGlobalSearch && (
                     <div className="space-y-2">
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Course (optional)</Label>
                         <select
                           value={courseId}
-                          onChange={e => setCourseId(e.target.value)}
+                          onChange={e => { setCourseId(e.target.value); setGolfCourseId(""); setTeeId(""); }}
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           <option value="">No course (manual scores only)</option>
@@ -264,6 +292,118 @@ function NewGameModal({ open, onClose }: { open: boolean; onClose: () => void })
                             ))}
                           </div>
                         </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => { setShowGlobalSearch(true); setCourseId(""); }}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Playing away? Search all courses →
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Global course search (no club courses, or user chose to search) */}
+                  {(showGlobalSearch || !clubCourses || clubCourses.length === 0) && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Search course database</Label>
+
+                      {golfCourseId && teeId ? (
+                        // Selected state
+                        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                          <MapPin size={13} className="text-green-600 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-green-900 truncate">{selectedGlobalCourseName}</p>
+                            <p className="text-xs text-green-600">
+                              {globalCourseTees?.find(t => t._id === teeId)?.name} tees
+                              {globalCourseTees?.find(t => t._id === teeId)?.courseRating
+                                ? ` · CR ${globalCourseTees.find(t => t._id === teeId)?.courseRating}`
+                                : ""}
+                            </p>
+                          </div>
+                          <button type="button" onClick={() => { setGolfCourseId(""); setTeeId(""); setGlobalQuery(""); setSelectedGlobalCourseName(""); }} className="text-green-600 hover:text-green-800">
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <Input
+                            placeholder="e.g. Finchley Golf Club"
+                            value={globalQuery}
+                            onChange={e => { setGlobalQuery(e.target.value); setGolfCourseId(""); setTeeId(""); }}
+                            className="h-8 text-sm"
+                          />
+                          {/* Search results */}
+                          {globalResults && globalResults.length > 0 && !golfCourseId && (
+                            <div className="border border-border rounded-lg divide-y divide-border max-h-40 overflow-y-auto">
+                              {globalResults.map((c: any) => (
+                                <button
+                                  key={c._id}
+                                  type="button"
+                                  onClick={() => {
+                                    setGolfCourseId(c._id);
+                                    setSelectedGlobalCourseName(c.name);
+                                    setGlobalQuery(c.name);
+                                    setFetchingTees(true);
+                                    ensureDetail({ courseId: c._id }).finally(() => setFetchingTees(false));
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-accent/50 text-sm"
+                                >
+                                  <span className="font-medium">{c.name}</span>
+                                  {(c.city || c.county) && (
+                                    <span className="text-xs text-muted-foreground ml-1.5">
+                                      {[c.city, c.county].filter(Boolean).join(", ")}
+                                    </span>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {/* Tee picker once course is selected */}
+                          {golfCourseId && fetchingTees && (
+                            <p className="text-xs text-muted-foreground">Fetching tee data…</p>
+                          )}
+                          {golfCourseId && !fetchingTees && globalCourseTees && globalCourseTees.length === 0 && (
+                            <p className="text-xs text-muted-foreground">No tee data available for this course yet.</p>
+                          )}
+                          {golfCourseId && !fetchingTees && globalCourseTees && globalCourseTees.length > 0 && (
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Select tees</Label>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                {globalCourseTees.map((tee: any) => (
+                                  <button
+                                    key={tee._id}
+                                    type="button"
+                                    onClick={() => setTeeId(tee._id)}
+                                    className={cn(
+                                      "text-left px-2.5 py-2 rounded-lg border text-xs transition-all",
+                                      teeId === tee._id
+                                        ? "border-primary bg-primary/5 text-primary font-medium"
+                                        : "border-border hover:border-primary/40"
+                                    )}
+                                  >
+                                    <span className="font-medium">{tee.name}</span>
+                                    {tee.courseRating && (
+                                      <span className="block text-muted-foreground font-normal">
+                                        CR {tee.courseRating} · S {tee.slopeRating}
+                                      </span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {clubCourses && clubCourses.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => { setShowGlobalSearch(false); setGolfCourseId(""); setTeeId(""); setGlobalQuery(""); }}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          ← Use my club's course
+                        </button>
                       )}
                     </div>
                   )}

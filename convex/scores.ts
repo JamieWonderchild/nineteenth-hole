@@ -53,7 +53,7 @@ export const syncFromEspn = internalAction({
       const espnId: string = comp.athlete?.id ?? "";
 
       // Match by espnPlayerId first, fall back to name matching
-      const player = players.find(p =>
+      const player = players.find((p: any) =>
         (p.espnPlayerId && p.espnPlayerId === espnId) ||
         p.name.toLowerCase() === espnName.toLowerCase()
       );

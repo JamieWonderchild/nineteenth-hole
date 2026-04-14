@@ -40,8 +40,10 @@ export const create = mutation({
     stakePerPlayer: v.number(), // pence/cents per player (0 = fun only)
     settlementType: v.string(), // 'cash' | 'stripe'
     scoringMode: v.optional(v.string()), // 'overall' | 'per_hole'
-    courseId: v.optional(v.id("courses")),
-    teeColour: v.optional(v.string()),   // 'white' | 'yellow' | 'blue' | 'red'
+    courseId: v.optional(v.id("courses")),           // club-scoped (legacy)
+    teeColour: v.optional(v.string()),               // legacy
+    golfCourseId: v.optional(v.id("golfCourses")),  // global course DB
+    teeId: v.optional(v.id("courseTees")),           // specific tee set played
     players: v.array(v.object({
       id: v.string(),
       name: v.string(),

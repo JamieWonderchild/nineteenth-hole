@@ -314,7 +314,7 @@ export default function RoundDetailScreen() {
         {round.holeScores && round.holeScores.length === 18 && (
           <View className="px-4 mt-5">
             <Text className="text-lg font-bold text-gray-900 mb-3">Scorecard</Text>
-            <ScorecardTable holeScores={round.holeScores} />
+            <ScorecardTable holeScores={(round.holeScores as any[]).map((h) => h.score)} />
           </View>
         )}
 

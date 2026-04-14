@@ -26,7 +26,7 @@ interface Player {
 
 interface HoleScore {
   hole: number;
-  score: number;
+  gross: number;
 }
 
 interface PlayerScore {
@@ -41,10 +41,10 @@ interface Game {
   _id: string;
   name: string;
   type: string;
-  date: number;
-  status: "active" | "complete";
+  date: string;
+  status: string;
   stakePerPlayer?: number;
-  scoringMode?: "overall" | "per_hole";
+  scoringMode?: string;
   players: Player[];
   scores?: PlayerScore[];
   resultSummary?: string;
@@ -75,7 +75,7 @@ function playerName(players: Player[], id: string): string {
   return players.find((p) => p.id === id)?.name ?? id;
 }
 
-function formatDate(ts: number): string {
+function formatDate(ts: string): string {
   return new Date(ts).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
@@ -111,7 +111,10 @@ export default function LiveGameScreen() {
     return <LoadingSpinner fullScreen />;
   }
 
-  const scoringMode = game.scoringMode ?? "overall";
+  // Capture narrowed type so closures below can reference it without null checks
+  const g = game as Game;
+
+  const scoringMode = g.scoringMode ?? "overall";
   const isPerHole = scoringMode === "per_hole";
 
   // ── Per-hole helpers ─────────────────────────────────────────────────────────
@@ -128,10 +131,10 @@ export default function LiveGameScreen() {
   }
 
   function runningTotal(playerId: string): number {
-    const player = game.players.find((p: Player) => p.id === playerId);
+    const player = g.players.find((p: Player) => p.id === playerId);
     const hcp = player?.handicap ?? 0;
 
-    if (game.type === "stableford") {
+    if (g.type === "stableford") {
       let pts = 0;
       for (let h = 1; h <= 18; h++) {
         const s = holeScoreMap[playerId]?.[h];
@@ -150,12 +153,12 @@ export default function LiveGameScreen() {
   // ── Save scores ──────────────────────────────────────────────────────────────
 
   async function handleSaveScores() {
-    const scores: PlayerScore[] = game.players.map((p: Player) => {
+    const scores: PlayerScore[] = g.players.map((p: Player) => {
       if (isPerHole) {
         const hs: HoleScore[] = [];
         for (let h = 1; h <= 18; h++) {
           const s = holeScoreMap[p.id]?.[h];
-          if (s != null && s > 0) hs.push({ hole: h, score: s });
+          if (s != null && s > 0) hs.push({ hole: h, gross: s });
         }
         return { playerId: p.id, holeScores: hs };
       } else {
@@ -165,19 +168,19 @@ export default function LiveGameScreen() {
       }
     });
 
-    await updateScores({ gameId: game._id as any, scores });
+    await updateScores({ gameId: g._id as any, scores });
   }
 
   async function handleComplete() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const scores: PlayerScore[] = game.players.map((p: Player) => {
+      const scores: PlayerScore[] = g.players.map((p: Player) => {
         if (isPerHole) {
           const hs: HoleScore[] = [];
           for (let h = 1; h <= 18; h++) {
             const s = holeScoreMap[p.id]?.[h];
-            if (s != null && s > 0) hs.push({ hole: h, score: s });
+            if (s != null && s > 0) hs.push({ hole: h, gross: s });
           }
           return { playerId: p.id, holeScores: hs };
         } else {
@@ -187,7 +190,7 @@ export default function LiveGameScreen() {
         }
       });
 
-      await completeGame({ gameId: game._id as any, scores });
+      await completeGame({ gameId: g._id as any, scores });
       setConfirmModalVisible(false);
     } catch (e: any) {
       Alert.alert("Error", e?.message ?? "Failed to complete game.");

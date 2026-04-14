@@ -13,7 +13,7 @@ type Competition = {
   status: "open" | "live" | "complete" | string;
   entryCount?: number;
   entryFee?: number;
-  startDate?: number;
+  startDate?: string;
   prizeStructure?: Array<{ position: number; percentage: number }>;
 };
 
@@ -27,7 +27,7 @@ function statusLabel(status: string): string {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-function formatStartDate(ts?: number): string | null {
+function formatStartDate(ts?: string): string | null {
   if (!ts) return null;
   return new Date(ts).toLocaleDateString("en-GB", {
     day: "numeric",
@@ -69,7 +69,7 @@ export default function PoolsScreen() {
       <Text className="text-gray-500 text-sm mb-5">Pick your squad for the majors</Text>
 
       <View className="gap-3">
-        {allPools.map((pool: Competition) => {
+        {(allPools as any[]).map((pool: Competition) => {
           const prizeSummary = topPrizeSummary(pool.prizeStructure);
           const startDateStr = formatStartDate(pool.startDate);
 

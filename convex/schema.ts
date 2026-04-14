@@ -246,12 +246,111 @@ export default defineSchema({
     .index("by_stripe_session", ["stripeCheckoutSessionId"]),
 
   // ============================================================================
-  // Golf Courses (par + stroke index per hole — used for scoring calc)
+  // Global Golf Course Database
+  // ============================================================================
+
+  golfCourses: defineTable({
+    // Identity
+    name: v.string(),                             // "Old Course", "Main Course"
+    venueName: v.optional(v.string()),            // "St Andrews Links" (multi-course venues)
+    slug: v.string(),                             // "st-andrews-old-course"
+
+    // Location
+    latitude: v.optional(v.number()),
+    longitude: v.optional(v.number()),
+    address: v.optional(v.string()),
+    city: v.optional(v.string()),
+    county: v.optional(v.string()),               // "Fife", "Middlesex"
+    country: v.string(),                          // ISO 3166-1 alpha-2: "GB", "US"
+    postcode: v.optional(v.string()),
+    timezone: v.optional(v.string()),             // "Europe/London"
+
+    // Course characteristics
+    numberOfHoles: v.number(),                    // 9 | 18 | 27 | 36
+    par: v.optional(v.number()),                  // overall par (most-played tee)
+    courseType: v.optional(v.string()),           // 'links'|'parkland'|'heathland'|'moorland'|'downland'|'other'
+    website: v.optional(v.string()),
+    phone: v.optional(v.string()),
+
+    // Platform linkage
+    golfClubId: v.optional(v.id("golfClubs")),   // → existing club directory entry
+    platformClubId: v.optional(v.id("clubs")),    // → platform club (if they've joined)
+
+    // External IDs (for data syncing / deduplication)
+    golfApiUkId: v.optional(v.string()),          // GolfAPI.uk
+    golfCourseApiId: v.optional(v.string()),      // GolfCourseAPI.com
+    osmRelationId: v.optional(v.string()),        // OpenStreetMap relation/way ID
+    englandGolfCourseId: v.optional(v.string()),  // England Golf / CDH course ID
+
+    // Data provenance
+    dataSource: v.string(),                       // 'manual'|'golf_api_uk'|'golf_course_api'|'osm'|'import'
+    verified: v.optional(v.boolean()),            // human-verified flag
+    verifiedAt: v.optional(v.string()),
+    verifiedBy: v.optional(v.string()),           // userId who verified
+
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_country", ["country"])
+    .index("by_county", ["county"])
+    .index("by_platform_club", ["platformClubId"])
+    .index("by_golf_club", ["golfClubId"])
+    .index("by_golf_api_uk_id", ["golfApiUkId"])
+    .searchIndex("search_name", {
+      searchField: "name",
+      filterFields: ["country", "county"],
+    }),
+
+  // One row per tee set — the atomic unit for WHS calculations and scoring
+  courseTees: defineTable({
+    courseId: v.id("golfCourses"),
+
+    // Tee identity
+    name: v.string(),                             // "White", "Yellow", "Red", "Championship"
+    colour: v.string(),                           // 'white'|'yellow'|'red'|'blue'|'black'|'gold'|'silver'|'other'
+    gender: v.string(),                           // 'male'|'female'|'both'
+
+    // WHS rating data (required for playing handicap calculation)
+    courseRating: v.optional(v.number()),         // e.g. 72.4
+    slopeRating: v.optional(v.number()),          // 55–155, scratch = ~113
+
+    // Totals
+    par: v.number(),
+    totalYards: v.optional(v.number()),
+    totalMeters: v.optional(v.number()),
+
+    // Hole-by-hole data for this tee set
+    holes: v.array(v.object({
+      number: v.number(),                         // 1–18
+      par: v.number(),                            // 3 | 4 | 5
+      strokeIndex: v.number(),                    // 1–18 (1 = hardest)
+      yards: v.optional(v.number()),
+      meters: v.optional(v.number()),
+      // GPS — tee box + green centre (future: rangefinder, course map)
+      teeLatitude: v.optional(v.number()),
+      teeLongitude: v.optional(v.number()),
+      greenLatitude: v.optional(v.number()),
+      greenLongitude: v.optional(v.number()),
+    })),
+
+    dataSource: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_course", ["courseId"])
+    .index("by_course_and_gender", ["courseId", "gender"]),
+
+  // ============================================================================
+  // Club Course Configuration (club-specific — links to global DB)
   // ============================================================================
 
   courses: defineTable({
     clubId: v.id("clubs"),
     name: v.string(),           // "Main Course"
+    // Link to global course database
+    golfCourseId: v.optional(v.id("golfCourses")),  // global course entry
+    defaultTeeId: v.optional(v.id("courseTees")),    // club's usual playing tee
     holes: v.array(v.object({
       number: v.number(),       // 1–18
       par: v.number(),          // 3 | 4 | 5
@@ -265,7 +364,8 @@ export default defineSchema({
     createdAt: v.string(),
     updatedAt: v.string(),
   })
-    .index("by_club", ["clubId"]),
+    .index("by_club", ["clubId"])
+    .index("by_golf_course", ["golfCourseId"]),
 
   // ============================================================================
   // Quick Games (informal rounds between friends)
@@ -280,8 +380,10 @@ export default defineSchema({
     currency: v.string(),       // 'GBP' | 'EUR' | 'USD'
     // Scoring mode
     scoringMode: v.optional(v.string()),   // 'overall' | 'per_hole'
-    courseId: v.optional(v.id("courses")), // linked course for auto-calc
-    teeColour: v.optional(v.string()),     // 'white' | 'yellow' | 'blue' | 'red'
+    courseId: v.optional(v.id("courses")), // club-scoped course (legacy)
+    teeColour: v.optional(v.string()),     // 'white' | 'yellow' | 'blue' | 'red' (legacy)
+    golfCourseId: v.optional(v.id("golfCourses")), // global course DB
+    teeId: v.optional(v.id("courseTees")),          // specific tee set played
     // Stake — how the money works
     stakePerPlayer: v.number(), // in pence/cents per player (0 = just for fun)
     settlementType: v.string(), // 'cash' | 'stripe'
@@ -895,9 +997,11 @@ export default defineSchema({
   rounds: defineTable({
     userId: v.string(),                        // Clerk user ID
     // Course identification — one of these will be set
-    golfClubId: v.optional(v.id("golfClubs")), // if matched to CDH directory
-    courseNameFreetext: v.optional(v.string()), // fallback freetext e.g. "Scratch Golf Links"
-    // Tee details
+    golfClubId: v.optional(v.id("golfClubs")),     // if matched to CDH directory (legacy)
+    courseNameFreetext: v.optional(v.string()),      // fallback freetext e.g. "Scratch Golf Links"
+    golfCourseId: v.optional(v.id("golfCourses")), // global course DB (preferred)
+    teeId: v.optional(v.id("courseTees")),          // specific tee set — auto-fills ratings below
+    // Tee details (auto-filled from teeId when available, else user-entered)
     tees: v.string(),                          // 'white' | 'yellow' | 'red' | 'blue'
     courseRating: v.optional(v.number()),      // e.g. 71.3
     slopeRating: v.optional(v.number()),       // e.g. 127

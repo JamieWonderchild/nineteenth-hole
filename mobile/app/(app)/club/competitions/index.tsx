@@ -120,7 +120,7 @@ export default function ClubCompetitionsScreen() {
 
   const clubs = useQuery(api.clubMembers.myActiveClubs, {});
 
-  const [selectedClubIdx] = useState(0);
+  const [selectedClubIdx, setSelectedClubIdx] = useState(0);
 
   const clubId =
     clubs && clubs.length > 0
@@ -165,8 +165,37 @@ export default function ClubCompetitionsScreen() {
   const past = comps.filter((c) => c.status === "complete");
 
   return (
-    <>
+    <View className="flex-1">
       <Stack.Screen options={{ title: "Competitions" }} />
+      {clubs.length > 1 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0 }}
+          className="bg-white border-b border-gray-100 py-2"
+          contentContainerStyle={{ paddingHorizontal: 12, alignItems: "center" }}
+        >
+          {clubs.map(({ club }: { club: any }, i: number) => (
+            <TouchableOpacity
+              key={club._id}
+              onPress={() => setSelectedClubIdx(i)}
+              className={`mx-1 px-4 py-1.5 rounded-full border ${
+                i === selectedClubIdx
+                  ? "bg-green-600 border-green-600"
+                  : "bg-white border-gray-200"
+              }`}
+            >
+              <Text
+                className={`text-sm font-medium ${
+                  i === selectedClubIdx ? "text-white" : "text-gray-700"
+                }`}
+              >
+                {club.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
       {comps.length === 0 ? (
         <EmptyState
           icon="trophy-outline"
@@ -230,6 +259,6 @@ export default function ClubCompetitionsScreen() {
           )}
         </ScrollView>
       )}
-    </>
+    </View>
   );
 }
