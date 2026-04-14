@@ -163,6 +163,10 @@ export default function CourseDetailPage() {
   }
 
   const course = data as CourseWithTees;
+  // Prefer par from tees (more accurate for WHS) over course-level par
+  const displayPar = course.tees.length > 0
+    ? (course.tees.find(t => t.gender === "male")?.par ?? course.tees[0].par)
+    : course.par;
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
@@ -198,10 +202,10 @@ export default function CourseDetailPage() {
           </span>
         </div>
 
-        {course.par && (
+        {displayPar && (
           <div className="flex items-center gap-2 pt-1">
             <Flag size={14} className="text-green-300" />
-            <span className="text-lg font-bold">Par {course.par}</span>
+            <span className="text-lg font-bold">Par {displayPar}</span>
           </div>
         )}
       </div>
@@ -262,7 +266,7 @@ export default function CourseDetailPage() {
       </Card>
 
       {/* Handicap Calculator */}
-      <HandicapCalculator tees={course.tees} coursePar={course.par} />
+      <HandicapCalculator tees={course.tees} coursePar={displayPar} />
 
       {/* Course Info */}
       {(course.website || course.phone || course.address) && (
