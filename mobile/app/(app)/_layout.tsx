@@ -1,12 +1,74 @@
-import { useAuth } from "@clerk/clerk-expo";
-import { Redirect, Tabs } from "expo-router";
-import { View, ActivityIndicator } from "react-native";
+import { useAuth, useUser } from "@clerk/clerk-expo";
+import { Redirect, Tabs, useSegments } from "expo-router";
+import { View, ActivityIndicator, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery, useMutation } from "convex/react";
+import { useEffect } from "react";
+import { api } from "../../lib/convex";
+
+// expo-notifications requires a compiled native module — load lazily so a
+// missing module never crashes the layout (e.g. Expo Go or a stale build).
+let Notifications: typeof import("expo-notifications") | null = null;
+try {
+  Notifications = require("expo-notifications");
+  Notifications?.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+} catch {}
+
+async function registerForPushNotifications(): Promise<string | null> {
+  if (!Notifications) return null;
+  try {
+    const { status: existing } = await Notifications.getPermissionsAsync();
+    let finalStatus = existing;
+    if (existing !== "granted") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== "granted") return null;
+    const token = await Notifications.getExpoPushTokenAsync({
+      projectId: "your-eas-project-id",
+    });
+    return token.data;
+  } catch {
+    return null;
+  }
+}
 
 export default function AppLayout() {
   const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
+  const segments = useSegments();
 
-  if (!isLoaded) {
+  const profile = useQuery(
+    api.golferProfiles.get,
+    user ? { userId: user.id } : "skip"
+  );
+
+  const myClubs = useQuery(
+    api.clubMembers.myActiveClubs,
+    isSignedIn ? {} : "skip"
+  );
+
+  const savePushToken = useMutation(api.pushNotifications.saveToken);
+
+  useEffect(() => {
+    if (!user || profile === undefined || profile === null) return;
+    registerForPushNotifications().then(token => {
+      if (token) {
+        savePushToken({
+          token,
+          platform: Platform.OS === "ios" ? "ios" : "android",
+        }).catch(console.error);
+      }
+    });
+  }, [user?.id, profile?._id]);
+
+  if (!isLoaded || (isSignedIn && profile === undefined)) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
         <ActivityIndicator size="large" color="#16a34a" />
@@ -18,6 +80,12 @@ export default function AppLayout() {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
+  if (profile === null && !segments.includes("onboarding" as never)) {
+    return <Redirect href="/(app)/onboarding" />;
+  }
+
+  const isClubMember = myClubs !== undefined && myClubs.length > 0;
+
   return (
     <Tabs
       screenOptions={{
@@ -26,35 +94,91 @@ export default function AppLayout() {
         headerStyle: { backgroundColor: "#fff" },
         headerTintColor: "#166534",
         headerTitleStyle: { fontWeight: "600" },
+        tabBarStyle: {
+          backgroundColor: "#fff",
+          borderTopColor: "#f3f4f6",
+          borderTopWidth: 1,
+          elevation: 8,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
+          height: Platform.OS === "ios" ? 88 : 64,
+          paddingBottom: Platform.OS === "ios" ? 28 : 8,
+          paddingTop: 8,
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Home",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="competitions"
+        name="rounds"
         options={{
-          title: "Competitions",
+          title: "Rounds",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="trophy-outline" size={size} color={color} />
+            <Ionicons name="stats-chart-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="play"
         options={{
-          title: "Profile",
+          title: "Play",
+          headerShown: false,
+          tabBarIcon: ({ focused }) => (
+            <View
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 26,
+                backgroundColor: "#16a34a",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: Platform.OS === "ios" ? 8 : 4,
+                shadowColor: "#16a34a",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: focused ? 0.5 : 0.3,
+                shadowRadius: 8,
+                elevation: 6,
+              }}
+            >
+              <Ionicons name="golf-outline" size={26} color="#fff" />
+            </View>
+          ),
+          tabBarLabel: () => null,
+        }}
+      />
+      <Tabs.Screen
+        name="club"
+        options={{
+          href: isClubMember ? undefined : null,
+          title: "Club",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+            <Ionicons name="people-outline" size={size} color={color} />
           ),
         }}
       />
+      <Tabs.Screen
+        name="me"
+        options={{
+          title: "Me",
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-circle-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen name="onboarding" options={{ href: null, headerShown: false }} />
     </Tabs>
   );
 }

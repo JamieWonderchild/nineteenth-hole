@@ -1,128 +1,79 @@
-import { useSignIn, useOAuth } from "@clerk/clerk-expo";
-import { Link, useRouter } from "expo-router";
-import { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from "react-native";
+import { useSSO } from "@clerk/clerk-expo";
 import * as WebBrowser from "expo-web-browser";
-import * as Linking from "expo-linking";
+import { View, Text, TouchableOpacity } from "react-native";
+import { useRouter } from "expo-router";
+import { Button } from "../../components/ui/button";
+import { Ionicons } from "@expo/vector-icons";
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function SignInScreen() {
-  const { signIn, setActive, isLoaded } = useSignIn();
-  const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });
+  const { startSSOFlow } = useSSO();
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function handleGoogleSignIn() {
+  const handleApple = async () => {
     try {
-      const redirectUrl = Linking.createURL("oauth-callback");
-      console.log("OAuth redirect URL:", redirectUrl);
-      const { createdSessionId, setActive: setOAuthActive } = await startOAuthFlow({
-        redirectUrl,
-      });
-      if (createdSessionId) {
-        await setOAuthActive!({ session: createdSessionId });
-        router.replace("/(app)");
-      }
-    } catch (err: any) {
-      Alert.alert("Google sign in failed", err.errors?.[0]?.message ?? "Something went wrong");
+      const { createdSessionId, setActive } = await startSSOFlow({ strategy: "oauth_apple" });
+      if (createdSessionId) await setActive?.({ session: createdSessionId });
+    } catch (e) {
+      console.error(e);
     }
-  }
+  };
 
-  async function handleSignIn() {
-    if (!isLoaded) return;
-    setLoading(true);
+  const handleGoogle = async () => {
     try {
-      const result = await signIn.create({ identifier: email, password });
-      await setActive({ session: result.createdSessionId });
-      router.replace("/(app)");
-    } catch (err: any) {
-      Alert.alert("Sign in failed", err.errors?.[0]?.message ?? "Something went wrong");
-    } finally {
-      setLoading(false);
+      const { createdSessionId, setActive } = await startSSOFlow({ strategy: "oauth_google" });
+      if (createdSessionId) await setActive?.({ session: createdSessionId });
+    } catch (e) {
+      console.error(e);
     }
-  }
+  };
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-white"
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <View className="flex-1 justify-center px-8">
-        {/* Logo / wordmark */}
-        <View className="mb-10">
-          <Text className="text-3xl font-bold text-green-700">The 19th Hole</Text>
-          <Text className="text-base text-gray-500 mt-1">Golf club management</Text>
+    <View className="flex-1 bg-white px-6">
+      {/* Header */}
+      <View className="flex-1 items-center justify-center gap-3">
+        <View className="w-20 h-20 bg-green-600 rounded-2xl items-center justify-center mb-4">
+          <Text className="text-white text-4xl">⛳</Text>
         </View>
+        <Text className="text-3xl font-bold text-gray-900">The 19th Hole</Text>
+        <Text className="text-gray-500 text-center text-base">
+          Track your rounds, manage your handicap, play with friends
+        </Text>
+      </View>
 
-        {/* Google sign in */}
+      {/* Auth buttons */}
+      <View className="pb-12 gap-3">
         <TouchableOpacity
-          className="border border-gray-300 rounded-lg py-4 items-center mb-6 flex-row justify-center gap-x-2"
-          onPress={handleGoogleSignIn}
+          onPress={handleApple}
+          className="bg-black rounded-full py-4 flex-row items-center justify-center gap-3"
         >
+          <Ionicons name="logo-apple" size={20} color="white" />
+          <Text className="text-white font-semibold text-base">Continue with Apple</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={handleGoogle}
+          className="bg-white border border-gray-300 rounded-full py-4 flex-row items-center justify-center gap-3"
+        >
+          <Text className="text-base">G</Text>
           <Text className="text-gray-700 font-semibold text-base">Continue with Google</Text>
         </TouchableOpacity>
 
-        {/* Divider */}
-        <View className="flex-row items-center mb-6">
+        <View className="flex-row items-center gap-3 my-1">
           <View className="flex-1 h-px bg-gray-200" />
-          <Text className="mx-3 text-gray-400 text-sm">or</Text>
+          <Text className="text-gray-400 text-sm">or</Text>
           <View className="flex-1 h-px bg-gray-200" />
         </View>
 
-        {/* Email */}
-        <Text className="text-sm font-medium text-gray-700 mb-1">Email</Text>
-        <TextInput
-          className="border border-gray-300 rounded-lg px-4 py-3 text-base text-gray-900 mb-4"
-          placeholder="you@example.com"
-          placeholderTextColor="#9ca3af"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
-        />
+        <Button onPress={() => router.push("/(auth)/sign-up")} variant="outline">
+          Create account with email
+        </Button>
 
-        {/* Password */}
-        <Text className="text-sm font-medium text-gray-700 mb-1">Password</Text>
-        <TextInput
-          className="border border-gray-300 rounded-lg px-4 py-3 text-base text-gray-900 mb-6"
-          placeholder="••••••••"
-          placeholderTextColor="#9ca3af"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-
-        {/* Sign in button */}
-        <TouchableOpacity
-          className="bg-green-600 rounded-lg py-4 items-center"
-          onPress={handleSignIn}
-          disabled={loading}
-        >
-          <Text className="text-white font-semibold text-base">
-            {loading ? "Signing in…" : "Sign in"}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Sign up link */}
-        <View className="flex-row justify-center mt-6">
-          <Text className="text-gray-500 text-sm">Don't have an account? </Text>
-          <Link href="/(auth)/sign-up">
-            <Text className="text-green-700 text-sm font-medium">Sign up</Text>
-          </Link>
-        </View>
+        <Text className="text-center text-gray-400 text-xs mt-2">
+          By continuing you agree to our Terms of Service and Privacy Policy
+        </Text>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }

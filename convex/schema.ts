@@ -887,4 +887,97 @@ export default defineSchema({
     createdAt: v.string(),
   })
     .index("by_club", ["clubId"]),
+
+  // ============================================================================
+  // Rounds (individual golfer round log — B2C, no club affiliation required)
+  // ============================================================================
+
+  rounds: defineTable({
+    userId: v.string(),                        // Clerk user ID
+    // Course identification — one of these will be set
+    golfClubId: v.optional(v.id("golfClubs")), // if matched to CDH directory
+    courseNameFreetext: v.optional(v.string()), // fallback freetext e.g. "Scratch Golf Links"
+    // Tee details
+    tees: v.string(),                          // 'white' | 'yellow' | 'red' | 'blue'
+    courseRating: v.optional(v.number()),      // e.g. 71.3
+    slopeRating: v.optional(v.number()),       // e.g. 127
+    scratchScore: v.optional(v.number()),      // par equivalent for handicap calc
+    // Scores
+    grossScore: v.number(),                    // total strokes
+    netScore: v.optional(v.number()),          // grossScore - playingHandicap
+    stablefordPoints: v.optional(v.number()),  // net stableford total
+    handicapAtTime: v.optional(v.number()),    // handicap index at time of round
+    differential: v.optional(v.number()),      // WHS score differential (computed)
+    // Hole-by-hole (optional — only if full scorecard mode used)
+    holeScores: v.optional(v.array(v.object({
+      hole: v.number(),           // 1–18
+      par: v.number(),
+      strokeIndex: v.number(),    // 1–18
+      score: v.number(),          // strokes taken
+      fairwayHit: v.optional(v.boolean()),
+      gir: v.optional(v.boolean()),  // green in regulation
+      putts: v.optional(v.number()),
+    }))),
+    // Metadata
+    date: v.string(),                          // ISO date "2026-04-13"
+    playedWith: v.optional(v.array(v.string())), // names of playing partners
+    isCountingRound: v.boolean(),              // default true; false = doesn't affect handicap
+    conditions: v.optional(v.string()),        // 'fine' | 'overcast' | 'wet' | 'windy'
+    notes: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_date", ["userId", "date"])
+    .index("by_golf_club", ["golfClubId"]),
+
+  // ============================================================================
+  // Handicap History (one row per index change)
+  // ============================================================================
+
+  handicapHistory: defineTable({
+    userId: v.string(),
+    date: v.string(),             // ISO date of change
+    handicapIndex: v.number(),    // new index after this change
+    previousIndex: v.optional(v.number()),
+    change: v.number(),           // positive = went up, negative = improved
+    direction: v.string(),        // 'up' | 'down' | 'same'
+    triggerRoundId: v.optional(v.id("rounds")), // which round caused this
+    reason: v.string(),           // 'round' | 'manual' | 'admin' | 'initial'
+    createdAt: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_date", ["userId", "date"]),
+
+  // ============================================================================
+  // Course Ratings (crowdsourced CR + Slope per tee at each golf club)
+  // ============================================================================
+
+  courseRatings: defineTable({
+    golfClubId: v.id("golfClubs"),
+    teeName: v.string(),          // 'white' | 'yellow' | 'red' | 'blue'
+    gender: v.string(),           // 'mens' | 'ladies'
+    courseRating: v.number(),     // e.g. 71.3
+    slopeRating: v.number(),      // 72–155, standard is 113
+    scratchScore: v.number(),     // par for the tee
+    submittedBy: v.string(),      // userId who submitted
+    verified: v.boolean(),        // admin-verified official ratings
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_golf_club", ["golfClubId"])
+    .index("by_golf_club_and_tee", ["golfClubId", "teeName"]),
+
+  // ============================================================================
+  // Push Tokens (Expo push notification tokens)
+  // ============================================================================
+
+  pushTokens: defineTable({
+    userId: v.string(),
+    token: v.string(),            // Expo push token e.g. "ExponentPushToken[xxx]"
+    platform: v.string(),         // 'ios' | 'android'
+    updatedAt: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_token", ["token"]),
 });

@@ -135,6 +135,93 @@ export const submitScore = mutation({
   },
 });
 
+// Member: submit their own score from mobile app (no admin required)
+export const submitOwnScore = mutation({
+  args: {
+    competitionId: v.id("competitions"),
+    grossScore: v.optional(v.number()),
+    stablefordPoints: v.optional(v.number()),
+    holeScores: v.optional(v.array(v.object({
+      hole: v.number(),
+      par: v.number(),
+      strokeIndex: v.number(),
+      score: v.number(),
+    }))),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const competition = await ctx.db.get(args.competitionId);
+    if (!competition) throw new Error("Competition not found");
+    if (!competition.clubId) throw new Error("Not a club competition");
+    if (competition.status !== "live" && competition.status !== "open") {
+      throw new Error("Competition is not accepting scores");
+    }
+
+    // Must be an active member of the club
+    const member = await ctx.db
+      .query("clubMembers")
+      .withIndex("by_club_and_user", q =>
+        q.eq("clubId", competition.clubId!).eq("userId", identity.subject)
+      )
+      .unique();
+    if (!member || member.status !== "active") throw new Error("Not a club member");
+
+    const handicap = member.handicap ?? 0;
+    const netScore = args.grossScore != null
+      ? args.grossScore - Math.round(handicap)
+      : undefined;
+
+    // Compute stableford if not provided but we have hole scores
+    let stablefordPoints = args.stablefordPoints;
+    if (!stablefordPoints && args.holeScores && args.holeScores.length > 0) {
+      stablefordPoints = args.holeScores.reduce((total, h) => {
+        const strokesReceived = Math.floor((handicap * h.strokeIndex) / 18);
+        const pts = Math.max(0, 2 + h.par - h.score + strokesReceived);
+        return total + pts;
+      }, 0);
+    }
+
+    const now = new Date().toISOString();
+
+    // Upsert — one score per member per competition
+    const existing = await ctx.db
+      .query("competitionScores")
+      .withIndex("by_competition_and_user", q =>
+        q.eq("competitionId", args.competitionId).eq("userId", identity.subject)
+      )
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        grossScore: args.grossScore,
+        netScore,
+        stablefordPoints,
+        notes: args.notes,
+        submittedBy: identity.subject,
+        submittedAt: now,
+      });
+      return existing._id;
+    }
+
+    return ctx.db.insert("competitionScores", {
+      competitionId: args.competitionId,
+      clubId: competition.clubId,
+      userId: identity.subject,
+      displayName: member.displayName,
+      handicap,
+      grossScore: args.grossScore,
+      netScore,
+      stablefordPoints,
+      notes: args.notes,
+      submittedAt: now,
+      submittedBy: identity.subject,
+    });
+  },
+});
+
 export const updateScore = mutation({
   args: {
     scoreId: v.id("competitionScores"),

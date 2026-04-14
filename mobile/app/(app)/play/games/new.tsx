@@ -1,0 +1,573 @@
+import { useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
+import { useRouter, useLocalSearchParams, Stack } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { useMutation } from "convex/react";
+import { api } from "../../../../lib/convex";
+import { Button, Card } from "../../../../components/ui";
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+type GameType = "stableford" | "strokeplay" | "skins" | "nassau" | "betterball";
+
+interface Player {
+  id: string;
+  name: string;
+  handicap?: number;
+}
+
+const FORMATS: Array<{
+  type: GameType;
+  label: string;
+  emoji: string;
+  description: string;
+}> = [
+  { type: "stableford", label: "Stableford", emoji: "🏌️", description: "Points-based" },
+  { type: "strokeplay", label: "Strokeplay", emoji: "⛳", description: "Lowest score wins" },
+  { type: "skins", label: "Skins", emoji: "💰", description: "Hole by hole drama" },
+  { type: "nassau", label: "Nassau", emoji: "🔀", description: "Front 9 / Back 9 / Overall" },
+  { type: "betterball", label: "Betterball", emoji: "🤝", description: "Team best ball" },
+];
+
+function newPlayerId(): string {
+  return Math.random().toString(36).substring(2, 10);
+}
+
+function todayISO(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+function stepTitle(step: number): string {
+  return ["Game Type", "Players", "Stakes", "Review"][step - 1] ?? "";
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
+export default function NewGameScreen() {
+  const router = useRouter();
+  const { type: typeParam } = useLocalSearchParams<{ type?: string }>();
+  const createGame = useMutation(api.quickGames.create);
+
+  // Step state
+  const [step, setStep] = useState(typeParam ? 2 : 1);
+
+  // Step 1
+  const [gameType, setGameType] = useState<GameType>(
+    (typeParam as GameType) || "stableford"
+  );
+
+  // Step 2
+  const [gameName, setGameName] = useState("Saturday game");
+  const [date, setDate] = useState(todayISO());
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [playerNameInput, setPlayerNameInput] = useState("");
+  const [playerHcpInput, setPlayerHcpInput] = useState("");
+
+  // Step 3
+  const [withStakes, setWithStakes] = useState(false);
+  const [stakeInput, setStakeInput] = useState("");
+  const [scoringMode, setScoringMode] = useState<"overall" | "per_hole">("overall");
+
+  // Submit
+  const [submitting, setSubmitting] = useState(false);
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  function addPlayer() {
+    const name = playerNameInput.trim();
+    if (!name) return;
+    const hcp = playerHcpInput.trim() ? parseFloat(playerHcpInput.trim()) : undefined;
+    setPlayers((prev) => [
+      ...prev,
+      { id: newPlayerId(), name, handicap: hcp },
+    ]);
+    setPlayerNameInput("");
+    setPlayerHcpInput("");
+  }
+
+  function removePlayer(id: string) {
+    setPlayers((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  function canAdvance(): boolean {
+    if (step === 1) return true;
+    if (step === 2) return players.length >= 2 && gameName.trim().length > 0;
+    if (step === 3) return true;
+    return true;
+  }
+
+  function goNext() {
+    if (!canAdvance()) {
+      if (step === 2 && players.length < 2)
+        Alert.alert("Add players", "You need at least 2 players to start a game.");
+      return;
+    }
+    if (step < 4) setStep((s) => s + 1);
+  }
+
+  function goBack() {
+    if (step > 1) setStep((s) => s - 1);
+    else router.back();
+  }
+
+  async function handleCreate() {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const stakePerPlayer = withStakes
+        ? Math.round(parseFloat(stakeInput || "0") * 100)
+        : 0;
+
+      const gameId = await createGame({
+        name: gameName.trim(),
+        type: gameType,
+        currency: "gbp",
+        stakePerPlayer,
+        settlementType: "cash",
+        scoringMode,
+        players: players.map((p) => ({
+          id: p.id,
+          name: p.name,
+          userId: undefined,
+          handicap: p.handicap,
+        })),
+        date: new Date(date).getTime(),
+      });
+
+      router.replace(`/play/games/${gameId}` as any);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Failed to create game.");
+      setSubmitting(false);
+    }
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+
+  return (
+    <>
+      <Stack.Screen options={{ title: stepTitle(step), headerBackVisible: false }} />
+      <KeyboardAvoidingView
+        className="flex-1 bg-gray-50"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        {/* Progress bar */}
+        <View className="flex-row px-4 pt-2 pb-1 gap-1">
+          {[1, 2, 3, 4].map((s) => (
+            <View
+              key={s}
+              className={`flex-1 h-1 rounded-full ${s <= step ? "bg-green-600" : "bg-gray-200"}`}
+            />
+          ))}
+        </View>
+
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+          {step === 1 && <Step1GameType selected={gameType} onSelect={setGameType} />}
+          {step === 2 && (
+            <Step2Players
+              gameName={gameName}
+              setGameName={setGameName}
+              date={date}
+              setDate={setDate}
+              players={players}
+              playerNameInput={playerNameInput}
+              setPlayerNameInput={setPlayerNameInput}
+              playerHcpInput={playerHcpInput}
+              setPlayerHcpInput={setPlayerHcpInput}
+              onAddPlayer={addPlayer}
+              onRemovePlayer={removePlayer}
+            />
+          )}
+          {step === 3 && (
+            <Step3Stakes
+              withStakes={withStakes}
+              setWithStakes={setWithStakes}
+              stakeInput={stakeInput}
+              setStakeInput={setStakeInput}
+              scoringMode={scoringMode}
+              setScoringMode={setScoringMode}
+            />
+          )}
+          {step === 4 && (
+            <Step4Review
+              gameType={gameType}
+              gameName={gameName}
+              date={date}
+              players={players}
+              withStakes={withStakes}
+              stakeInput={stakeInput}
+              scoringMode={scoringMode}
+            />
+          )}
+        </ScrollView>
+
+        {/* Navigation buttons */}
+        <View className="flex-row gap-3 px-4 pb-6 pt-2 border-t border-gray-100 bg-white">
+          <Button variant="outline" onPress={goBack} className="flex-1">
+            {step === 1 ? "Cancel" : "Back"}
+          </Button>
+          {step < 4 ? (
+            <Button onPress={goNext} className="flex-1">
+              Next
+            </Button>
+          ) : (
+            <Button onPress={handleCreate} loading={submitting} className="flex-1">
+              Start Game
+            </Button>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </>
+  );
+}
+
+// ── Step 1 ────────────────────────────────────────────────────────────────────
+
+function Step1GameType({
+  selected,
+  onSelect,
+}: {
+  selected: GameType;
+  onSelect: (t: GameType) => void;
+}) {
+  return (
+    <View className="gap-3">
+      <Text className="text-xl font-bold text-gray-900 mb-2">Choose a format</Text>
+      {FORMATS.map((f) => (
+        <TouchableOpacity
+          key={f.type}
+          onPress={() => onSelect(f.type)}
+          className={`flex-row items-center gap-4 p-4 rounded-xl border-2 ${
+            selected === f.type
+              ? "border-green-600 bg-green-50"
+              : "border-gray-100 bg-white"
+          }`}
+        >
+          <Text className="text-3xl">{f.emoji}</Text>
+          <View className="flex-1">
+            <Text
+              className={`font-bold text-base ${
+                selected === f.type ? "text-green-700" : "text-gray-900"
+              }`}
+            >
+              {f.label}
+            </Text>
+            <Text className="text-sm text-gray-500">{f.description}</Text>
+          </View>
+          {selected === f.type && (
+            <Ionicons name="checkmark-circle" size={22} color="#16a34a" />
+          )}
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+// ── Step 2 ────────────────────────────────────────────────────────────────────
+
+function Step2Players({
+  gameName,
+  setGameName,
+  date,
+  setDate,
+  players,
+  playerNameInput,
+  setPlayerNameInput,
+  playerHcpInput,
+  setPlayerHcpInput,
+  onAddPlayer,
+  onRemovePlayer,
+}: {
+  gameName: string;
+  setGameName: (v: string) => void;
+  date: string;
+  setDate: (v: string) => void;
+  players: Player[];
+  playerNameInput: string;
+  setPlayerNameInput: (v: string) => void;
+  playerHcpInput: string;
+  setPlayerHcpInput: (v: string) => void;
+  onAddPlayer: () => void;
+  onRemovePlayer: (id: string) => void;
+}) {
+  return (
+    <View className="gap-5">
+      <Text className="text-xl font-bold text-gray-900">Game details</Text>
+
+      <View className="gap-1">
+        <Text className="text-sm font-medium text-gray-700">Game name</Text>
+        <TextInput
+          value={gameName}
+          onChangeText={setGameName}
+          placeholder="e.g. Saturday game"
+          className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900"
+        />
+      </View>
+
+      <View className="gap-1">
+        <Text className="text-sm font-medium text-gray-700">Date</Text>
+        <TextInput
+          value={date}
+          onChangeText={setDate}
+          placeholder="YYYY-MM-DD"
+          className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900"
+        />
+      </View>
+
+      <View className="gap-3">
+        <Text className="text-sm font-medium text-gray-700">
+          Players{" "}
+          <Text className="text-gray-400 font-normal">(min. 2)</Text>
+        </Text>
+
+        {/* Add player row */}
+        <View className="flex-row gap-2">
+          <TextInput
+            value={playerNameInput}
+            onChangeText={setPlayerNameInput}
+            placeholder="Name"
+            className="flex-1 bg-white border border-gray-200 rounded-xl px-3 py-3 text-gray-900"
+            onSubmitEditing={onAddPlayer}
+            returnKeyType="done"
+          />
+          <TextInput
+            value={playerHcpInput}
+            onChangeText={setPlayerHcpInput}
+            placeholder="HCP"
+            keyboardType="decimal-pad"
+            className="w-20 bg-white border border-gray-200 rounded-xl px-3 py-3 text-gray-900"
+          />
+          <TouchableOpacity
+            onPress={onAddPlayer}
+            className="bg-green-600 rounded-xl px-4 items-center justify-center"
+          >
+            <Text className="text-white font-bold text-lg">+</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Player chips */}
+        {players.length > 0 && (
+          <View className="flex-row flex-wrap gap-2">
+            {players.map((p) => (
+              <View
+                key={p.id}
+                className="flex-row items-center bg-green-100 rounded-full px-3 py-1.5 gap-1.5"
+              >
+                <Text className="text-green-800 font-medium text-sm">
+                  {p.name}
+                  {p.handicap != null ? ` (${p.handicap})` : ""}
+                </Text>
+                <TouchableOpacity onPress={() => onRemovePlayer(p.id)} hitSlop={8}>
+                  <Ionicons name="close-circle" size={16} color="#15803d" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {players.length < 2 && (
+          <Text className="text-xs text-amber-600">Add at least 2 players to continue.</Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// ── Step 3 ────────────────────────────────────────────────────────────────────
+
+function Step3Stakes({
+  withStakes,
+  setWithStakes,
+  stakeInput,
+  setStakeInput,
+  scoringMode,
+  setScoringMode,
+}: {
+  withStakes: boolean;
+  setWithStakes: (v: boolean) => void;
+  stakeInput: string;
+  setStakeInput: (v: string) => void;
+  scoringMode: "overall" | "per_hole";
+  setScoringMode: (v: "overall" | "per_hole") => void;
+}) {
+  return (
+    <View className="gap-6">
+      <Text className="text-xl font-bold text-gray-900">Stakes & scoring</Text>
+
+      {/* Stake toggle */}
+      <View className="gap-3">
+        <Text className="text-sm font-medium text-gray-700">Playing for</Text>
+        <View className="flex-row gap-3">
+          {[
+            { value: false, label: "Just for fun", icon: "happy-outline" as const },
+            { value: true, label: "With stakes", icon: "cash-outline" as const },
+          ].map((opt) => (
+            <TouchableOpacity
+              key={String(opt.value)}
+              onPress={() => setWithStakes(opt.value)}
+              className={`flex-1 flex-row items-center justify-center gap-2 py-3 rounded-xl border-2 ${
+                withStakes === opt.value
+                  ? "border-green-600 bg-green-50"
+                  : "border-gray-100 bg-white"
+              }`}
+            >
+              <Ionicons
+                name={opt.icon}
+                size={18}
+                color={withStakes === opt.value ? "#16a34a" : "#6b7280"}
+              />
+              <Text
+                className={`font-medium text-sm ${
+                  withStakes === opt.value ? "text-green-700" : "text-gray-600"
+                }`}
+              >
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Stake amount */}
+      {withStakes && (
+        <View className="gap-2">
+          <Text className="text-sm font-medium text-gray-700">Stake per player (£)</Text>
+          <TextInput
+            value={stakeInput}
+            onChangeText={setStakeInput}
+            placeholder="e.g. 5"
+            keyboardType="decimal-pad"
+            className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900"
+          />
+          <Text className="text-xs text-gray-400">Settlement via cash (Stripe coming soon)</Text>
+        </View>
+      )}
+
+      {/* Scoring mode */}
+      <View className="gap-3">
+        <Text className="text-sm font-medium text-gray-700">Score tracking</Text>
+        {[
+          {
+            value: "overall" as const,
+            label: "Overall score",
+            description: "Enter final totals at the end",
+          },
+          {
+            value: "per_hole" as const,
+            label: "Hole by hole",
+            description: "Track each hole live",
+          },
+        ].map((opt) => (
+          <TouchableOpacity
+            key={opt.value}
+            onPress={() => setScoringMode(opt.value)}
+            className={`flex-row items-center gap-4 p-4 rounded-xl border-2 ${
+              scoringMode === opt.value
+                ? "border-green-600 bg-green-50"
+                : "border-gray-100 bg-white"
+            }`}
+          >
+            <View className="flex-1">
+              <Text
+                className={`font-semibold text-sm ${
+                  scoringMode === opt.value ? "text-green-700" : "text-gray-900"
+                }`}
+              >
+                {opt.label}
+              </Text>
+              <Text className="text-xs text-gray-500 mt-0.5">{opt.description}</Text>
+            </View>
+            {scoringMode === opt.value && (
+              <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
+            )}
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ── Step 4 ────────────────────────────────────────────────────────────────────
+
+function Step4Review({
+  gameType,
+  gameName,
+  date,
+  players,
+  withStakes,
+  stakeInput,
+  scoringMode,
+}: {
+  gameType: GameType;
+  gameName: string;
+  date: string;
+  players: Player[];
+  withStakes: boolean;
+  stakeInput: string;
+  scoringMode: "overall" | "per_hole";
+}) {
+  const format = FORMATS.find((f) => f.type === gameType);
+  const stakeDisplay = withStakes && stakeInput
+    ? `£${parseFloat(stakeInput || "0").toFixed(2)}/player`
+    : "None";
+
+  const rows = [
+    { label: "Format", value: `${format?.emoji ?? ""} ${format?.label ?? gameType}` },
+    { label: "Name", value: gameName },
+    { label: "Date", value: date },
+    { label: "Players", value: `${players.length} player${players.length !== 1 ? "s" : ""}` },
+    { label: "Stakes", value: stakeDisplay },
+    { label: "Scoring", value: scoringMode === "per_hole" ? "Hole by hole" : "Overall score" },
+  ];
+
+  return (
+    <View className="gap-4">
+      <Text className="text-xl font-bold text-gray-900">Review</Text>
+
+      <Card className="overflow-hidden">
+        {rows.map((row, i) => (
+          <View
+            key={row.label}
+            className={`flex-row items-center justify-between px-4 py-3 ${
+              i < rows.length - 1 ? "border-b border-gray-50" : ""
+            }`}
+          >
+            <Text className="text-gray-500 text-sm">{row.label}</Text>
+            <Text className="text-gray-900 font-medium text-sm">{row.value}</Text>
+          </View>
+        ))}
+      </Card>
+
+      <Card className="px-4 py-3">
+        <Text className="text-sm font-medium text-gray-700 mb-2">Players</Text>
+        <View className="gap-2">
+          {players.map((p) => (
+            <View key={p.id} className="flex-row items-center gap-2">
+              <View className="w-6 h-6 rounded-full bg-green-100 items-center justify-center">
+                <Text className="text-green-700 text-xs font-bold">
+                  {p.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <Text className="text-gray-900 text-sm flex-1">{p.name}</Text>
+              {p.handicap != null && (
+                <Text className="text-gray-400 text-sm">HCP {p.handicap}</Text>
+              )}
+            </View>
+          ))}
+        </View>
+      </Card>
+
+      <Text className="text-xs text-gray-400 text-center">
+        Tap Start Game to begin. Scores update live for all players.
+      </Text>
+    </View>
+  );
+}

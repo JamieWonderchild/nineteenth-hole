@@ -7,7 +7,7 @@ export const get = query({
     return ctx.db
       .query("golferProfiles")
       .withIndex("by_user", q => q.eq("userId", userId))
-      .unique();
+      .first();
   },
 });
 
@@ -25,7 +25,7 @@ export const upsert = mutation({
     const existing = await ctx.db
       .query("golferProfiles")
       .withIndex("by_user", q => q.eq("userId", identity.subject))
-      .unique();
+      .first();
 
     const now = new Date().toISOString();
     if (existing) {
