@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, LogOut,
   Globe, ChevronRight, ChevronDown, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered, Clock, MapPin,
-  MessageSquare, Mail, Swords, UserCheck, ShoppingCart, Shield, CreditCard, UserCircle, BarChart2, Wallet, Check, Monitor
+  MessageSquare, Mail, Swords, UserCheck, ShoppingCart, Shield, CreditCard, UserCircle, BarChart2, Wallet, Check, Monitor, Map
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
@@ -154,6 +154,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               onClick={onNav}
             />
             <NavItem href="/games" icon={<Zap size={16} />} label="Quick Games" active={pathname.startsWith("/games")} onClick={onNav} />
+            <NavItem href="/courses" icon={<Map size={16} />} label="Golf Courses" active={pathname.startsWith("/courses")} onClick={onNav} />
             {club && <div className="my-2 border-t border-border" />}
           </>
         )}
@@ -162,6 +163,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
           <>
             <NavItem href="/pools" icon={<Trophy size={16} />} label="Tour Pools" active={pathname.startsWith("/pools")} onClick={onNav} />
             <NavItem href="/games" icon={<Zap size={16} />} label="My Games" active={pathname.startsWith("/games")} onClick={onNav} />
+            <NavItem href="/courses" icon={<Map size={16} />} label="Golf Courses" active={pathname.startsWith("/courses")} onClick={onNav} />
             {club && <div className="my-2 border-t border-border" />}
           </>
         )}
