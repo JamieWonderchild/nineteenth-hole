@@ -1,12 +1,12 @@
-import { AppNav } from "@/components/layout/AppNav";
+import { ManageSidebar } from "@/components/layout/ManageSidebar";
 
 export default function HomeLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AppNav />
-      <main className="max-w-6xl mx-auto px-4 py-6">
+    <div className="flex min-h-screen bg-gray-50">
+      <ManageSidebar />
+      <div className="flex-1 md:overflow-auto min-w-0 pt-14 md:pt-0 px-6 py-8">
         {children}
-      </main>
+      </div>
     </div>
   );
 }
