@@ -7,7 +7,7 @@ export const getLatest = query({
     const profile = await ctx.db
       .query("golferProfiles")
       .withIndex("by_user", q => q.eq("userId", userId))
-      .unique();
+      .first();
     return profile?.handicapIndex ?? null;
   },
 });

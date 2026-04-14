@@ -1,34 +1,37 @@
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { Redirect, Tabs, useSegments, useRouter } from "expo-router";
+import { Redirect, Tabs, useSegments } from "expo-router";
 import { View, ActivityIndicator, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "convex/react";
 import { useEffect } from "react";
-import * as Notifications from "expo-notifications";
 import { api } from "../../lib/convex";
 
-// Configure how notifications appear when app is foregrounded
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+// expo-notifications requires a compiled native module — load lazily so a
+// missing module never crashes the layout (e.g. Expo Go or a stale build).
+let Notifications: typeof import("expo-notifications") | null = null;
+try {
+  Notifications = require("expo-notifications");
+  Notifications?.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+} catch {}
 
 async function registerForPushNotifications(): Promise<string | null> {
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  let finalStatus = existing;
-  if (existing !== "granted") {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-  if (finalStatus !== "granted") return null;
-
-  // Get Expo push token
+  if (!Notifications) return null;
   try {
+    const { status: existing } = await Notifications.getPermissionsAsync();
+    let finalStatus = existing;
+    if (existing !== "granted") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== "granted") return null;
     const token = await Notifications.getExpoPushTokenAsync({
-      projectId: "your-eas-project-id", // Replace with actual EAS project ID
+      projectId: "your-eas-project-id",
     });
     return token.data;
   } catch {
@@ -41,19 +44,20 @@ export default function AppLayout() {
   const { user } = useUser();
   const segments = useSegments();
 
-  // Check if golfer profile exists
   const profile = useQuery(
     api.golferProfiles.get,
     user ? { userId: user.id } : "skip"
   );
 
+  const myClubs = useQuery(
+    api.clubMembers.myActiveClubs,
+    isSignedIn ? {} : "skip"
+  );
+
   const savePushToken = useMutation(api.pushNotifications.saveToken);
 
-  // Register push notifications once profile is confirmed
   useEffect(() => {
-    if (!user || profile === undefined) return;
-    if (profile === null) return; // wait for onboarding to complete
-
+    if (!user || profile === undefined || profile === null) return;
     registerForPushNotifications().then(token => {
       if (token) {
         savePushToken({
@@ -76,10 +80,11 @@ export default function AppLayout() {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
-  // First time user — no golfer profile yet
   if (profile === null && !segments.includes("onboarding" as never)) {
     return <Redirect href="/(app)/onboarding" />;
   }
+
+  const isClubMember = myClubs !== undefined && myClubs.length > 0;
 
   return (
     <Tabs
@@ -108,6 +113,7 @@ export default function AppLayout() {
         name="index"
         options={{
           title: "Home",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
@@ -154,6 +160,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="club"
         options={{
+          href: isClubMember ? undefined : null,
           title: "Club",
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
@@ -171,7 +178,6 @@ export default function AppLayout() {
           ),
         }}
       />
-      {/* Hidden screens — not shown as tabs */}
       <Tabs.Screen name="onboarding" options={{ href: null, headerShown: false }} />
     </Tabs>
   );

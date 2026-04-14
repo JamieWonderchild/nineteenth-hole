@@ -15,126 +15,497 @@ import { api } from "../../lib/convex";
 import { HandicapBadge, Card, Badge, LoadingSpinner } from "../../components/ui";
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-GB", {
+  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-GB", {
     weekday: "short",
     day: "numeric",
     month: "short",
   });
 }
 
-function ConditionsIcon({ conditions }: { conditions?: string }) {
-  const map: Record<string, string> = {
-    dry: "☀️",
-    overcast: "🌤",
-    wet: "🌧",
-    windy: "💨",
-  };
-  if (!conditions) return null;
-  return <Text className="text-sm">{map[conditions] ?? ""}</Text>;
+function formatTime(timeStr: string) {
+  const [h, m] = timeStr.split(":").map(Number);
+  const suffix = h >= 12 ? "pm" : "am";
+  const hour = h % 12 === 0 ? 12 : h % 12;
+  return `${hour}:${m.toString().padStart(2, "0")}${suffix}`;
 }
 
-function RoundCard({
-  round,
-  onPress,
+// ── Club Member Home ──────────────────────────────────────────────────────────
+
+function ClubMemberHome({
+  greeting,
+  firstName,
+  userId,
+  handicap,
+  rounds,
+  club,
+  membership,
+  refreshing,
+  onRefresh,
+  router,
 }: {
-  round: {
-    _id: string;
-    date: string;
-    courseNameFreetext?: string;
-    golfClubId?: string;
-    grossScore: number;
-    stablefordPoints?: number;
-    netScore?: number;
-    differential?: number;
-    previousHandicap?: number;
-    tees?: string;
-    conditions?: string;
-  };
-  onPress: () => void;
+  greeting: string;
+  firstName: string;
+  userId: string;
+  handicap: number | null | undefined;
+  rounds: any[] | undefined;
+  club: any;
+  membership: any;
+  refreshing: boolean;
+  onRefresh: () => void;
+  router: ReturnType<typeof useRouter>;
 }) {
-  const diffArrow =
-    round.differential !== undefined && round.previousHandicap !== undefined
-      ? round.differential < round.previousHandicap
-        ? "↓"
-        : round.differential > round.previousHandicap
-        ? "↑"
-        : "→"
-      : null;
-  const arrowColor =
-    diffArrow === "↓" ? "#16a34a" : diffArrow === "↑" ? "#dc2626" : "#9ca3af";
+  const activeComps = useQuery(
+    api.competitions.listActiveForClub,
+    club?._id ? { clubId: club._id } : "skip"
+  );
+  const myBookings = useQuery(
+    api.teeTimes.listMyBookings,
+    club?._id && userId ? { clubId: club._id, userId } : "skip"
+  );
+
+  const nextComp = activeComps?.[0] ?? null;
+  const nextBooking = myBookings?.[0] ?? null;
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-      <Card className="p-4 mb-3">
-        <View className="flex-row items-start justify-between">
-          <View className="flex-1 gap-0.5">
-            <Text className="text-xs text-gray-400 font-medium">
-              {formatDate(round.date)}
-            </Text>
-            <Text className="text-base font-semibold text-gray-900" numberOfLines={1}>
-              {round.courseNameFreetext ?? "Course"}
-            </Text>
-            <View className="flex-row items-center gap-2 mt-1">
-              <Badge variant="muted">
-                <Text className="text-xs text-gray-700">
-                  {round.grossScore} gross
-                </Text>
-              </Badge>
-              {round.stablefordPoints !== undefined && (
-                <Badge variant="success">
-                  <Text className="text-xs text-green-800">
-                    {round.stablefordPoints} pts
-                  </Text>
-                </Badge>
-              )}
-              {round.netScore !== undefined && round.stablefordPoints === undefined && (
-                <Badge variant="default">
-                  <Text className="text-xs text-green-800">
-                    Net {round.netScore}
-                  </Text>
-                </Badge>
-              )}
+    <ScrollView
+      className="flex-1"
+      contentContainerStyle={{ paddingBottom: 40 }}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" />
+      }
+    >
+      {/* Hero header */}
+      <View
+        className="px-5 pb-6"
+        style={{
+          backgroundColor: "#fff",
+          borderBottomLeftRadius: 24,
+          borderBottomRightRadius: 24,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+          elevation: 3,
+        }}
+      >
+        <View className="flex-row items-start justify-between mb-5">
+          <View>
+            <Text className="text-sm text-gray-400 font-medium mb-0.5">{greeting}</Text>
+            <Text className="text-3xl font-bold text-gray-900">{firstName}</Text>
+          </View>
+          <View className="items-end">
+            {handicap !== undefined && handicap !== null ? (
+              <>
+                <View className="w-14 h-14 rounded-full bg-green-600 items-center justify-center mb-0.5"
+                  style={{
+                    shadowColor: "#16a34a",
+                    shadowOffset: { width: 0, height: 3 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 8,
+                    elevation: 4,
+                  }}
+                >
+                  <Text className="text-white font-bold text-xl">{handicap.toFixed(1)}</Text>
+                </View>
+                <Text className="text-xs text-gray-400">Handicap</Text>
+              </>
+            ) : (
+              <TouchableOpacity
+                onPress={() => router.push("/(app)/rounds/new")}
+                className="bg-green-50 border border-green-200 rounded-xl px-3 py-2 items-center"
+              >
+                <Ionicons name="add-circle-outline" size={18} color="#16a34a" />
+                <Text className="text-green-700 text-xs font-semibold mt-0.5">Log round</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Club banner */}
+        <View
+          className="rounded-2xl overflow-hidden"
+          style={{
+            backgroundColor: "#15803d",
+            shadowColor: "#166534",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25,
+            shadowRadius: 12,
+            elevation: 5,
+          }}
+        >
+          <TouchableOpacity
+            onPress={() => router.push("/(app)/club" as any)}
+            activeOpacity={0.9}
+          >
+            {/* Club name bar */}
+            <View className="flex-row items-center px-4 pt-4 pb-3 border-b border-white/10">
+              <View className="w-8 h-8 rounded-full bg-white/20 items-center justify-center mr-2.5">
+                <Ionicons name="golf-outline" size={17} color="#fff" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-white font-bold text-base">{club.name}</Text>
+                <Text className="text-green-300 text-xs capitalize">{membership.role}</Text>
+              </View>
+              <View className="flex-row items-center gap-1">
+                <Text className="text-green-300 text-xs">View club</Text>
+                <Ionicons name="chevron-forward" size={13} color="#86efac" />
+              </View>
             </View>
-          </View>
-          <View className="items-end gap-1">
-            {diffArrow && (
-              <Text style={{ color: arrowColor, fontSize: 18, fontWeight: "700" }}>
-                {diffArrow}
-              </Text>
-            )}
-            {round.differential !== undefined && (
-              <Text className="text-xs text-gray-400">
-                {round.differential.toFixed(1)} diff
-              </Text>
-            )}
-            <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
-          </View>
+
+            {/* Stats row */}
+            <View className="flex-row">
+              <TouchableOpacity
+                onPress={() => router.push("/(app)/club/competitions/index" as any)}
+                className="flex-1 px-4 py-3.5"
+                activeOpacity={0.75}
+              >
+                <View className="flex-row items-center gap-1.5 mb-1.5">
+                  <Ionicons name="trophy-outline" size={14} color="#86efac" />
+                  <Text className="text-green-300 text-xs font-medium uppercase tracking-wide">Competition</Text>
+                </View>
+                <Text className="text-white font-semibold text-sm" numberOfLines={1}>
+                  {activeComps === undefined ? "Loading…" : nextComp ? nextComp.name : "None today"}
+                </Text>
+                {nextComp && (
+                  <View className="mt-1">
+                    <Badge variant="success">
+                      <Text className="text-green-800 text-xs">Live</Text>
+                    </Badge>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <View className="w-px bg-white/10 my-3" />
+
+              <TouchableOpacity
+                onPress={() => router.push("/(app)/club/tee-times" as any)}
+                className="flex-1 px-4 py-3.5"
+                activeOpacity={0.75}
+              >
+                <View className="flex-row items-center gap-1.5 mb-1.5">
+                  <Ionicons name="calendar-outline" size={14} color="#86efac" />
+                  <Text className="text-green-300 text-xs font-medium uppercase tracking-wide">Tee Time</Text>
+                </View>
+                <Text className="text-white font-semibold text-sm" numberOfLines={1}>
+                  {myBookings === undefined
+                    ? "Loading…"
+                    : nextBooking
+                    ? formatTime(nextBooking.time)
+                    : "None booked"}
+                </Text>
+                {nextBooking && (
+                  <Text className="text-green-300 text-xs mt-0.5">{formatDate(nextBooking.date)}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
         </View>
-      </Card>
-    </TouchableOpacity>
+      </View>
+
+      {/* Quick Game */}
+      <View className="px-5 mt-5 mb-5">
+        <TouchableOpacity
+          onPress={() => router.push("/(app)/play/games/new")}
+          activeOpacity={0.85}
+          className="flex-row items-center gap-3.5 bg-white rounded-2xl p-4 border border-gray-100"
+          style={{
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.07,
+            shadowRadius: 8,
+            elevation: 2,
+          }}
+        >
+          <View className="w-12 h-12 rounded-full bg-green-600 items-center justify-center"
+            style={{
+              shadowColor: "#16a34a",
+              shadowOffset: { width: 0, height: 3 },
+              shadowOpacity: 0.4,
+              shadowRadius: 6,
+            }}
+          >
+            <Ionicons name="play" size={20} color="#fff" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-gray-900 font-bold text-base">Start a Quick Game</Text>
+            <Text className="text-gray-400 text-xs mt-0.5">Skins, Stableford, Nassau & more</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Recent Rounds */}
+      <View className="px-5">
+        <View className="flex-row items-center justify-between mb-3">
+          <Text className="text-base font-bold text-gray-900">Recent Rounds</Text>
+          <TouchableOpacity onPress={() => router.push("/(app)/rounds")}>
+            <Text className="text-green-600 font-medium text-sm">See all</Text>
+          </TouchableOpacity>
+        </View>
+
+        {rounds === undefined ? (
+          <View className="py-6 items-center"><LoadingSpinner /></View>
+        ) : rounds.length === 0 ? (
+          <TouchableOpacity
+            onPress={() => router.push("/(app)/rounds/new")}
+            className="bg-white rounded-2xl p-5 border border-dashed border-gray-200 items-center gap-2"
+          >
+            <Ionicons name="golf-outline" size={28} color="#d1d5db" />
+            <Text className="text-gray-400 text-sm">No rounds yet — tap to log one</Text>
+          </TouchableOpacity>
+        ) : (
+          rounds.slice(0, 2).map((round: any) => (
+            <TouchableOpacity
+              key={round._id}
+              onPress={() => router.push(`/(app)/rounds/${round._id}`)}
+              activeOpacity={0.7}
+              className="mb-2.5 bg-white rounded-2xl p-4 border border-gray-100 flex-row items-center"
+              style={{
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.05,
+                shadowRadius: 4,
+                elevation: 1,
+              }}
+            >
+              <View className="flex-1">
+                <Text className="text-xs text-gray-400 mb-0.5">{formatDate(round.date)}</Text>
+                <Text className="font-semibold text-gray-900" numberOfLines={1}>
+                  {round.courseNameFreetext ?? "Course"}
+                </Text>
+                <View className="flex-row items-center gap-1.5 mt-1.5">
+                  <View className="bg-gray-100 rounded-full px-2 py-0.5">
+                    <Text className="text-xs text-gray-600 font-medium">{round.grossScore} gross</Text>
+                  </View>
+                  {round.stablefordPoints !== undefined && (
+                    <View className="bg-green-100 rounded-full px-2 py-0.5">
+                      <Text className="text-xs text-green-700 font-medium">{round.stablefordPoints} pts</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#e5e7eb" />
+            </TouchableOpacity>
+          ))
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
-function InviteClubCard() {
+// ── Individual Home ───────────────────────────────────────────────────────────
+
+function IndividualHome({
+  greeting,
+  firstName,
+  handicap,
+  rounds,
+  refreshing,
+  onRefresh,
+  router,
+}: {
+  greeting: string;
+  firstName: string;
+  handicap: number | null | undefined;
+  rounds: any[] | undefined;
+  refreshing: boolean;
+  onRefresh: () => void;
+  router: ReturnType<typeof useRouter>;
+}) {
   return (
-    <Card className="p-5 mb-4 border-dashed border-green-200 bg-green-50">
-      <View className="flex-row items-center gap-3">
-        <View className="w-10 h-10 rounded-full bg-green-100 items-center justify-center">
-          <Ionicons name="people-outline" size={20} color="#16a34a" />
+    <ScrollView
+      className="flex-1"
+      contentContainerStyle={{ paddingBottom: 40 }}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" />
+      }
+    >
+      {/* Hero header */}
+      <View
+        className="px-5 pb-6"
+        style={{
+          backgroundColor: "#fff",
+          borderBottomLeftRadius: 24,
+          borderBottomRightRadius: 24,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+          elevation: 3,
+        }}
+      >
+        <View className="flex-row items-start justify-between mb-5">
+          <View>
+            <Text className="text-sm text-gray-400 font-medium mb-0.5">{greeting}</Text>
+            <Text className="text-3xl font-bold text-gray-900">{firstName}</Text>
+          </View>
+          <View className="items-end">
+            {handicap !== undefined && handicap !== null ? (
+              <>
+                <View
+                  className="w-14 h-14 rounded-full bg-green-600 items-center justify-center mb-0.5"
+                  style={{
+                    shadowColor: "#16a34a",
+                    shadowOffset: { width: 0, height: 3 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 8,
+                    elevation: 4,
+                  }}
+                >
+                  <Text className="text-white font-bold text-xl">{handicap.toFixed(1)}</Text>
+                </View>
+                <Text className="text-xs text-gray-400">Handicap</Text>
+              </>
+            ) : (
+              <TouchableOpacity
+                onPress={() => router.push("/(app)/rounds/new")}
+                className="bg-green-50 border border-green-200 rounded-xl px-3 py-2 items-center"
+              >
+                <Ionicons name="add-circle-outline" size={18} color="#16a34a" />
+                <Text className="text-green-700 text-xs font-semibold mt-0.5">Log round</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-        <View className="flex-1">
-          <Text className="font-semibold text-gray-900 text-sm">
-            Bring your club to The 19th Hole
-          </Text>
-          <Text className="text-xs text-gray-500 mt-0.5">
-            Competitions, leaderboards, and tee times — together.
-          </Text>
-        </View>
-        <Ionicons name="arrow-forward-circle-outline" size={22} color="#16a34a" />
+
+        {/* Quick Game hero */}
+        <TouchableOpacity
+          onPress={() => router.push("/(app)/play/games/new")}
+          activeOpacity={0.88}
+          className="rounded-2xl p-5 flex-row items-center justify-between"
+          style={{
+            backgroundColor: "#16a34a",
+            shadowColor: "#16a34a",
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.4,
+            shadowRadius: 14,
+            elevation: 6,
+          }}
+        >
+          <View>
+            <Text className="text-green-200 text-xs font-medium mb-1">Ready to play?</Text>
+            <Text className="text-white text-2xl font-bold">Quick Game</Text>
+            <Text className="text-green-300 text-xs mt-0.5">Skins · Stableford · Nassau · more</Text>
+          </View>
+          <View
+            className="w-16 h-16 rounded-full bg-white/20 items-center justify-center"
+          >
+            <Ionicons name="golf" size={30} color="#fff" />
+          </View>
+        </TouchableOpacity>
       </View>
-    </Card>
+
+      {/* Recent Rounds */}
+      <View className="px-5 mt-5 mb-5">
+        <View className="flex-row items-center justify-between mb-3">
+          <Text className="text-base font-bold text-gray-900">Recent Rounds</Text>
+          <TouchableOpacity onPress={() => router.push("/(app)/rounds")}>
+            <Text className="text-green-600 font-medium text-sm">See all</Text>
+          </TouchableOpacity>
+        </View>
+
+        {rounds === undefined ? (
+          <View className="py-8 items-center"><LoadingSpinner /></View>
+        ) : rounds.length === 0 ? (
+          <View className="items-center py-10 gap-3">
+            <View className="w-16 h-16 rounded-full bg-gray-100 items-center justify-center">
+              <Ionicons name="golf-outline" size={30} color="#9ca3af" />
+            </View>
+            <View className="items-center gap-1">
+              <Text className="font-semibold text-gray-700">No rounds logged yet</Text>
+              <Text className="text-gray-400 text-sm text-center">
+                Log your first 3 rounds to unlock your WHS handicap.
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => router.push("/(app)/rounds/new")}
+              className="mt-1 bg-green-600 rounded-full px-6 py-3 flex-row items-center gap-2"
+              style={{
+                shadowColor: "#16a34a",
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.3,
+                shadowRadius: 6,
+              }}
+            >
+              <Ionicons name="add" size={16} color="#fff" />
+              <Text className="text-white font-semibold">Log a Round</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {rounds.map((round: any) => (
+              <TouchableOpacity
+                key={round._id}
+                onPress={() => router.push(`/(app)/rounds/${round._id}`)}
+                activeOpacity={0.7}
+                className="mb-2.5 bg-white rounded-2xl p-4 border border-gray-100 flex-row items-center"
+                style={{
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 4,
+                  elevation: 1,
+                }}
+              >
+                <View className="flex-1">
+                  <Text className="text-xs text-gray-400 mb-0.5">{formatDate(round.date)}</Text>
+                  <Text className="font-semibold text-gray-900" numberOfLines={1}>
+                    {round.courseNameFreetext ?? "Course"}
+                  </Text>
+                  <View className="flex-row items-center gap-1.5 mt-1.5">
+                    <View className="bg-gray-100 rounded-full px-2 py-0.5">
+                      <Text className="text-xs text-gray-600 font-medium">{round.grossScore} gross</Text>
+                    </View>
+                    {round.stablefordPoints !== undefined && (
+                      <View className="bg-green-100 rounded-full px-2 py-0.5">
+                        <Text className="text-xs text-green-700 font-medium">{round.stablefordPoints} pts</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#e5e7eb" />
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              onPress={() => router.push("/(app)/rounds/new")}
+              className="mt-1 bg-white border border-gray-200 rounded-2xl p-4 flex-row items-center justify-center gap-2"
+            >
+              <Ionicons name="add-circle-outline" size={18} color="#16a34a" />
+              <Text className="text-green-700 font-semibold text-sm">Log another round</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+
+      {/* Club upsell */}
+      <View className="px-5">
+        <TouchableOpacity
+          activeOpacity={0.8}
+          className="bg-white rounded-2xl p-4 border border-gray-100 flex-row items-center gap-3"
+          style={{
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 4,
+          }}
+        >
+          <View className="w-10 h-10 rounded-full bg-green-50 items-center justify-center">
+            <Ionicons name="people-outline" size={20} color="#16a34a" />
+          </View>
+          <View className="flex-1">
+            <Text className="font-semibold text-gray-900 text-sm">Bring your club</Text>
+            <Text className="text-xs text-gray-400 mt-0.5">
+              Competitions, tee times & messaging — together.
+            </Text>
+          </View>
+          <Ionicons name="arrow-forward" size={16} color="#9ca3af" />
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 }
+
+// ── Root ──────────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const { user } = useUser();
@@ -144,13 +515,10 @@ export default function HomeScreen() {
   const userId = user?.id ?? "";
   const handicap = useQuery(api.handicap.getLatest, userId ? { userId } : "skip");
   const rounds = useQuery(api.rounds.list, userId ? { userId, limit: 3 } : "skip");
-  const profile = useQuery(api.golferProfiles.get, userId ? { userId } : "skip");
-
-  const isLoading = handicap === undefined || rounds === undefined;
+  const myClubs = useQuery(api.clubMembers.myActiveClubs, userId ? {} : "skip");
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    // Convex reactivity handles re-fetches; just reset after a beat
     setTimeout(() => setRefreshing(false), 800);
   }, []);
 
@@ -159,136 +527,42 @@ export default function HomeScreen() {
   const greeting =
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  const hasNoClub = !profile?.homeClub;
+  if (rounds === undefined || myClubs === undefined) {
+    return (
+      <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
+        <LoadingSpinner fullScreen />
+      </SafeAreaView>
+    );
+  }
+
+  const firstClub = myClubs.length > 0 ? myClubs[0] : null;
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 32 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#16a34a"
-          />
-        }
-      >
-        {/* Header */}
-        <View className="px-4 pt-5 pb-4 flex-row items-center justify-between">
-          <View>
-            <Text className="text-sm text-gray-500 font-medium">{greeting},</Text>
-            <Text className="text-2xl font-bold text-gray-900">{firstName}</Text>
-          </View>
-          {isLoading ? (
-            <LoadingSpinner />
-          ) : handicap !== null && handicap !== undefined ? (
-            <HandicapBadge index={handicap} size="sm" />
-          ) : (
-            <TouchableOpacity
-              onPress={() => router.push("/(app)/rounds/new")}
-              className="bg-green-50 border border-green-200 rounded-full px-3 py-1.5 flex-row items-center gap-1"
-            >
-              <Ionicons name="add-circle-outline" size={15} color="#16a34a" />
-              <Text className="text-green-700 text-xs font-semibold">Log a round</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Quick Game CTA */}
-        <View className="px-4 mb-5">
-          <TouchableOpacity
-            onPress={() => router.push("/(app)/play/games/new")}
-            activeOpacity={0.85}
-            className="bg-green-600 rounded-2xl p-5 flex-row items-center justify-between"
-            style={{
-              shadowColor: "#16a34a",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 12,
-              elevation: 6,
-            }}
-          >
-            <View>
-              <Text className="text-white text-xs font-medium opacity-80 mb-0.5">
-                Ready to play?
-              </Text>
-              <Text className="text-white text-xl font-bold">Quick Game</Text>
-              <Text className="text-green-200 text-xs mt-0.5">
-                Start scoring right now
-              </Text>
-            </View>
-            <View className="w-14 h-14 rounded-full bg-white/20 items-center justify-center">
-              <Ionicons name="play-circle" size={36} color="#fff" />
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Recent Rounds */}
-        <View className="px-4 mb-2">
-          <View className="flex-row items-center justify-between mb-3">
-            <Text className="text-lg font-bold text-gray-900">Recent Rounds</Text>
-            <TouchableOpacity onPress={() => router.push("/(app)/rounds")}>
-              <Text className="text-green-600 font-medium text-sm">See all</Text>
-            </TouchableOpacity>
-          </View>
-
-          {isLoading ? (
-            <View className="py-8 items-center">
-              <LoadingSpinner />
-            </View>
-          ) : !rounds || rounds.length === 0 ? (
-            <Card className="p-5 items-center gap-3">
-              <View className="w-14 h-14 rounded-full bg-green-50 items-center justify-center">
-                <Ionicons name="golf-outline" size={28} color="#16a34a" />
-              </View>
-              <View className="items-center gap-1">
-                <Text className="font-semibold text-gray-900">No rounds yet</Text>
-                <Text className="text-gray-500 text-sm text-center">
-                  Log your first round to start tracking your handicap.
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => router.push("/(app)/rounds/new")}
-                className="bg-green-600 rounded-full px-5 py-2.5 flex-row items-center gap-1.5"
-              >
-                <Ionicons name="add" size={16} color="#fff" />
-                <Text className="text-white font-semibold text-sm">Log a Round</Text>
-              </TouchableOpacity>
-            </Card>
-          ) : (
-            rounds.map((round: any) => (
-              <RoundCard
-                key={round._id}
-                round={round}
-                onPress={() => router.push(`/(app)/rounds/${round._id}`)}
-              />
-            ))
-          )}
-        </View>
-
-        {/* Log new round shortcut if rounds exist */}
-        {rounds && rounds.length > 0 && (
-          <View className="px-4 mb-5">
-            <TouchableOpacity
-              onPress={() => router.push("/(app)/rounds/new")}
-              className="border border-green-200 bg-green-50 rounded-xl p-4 flex-row items-center justify-center gap-2"
-            >
-              <Ionicons name="add-circle-outline" size={20} color="#16a34a" />
-              <Text className="text-green-700 font-semibold text-sm">
-                Log another round
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Invite club card */}
-        {hasNoClub && (
-          <View className="px-4">
-            <InviteClubCard />
-          </View>
-        )}
-      </ScrollView>
+      {firstClub ? (
+        <ClubMemberHome
+          greeting={greeting}
+          firstName={firstName}
+          userId={userId}
+          handicap={handicap}
+          rounds={rounds}
+          club={firstClub.club}
+          membership={firstClub.membership}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          router={router}
+        />
+      ) : (
+        <IndividualHome
+          greeting={greeting}
+          firstName={firstName}
+          handicap={handicap}
+          rounds={rounds}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          router={router}
+        />
+      )}
     </SafeAreaView>
   );
 }
