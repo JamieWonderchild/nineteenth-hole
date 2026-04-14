@@ -29,8 +29,6 @@ const TEE_HEX: Record<string, string> = {
   other: "#6b7280",
 };
 
-const TEE_ORDER_MALE = ["white", "yellow", "blue", "black"];
-const TEE_ORDER_FEMALE = ["red", "gold"];
 
 function TeeCircle({ colour, size = 20 }: { colour: string; size?: number }) {
   const bg = TEE_HEX[colour] ?? TEE_HEX.other;
@@ -53,13 +51,14 @@ function sortTees(tees: any[]): any[] {
   const male = tees.filter((t) => t.gender === "male" || t.gender === "both");
   const female = tees.filter((t) => t.gender === "female");
 
-  function orderIndex(tee: any, order: string[]) {
-    const idx = order.indexOf(tee.colour);
-    return idx === -1 ? order.length : idx;
+  function byYards(a: any, b: any) {
+    const ay = a.totalYards ?? -1;
+    const by = b.totalYards ?? -1;
+    return by - ay; // longest first
   }
 
-  male.sort((a, b) => orderIndex(a, TEE_ORDER_MALE) - orderIndex(b, TEE_ORDER_MALE));
-  female.sort((a, b) => orderIndex(a, TEE_ORDER_FEMALE) - orderIndex(b, TEE_ORDER_FEMALE));
+  male.sort(byYards);
+  female.sort(byYards);
 
   return [...male, ...female];
 }

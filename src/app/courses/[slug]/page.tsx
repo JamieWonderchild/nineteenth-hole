@@ -171,9 +171,18 @@ export default function CourseDetailPage() {
   }
 
   const course = data as CourseWithTees;
+
+  // Sort tees by yardage descending (longest first), male/both before female
+  const sortedTees = [...course.tees].sort((a, b) => {
+    const genderA = a.gender === "female" ? 1 : 0;
+    const genderB = b.gender === "female" ? 1 : 0;
+    if (genderA !== genderB) return genderA - genderB;
+    return (b.totalYards ?? -1) - (a.totalYards ?? -1);
+  });
+
   // Prefer par from tees (more accurate for WHS) over course-level par
-  const displayPar = course.tees.length > 0
-    ? (course.tees.find(t => t.gender === "male")?.par ?? course.tees[0].par)
+  const displayPar = sortedTees.length > 0
+    ? (sortedTees.find(t => t.gender === "male")?.par ?? sortedTees[0].par)
     : course.par;
 
   return (
@@ -224,7 +233,7 @@ export default function CourseDetailPage() {
           <CardTitle className="text-base">Tee Sets</CardTitle>
         </CardHeader>
         <CardContent>
-          {course.tees.length === 0 ? (
+          {sortedTees.length === 0 ? (
             <div className="space-y-1">
               <p className="text-sm text-gray-500">Tee data loading…</p>
               <p className="text-xs text-gray-400">
@@ -245,7 +254,7 @@ export default function CourseDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {course.tees.map(tee => (
+                  {sortedTees.map(tee => (
                     <tr key={tee._id} className="hover:bg-gray-50/50">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -274,7 +283,7 @@ export default function CourseDetailPage() {
       </Card>
 
       {/* Handicap Calculator */}
-      <HandicapCalculator tees={course.tees} coursePar={displayPar} />
+      <HandicapCalculator tees={sortedTees} coursePar={displayPar} />
 
       {/* Course Info */}
       {(course.website || course.phone || course.address) && (
