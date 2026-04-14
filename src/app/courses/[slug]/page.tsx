@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { useQuery } from "convex/react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "convex/_generated/api";
 import Link from "next/link";
 import { MapPin, Globe, Phone, Flag } from "lucide-react";
@@ -140,6 +140,14 @@ export default function CourseDetailPage() {
   const slug = params?.slug as string;
 
   const data = useQuery(api.golfCourses.getBySlug, slug ? { slug } : "skip");
+  const ensureDetail = useAction(api.golfCourses.ensureDetail);
+
+  // Lazily fetch tee data the first time someone views a course with no tees
+  useEffect(() => {
+    if (data && (data as any).tees?.length === 0 && (data as any)._id) {
+      ensureDetail({ courseId: (data as any)._id });
+    }
+  }, [(data as any)?._id, (data as any)?.tees?.length]);
 
   if (data === undefined) {
     return (
