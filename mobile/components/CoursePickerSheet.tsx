@@ -185,12 +185,20 @@ export function CoursePickerSheet({ visible, onClose, onSelect, country = "GB" }
 
         {/* Phase 1: Course search */}
         {!selectedCourseId && (
-          <View className="flex-1">
-            <View className="px-4 pt-3 pb-2">
-              <View className="flex-row items-center bg-gray-100 rounded-xl px-3 py-2.5 gap-2">
+          <View style={{ flex: 1 }}>
+            <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }}>
+              <View style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#f3f4f6",
+                borderRadius: 12,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                gap: 8,
+              }}>
                 <Ionicons name="search" size={18} color="#9ca3af" />
                 <TextInput
-                  className="flex-1 text-base text-gray-900"
+                  style={{ flex: 1, fontSize: 16, color: "#111827" }}
                   placeholder="e.g. Finchley Golf Club"
                   placeholderTextColor="#9ca3af"
                   value={rawQuery}
