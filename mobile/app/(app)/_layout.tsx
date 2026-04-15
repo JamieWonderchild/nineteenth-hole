@@ -1,6 +1,6 @@
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { Redirect, Tabs, useSegments } from "expo-router";
-import { View, ActivityIndicator, Platform } from "react-native";
+import { Redirect, Tabs, useSegments, useRouter } from "expo-router";
+import { View, ActivityIndicator, Platform, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "convex/react";
 import { useEffect } from "react";
@@ -45,6 +45,7 @@ export default function AppLayout() {
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const segments = useSegments();
+  const router = useRouter();
 
   const profile = useQuery(
     api.golferProfiles.get,
@@ -134,29 +135,35 @@ export default function AppLayout() {
       <Tabs.Screen
         name="play"
         options={{
-          title: "Play",
+          title: "Log Round",
           headerShown: false,
-          tabBarIcon: ({ focused }) => (
-            <View
-              style={{
-                width: 52,
-                height: 52,
-                borderRadius: 26,
-                backgroundColor: "#16a34a",
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: Platform.OS === "ios" ? 8 : 4,
-                shadowColor: "#16a34a",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: focused ? 0.5 : 0.3,
-                shadowRadius: 8,
-                elevation: 6,
-              }}
-            >
-              <Ionicons name="golf-outline" size={26} color="#fff" />
-            </View>
-          ),
           tabBarLabel: () => null,
+          tabBarButton: ({ style }) => (
+            <TouchableOpacity
+              style={style}
+              activeOpacity={0.85}
+              onPress={() => router.push("/(app)/rounds/new" as any)}
+            >
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  backgroundColor: "#16a34a",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: Platform.OS === "ios" ? 8 : 4,
+                  shadowColor: "#16a34a",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.4,
+                  shadowRadius: 10,
+                  elevation: 6,
+                }}
+              >
+                <Ionicons name="add" size={30} color="#fff" />
+              </View>
+            </TouchableOpacity>
+          ),
         }}
       />
       <Tabs.Screen

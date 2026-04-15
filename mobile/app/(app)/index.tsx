@@ -382,6 +382,10 @@ function IndividualHome({
   onRefresh: () => void;
   router: ReturnType<typeof useRouter>;
 }) {
+  const roundCount = rounds?.length ?? 0;
+  const roundsNeeded = Math.max(0, 3 - roundCount);
+  const hasHandicap = handicap !== null && handicap !== undefined;
+
   return (
     <ScrollView
       className="flex-1"
@@ -404,75 +408,117 @@ function IndividualHome({
           elevation: 3,
         }}
       >
-        <View className="flex-row items-start justify-between mb-5">
+        <View className="flex-row items-center justify-between mb-5">
           <View>
             <Text className="text-sm text-gray-400 font-medium mb-0.5">{greeting}</Text>
-            <Text className="text-3xl font-bold text-gray-900">{firstName}</Text>
+            <Text className="text-2xl font-bold text-gray-900">{firstName}</Text>
           </View>
-          <View className="items-end">
-            {handicap !== undefined && handicap !== null ? (
-              <>
-                <View
-                  className="w-14 h-14 rounded-full bg-green-600 items-center justify-center mb-0.5"
-                  style={{
-                    shadowColor: "#16a34a",
-                    shadowOffset: { width: 0, height: 3 },
-                    shadowOpacity: 0.35,
-                    shadowRadius: 8,
-                    elevation: 4,
-                  }}
-                >
-                  <Text className="text-white font-bold text-xl">{handicap.toFixed(1)}</Text>
-                </View>
-                <Text className="text-xs text-gray-400">Handicap</Text>
-              </>
-            ) : (
-              <TouchableOpacity
-                onPress={() => router.push("/(app)/rounds/new")}
-                className="bg-green-50 border border-green-200 rounded-xl px-3 py-2 items-center"
-              >
-                <Ionicons name="add-circle-outline" size={18} color="#16a34a" />
-                <Text className="text-green-700 text-xs font-semibold mt-0.5">Log round</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <TouchableOpacity
+            onPress={() => router.push("/(app)/rounds" as any)}
+            className="items-center"
+          >
+            <Text className="text-xs text-gray-400 mb-1 uppercase tracking-wide font-medium">
+              Handicap
+            </Text>
+            <View
+              style={{
+                width: 56, height: 56, borderRadius: 28,
+                backgroundColor: hasHandicap ? "#16a34a" : "#f3f4f6",
+                alignItems: "center", justifyContent: "center",
+                shadowColor: hasHandicap ? "#16a34a" : "#000",
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: hasHandicap ? 0.35 : 0.08,
+                shadowRadius: 8, elevation: 4,
+              }}
+            >
+              {hasHandicap ? (
+                <Text className="text-white font-bold text-lg">{handicap!.toFixed(1)}</Text>
+              ) : (
+                <Text className="text-gray-400 font-bold text-lg">–</Text>
+              )}
+            </View>
+          </TouchableOpacity>
         </View>
 
-        {/* Quick Game hero */}
-        <TouchableOpacity
-          onPress={() => router.push("/(app)/play/games/new")}
-          activeOpacity={0.88}
-          className="rounded-2xl p-5 flex-row items-center justify-between"
-          style={{
-            backgroundColor: "#16a34a",
-            shadowColor: "#16a34a",
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.4,
-            shadowRadius: 14,
-            elevation: 6,
-          }}
-        >
-          <View>
-            <Text className="text-green-200 text-xs font-medium mb-1">Ready to play?</Text>
-            <Text className="text-white text-2xl font-bold">Quick Game</Text>
-            <Text className="text-green-300 text-xs mt-0.5">Skins · Stableford · Nassau · more</Text>
-          </View>
-          <View
-            className="w-16 h-16 rounded-full bg-white/20 items-center justify-center"
+        {/* Handicap hero card */}
+        {hasHandicap ? (
+          <TouchableOpacity
+            onPress={() => router.push("/(app)/rounds/new" as any)}
+            activeOpacity={0.88}
+            className="rounded-2xl p-5 flex-row items-center justify-between"
+            style={{
+              backgroundColor: "#16a34a",
+              shadowColor: "#16a34a",
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.35,
+              shadowRadius: 14,
+              elevation: 6,
+            }}
           >
-            <Ionicons name="golf" size={30} color="#fff" />
-          </View>
-        </TouchableOpacity>
+            <View>
+              <Text className="text-green-200 text-xs font-medium mb-1 uppercase tracking-wide">
+                WHS Handicap Index
+              </Text>
+              <Text className="text-white text-4xl font-bold">{handicap!.toFixed(1)}</Text>
+              <Text className="text-green-300 text-xs mt-1">Updated automatically · Tap to log a round</Text>
+            </View>
+            <View className="w-14 h-14 rounded-full bg-white/20 items-center justify-center">
+              <Ionicons name="add" size={28} color="#fff" />
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={() => router.push("/(app)/rounds/new" as any)}
+            activeOpacity={0.88}
+            className="rounded-2xl p-5"
+            style={{
+              backgroundColor: "#16a34a",
+              shadowColor: "#16a34a",
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.35,
+              shadowRadius: 14,
+              elevation: 6,
+            }}
+          >
+            <Text className="text-green-200 text-xs font-medium mb-2 uppercase tracking-wide">
+              WHS Handicap Index
+            </Text>
+            {/* Progress dots */}
+            <View className="flex-row gap-2 mb-3">
+              {[0, 1, 2].map(i => (
+                <View
+                  key={i}
+                  style={{
+                    width: 28, height: 8, borderRadius: 4,
+                    backgroundColor: i < roundCount ? "#fff" : "rgba(255,255,255,0.25)",
+                  }}
+                />
+              ))}
+            </View>
+            <Text className="text-white text-xl font-bold">
+              {roundsNeeded === 0
+                ? "Calculating your handicap…"
+                : `${roundsNeeded} more round${roundsNeeded !== 1 ? "s" : ""} to go`}
+            </Text>
+            <Text className="text-green-300 text-xs mt-1">
+              Log {roundsNeeded > 0 ? `${roundsNeeded} more` : "rounds"} with course & slope data for your official WHS index
+            </Text>
+            <View className="mt-4 bg-white/20 rounded-xl py-2.5 flex-row items-center justify-center gap-2">
+              <Ionicons name="add" size={16} color="#fff" />
+              <Text className="text-white font-semibold text-sm">Log a Round</Text>
+            </View>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Recent Courses */}
       <RecentCoursesStrip userId={userId} router={router} />
 
       {/* Recent Rounds */}
-      <View className="px-5 mt-5 mb-5">
+      <View className="px-5 mt-5 mb-4">
         <View className="flex-row items-center justify-between mb-3">
           <Text className="text-base font-bold text-gray-900">Recent Rounds</Text>
-          <TouchableOpacity onPress={() => router.push("/(app)/rounds")}>
+          <TouchableOpacity onPress={() => router.push("/(app)/rounds" as any)}>
             <Text className="text-green-600 font-medium text-sm">See all</Text>
           </TouchableOpacity>
         </View>
@@ -480,36 +526,19 @@ function IndividualHome({
         {rounds === undefined ? (
           <View className="py-8 items-center"><LoadingSpinner /></View>
         ) : rounds.length === 0 ? (
-          <View className="items-center py-10 gap-3">
-            <View className="w-16 h-16 rounded-full bg-gray-100 items-center justify-center">
-              <Ionicons name="golf-outline" size={30} color="#9ca3af" />
-            </View>
-            <View className="items-center gap-1">
-              <Text className="font-semibold text-gray-700">No rounds logged yet</Text>
-              <Text className="text-gray-400 text-sm text-center">
-                Log your first 3 rounds to unlock your WHS handicap.
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => router.push("/(app)/rounds/new")}
-              className="mt-1 bg-green-600 rounded-full px-6 py-3 flex-row items-center gap-2"
-              style={{
-                shadowColor: "#16a34a",
-                shadowOffset: { width: 0, height: 3 },
-                shadowOpacity: 0.3,
-                shadowRadius: 6,
-              }}
-            >
-              <Ionicons name="add" size={16} color="#fff" />
-              <Text className="text-white font-semibold">Log a Round</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={() => router.push("/(app)/rounds/new" as any)}
+            className="bg-white rounded-2xl p-5 border border-dashed border-gray-200 items-center gap-2"
+          >
+            <Ionicons name="golf-outline" size={28} color="#d1d5db" />
+            <Text className="text-gray-400 text-sm">No rounds yet — tap to log one</Text>
+          </TouchableOpacity>
         ) : (
           <>
             {rounds.map((round: any) => (
               <TouchableOpacity
                 key={round._id}
-                onPress={() => router.push(`/(app)/rounds/${round._id}`)}
+                onPress={() => router.push(`/(app)/rounds/${round._id}` as any)}
                 activeOpacity={0.7}
                 className="mb-2.5 bg-white rounded-2xl p-4 border border-gray-100 flex-row items-center"
                 style={{
@@ -529,6 +558,13 @@ function IndividualHome({
                     <View className="bg-gray-100 rounded-full px-2 py-0.5">
                       <Text className="text-xs text-gray-600 font-medium">{round.grossScore} gross</Text>
                     </View>
+                    {round.differential !== undefined && (
+                      <View className="bg-blue-50 rounded-full px-2 py-0.5">
+                        <Text className="text-xs text-blue-600 font-medium">
+                          {round.differential > 0 ? "+" : ""}{round.differential?.toFixed(1)} diff
+                        </Text>
+                      </View>
+                    )}
                     {round.stablefordPoints !== undefined && (
                       <View className="bg-green-100 rounded-full px-2 py-0.5">
                         <Text className="text-xs text-green-700 font-medium">{round.stablefordPoints} pts</Text>
@@ -539,15 +575,33 @@ function IndividualHome({
                 <Ionicons name="chevron-forward" size={16} color="#e5e7eb" />
               </TouchableOpacity>
             ))}
-            <TouchableOpacity
-              onPress={() => router.push("/(app)/rounds/new")}
-              className="mt-1 bg-white border border-gray-200 rounded-2xl p-4 flex-row items-center justify-center gap-2"
-            >
-              <Ionicons name="add-circle-outline" size={18} color="#16a34a" />
-              <Text className="text-green-700 font-semibold text-sm">Log another round</Text>
-            </TouchableOpacity>
           </>
         )}
+      </View>
+
+      {/* Quick Games — secondary */}
+      <View className="px-5 mb-4">
+        <TouchableOpacity
+          onPress={() => router.push("/(app)/play/games/new" as any)}
+          activeOpacity={0.85}
+          className="flex-row items-center gap-3 bg-white rounded-2xl p-4 border border-gray-100"
+          style={{
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.06,
+            shadowRadius: 6,
+            elevation: 2,
+          }}
+        >
+          <View className="w-10 h-10 rounded-full bg-amber-50 items-center justify-center">
+            <Ionicons name="flash-outline" size={20} color="#d97706" />
+          </View>
+          <View className="flex-1">
+            <Text className="font-semibold text-gray-900 text-sm">Quick Games</Text>
+            <Text className="text-xs text-gray-400 mt-0.5">Skins · Stableford · Nassau · more</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+        </TouchableOpacity>
       </View>
 
       {/* Club upsell */}
