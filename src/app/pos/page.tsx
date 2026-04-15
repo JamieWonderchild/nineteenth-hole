@@ -9,7 +9,7 @@ import { formatCurrency } from "@/lib/format";
 import {
   Minus, Plus, X, CreditCard, Banknote, User, Terminal,
   Gift, Search, Settings, StickyNote, CheckCircle, AlertCircle,
-  PenLine, MapPin, Maximize2, ArrowLeft,
+  PenLine, MapPin, Maximize2, ArrowLeft, Pencil,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -221,6 +221,53 @@ function SaleCompleteOverlay({ sale, currency, onDismiss }: {
   );
 }
 
+// ── New tab modal ─────────────────────────────────────────────────────────────
+
+function NewTabModal({
+  onOpen,
+  onClose,
+}: {
+  onOpen: (name: string) => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState("");
+  const nameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { nameRef.current?.focus(); }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
+      <div className="bg-white w-full sm:max-w-xs rounded-t-2xl sm:rounded-2xl p-6 shadow-xl">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-bold text-gray-900">New tab</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+        <input
+          ref={nameRef}
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && onOpen(name)}
+          placeholder="Tab name — Table 4, Jamie… (optional)"
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500 mb-4"
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onOpen(name)}
+            className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-semibold transition-colors"
+          >
+            Open tab
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main POS ──────────────────────────────────────────────────────────────────
 
 export default function POSPage() {
@@ -255,11 +302,45 @@ export default function POSPage() {
     club && selectedLocationId ? { clubId: club._id, locationId: selectedLocationId } : "skip"
   );
 
+  // ── Open tabs ───────────────────────────────────────────────────────────────
+  const openTabMut    = useMutation(api.posTabs.openTab);
+  const addItemMut    = useMutation(api.posTabs.addItem);
+  const updateItemMut = useMutation(api.posTabs.updateItem);
+  const removeItemMut = useMutation(api.posTabs.removeItem);
+  const closeTabMut   = useMutation(api.posTabs.closeTab);
+  const voidTabMut    = useMutation(api.posTabs.voidTab);
+  const renameTabMut  = useMutation(api.posTabs.renameTab);
+
+  const openTabs = useQuery(
+    api.posTabs.listOpenTabs,
+    club ? { clubId: club._id, ...(selectedLocationId ? { locationId: selectedLocationId } : {}) } : "skip"
+  );
+  const [activeTabId, setActiveTabId] = useState<Id<"posTabs"> | null>(null);
+  const [showNewTabModal, setShowNewTabModal] = useState(false);
+  const [editingTabName, setEditingTabName] = useState(false);
+  const [tabNameInput, setTabNameInput] = useState("");
+
+  const activeTab = useQuery(
+    api.posTabs.getTab,
+    activeTabId ? { tabId: activeTabId } : "skip"
+  );
+
   // Category + product filter
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
 
-  // Basket
+  // Basket (quick sale mode — local state)
   const [basket, setBasket] = useState<BasketItem[]>([]);
+
+  // Derived basket — in tab mode, items come from Convex; in quick sale mode, from local state
+  const displayBasket: BasketItem[] = activeTabId && activeTab
+    ? activeTab.items.map(i => ({
+        productId:      (i.productId ?? "custom") as Id<"posProducts"> | "custom",
+        productName:    i.productName,
+        quantity:       i.quantity,
+        unitPricePence: i.unitPricePence,
+        subtotalPence:  i.subtotalPence,
+      }))
+    : basket;
   const [note, setNote] = useState("");
   const [showNote, setShowNote] = useState(false);
 
@@ -307,9 +388,9 @@ export default function POSPage() {
     return products.filter(p => (p.categoryId ?? "uncategorised") === selectedCat);
   }, [products, selectedCat]);
 
-  const total = basket.reduce((s, i) => s + i.subtotalPence, 0);
+  const total = displayBasket.reduce((s, i) => s + i.subtotalPence, 0);
   const currency = club?.currency ?? "GBP";
-  const itemCount = basket.reduce((s, i) => s + i.quantity, 0);
+  const itemCount = displayBasket.reduce((s, i) => s + i.quantity, 0);
 
   // ── Category tabs ──────────────────────────────────────────────────────────
 
@@ -323,46 +404,74 @@ export default function POSPage() {
 
   // ── Basket helpers ─────────────────────────────────────────────────────────
 
-  function addToBasket(item: { id: Id<"posProducts"> | "custom"; name: string; pricePence: number }) {
-    setBasket(prev => {
-      const existing = prev.find(i => i.productId === item.id && item.id !== "custom");
-      if (existing) {
-        return prev.map(i => i.productId === item.id
-          ? { ...i, quantity: i.quantity + 1, subtotalPence: (i.quantity + 1) * i.unitPricePence }
-          : i
-        );
-      }
-      return [...prev, {
-        productId: item.id,
-        productName: item.name,
-        quantity: 1,
+  async function addToBasket(item: { id: Id<"posProducts"> | "custom"; name: string; pricePence: number }) {
+    if (activeTabId) {
+      await addItemMut({
+        tabId:          activeTabId,
+        productId:      item.id !== "custom" ? item.id as Id<"posProducts"> : undefined,
+        productName:    item.name,
         unitPricePence: item.pricePence,
-        subtotalPence: item.pricePence,
-      }];
-    });
+        quantity:       1,
+      });
+    } else {
+      setBasket(prev => {
+        const existing = prev.find(i => i.productId === item.id && item.id !== "custom");
+        if (existing) {
+          return prev.map(i => i.productId === item.id
+            ? { ...i, quantity: i.quantity + 1, subtotalPence: (i.quantity + 1) * i.unitPricePence }
+            : i
+          );
+        }
+        return [...prev, {
+          productId: item.id,
+          productName: item.name,
+          quantity: 1,
+          unitPricePence: item.pricePence,
+          subtotalPence: item.pricePence,
+        }];
+      });
+    }
   }
 
-  function changeQty(productId: Id<"posProducts"> | "custom", delta: number, unique?: boolean) {
-    setBasket(prev => {
+  async function changeQty(productId: Id<"posProducts"> | "custom", delta: number, unique?: boolean) {
+    if (activeTabId && activeTab) {
+      // Find index in the Convex tab items
+      const items = activeTab.items;
+      let idx: number;
       if (unique) {
-        // custom items can have multiple rows, find the right one by position
-        return prev.map((i, idx) =>
-          idx === (prev.findLastIndex(x => x.productId === productId))
+        idx = items.reduce((found, item, i) =>
+          (item.productId ?? "custom") === productId ? i : found, -1);
+      } else {
+        idx = items.findIndex(i => (i.productId ?? "custom") === productId);
+      }
+      if (idx === -1) return;
+      const newQty = items[idx].quantity + delta;
+      await updateItemMut({ tabId: activeTabId, itemIndex: idx, quantity: newQty });
+    } else {
+      setBasket(prev => {
+        if (unique) {
+          return prev.map((i, idx) =>
+            idx === (prev.findLastIndex(x => x.productId === productId))
+              ? { ...i, quantity: i.quantity + delta, subtotalPence: (i.quantity + delta) * i.unitPricePence }
+              : i
+          ).filter(i => i.quantity > 0);
+        }
+        return prev
+          .map(i => i.productId === productId
             ? { ...i, quantity: i.quantity + delta, subtotalPence: (i.quantity + delta) * i.unitPricePence }
             : i
-        ).filter(i => i.quantity > 0);
-      }
-      return prev
-        .map(i => i.productId === productId
-          ? { ...i, quantity: i.quantity + delta, subtotalPence: (i.quantity + delta) * i.unitPricePence }
-          : i
-        )
-        .filter(i => i.quantity > 0);
-    });
+          )
+          .filter(i => i.quantity > 0);
+      });
+    }
   }
 
-  function removeItem(index: number) {
-    setBasket(prev => prev.filter((_, i) => i !== index));
+  async function removeItem(index: number) {
+    if (activeTabId) {
+      await removeItemMut({ tabId: activeTabId, itemIndex: index });
+    } else {
+      setBasket(prev => prev.filter((_, i) => i !== index));
+    }
   }
 
   function clearAll() {
@@ -377,7 +486,7 @@ export default function POSPage() {
   // ── Charge ─────────────────────────────────────────────────────────────────
 
   async function handleCharge() {
-    if (!club || basket.length === 0 || saving) return;
+    if (!club || displayBasket.length === 0 || saving) return;
 
     if (paymentMethod === "terminal" && !selectedTerminalId) {
       setShowTerminalPicker(true);
@@ -392,81 +501,117 @@ export default function POSPage() {
     setError(null);
 
     try {
-      const items = basket.map(i => ({
-        productId: i.productId !== "custom" ? i.productId : undefined,
-        productName: i.productName,
-        quantity: i.quantity,
-        unitPricePence: i.unitPricePence,
-        subtotalPence: i.subtotalPence,
-      }));
-
-      if (paymentMethod === "terminal") {
-        const res = await fetch("/api/payments/terminal", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clubId: club._id,
-            terminalId: selectedTerminalId,
-            amount: total,
-            currency,
-            purpose: "pos_sale",
-            description: basket.map(i => `${i.quantity}× ${i.productName}`).join(", "),
-            ...(selectedMemberId ? { memberId: selectedMemberId } : {}),
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json() as { error?: string };
-          throw new Error(err.error ?? "Failed to reach terminal");
+      if (activeTabId) {
+        // ── Tab mode — close the tab (records the sale internally) ──────────
+        if (paymentMethod === "terminal") {
+          const res = await fetch("/api/payments/terminal", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              clubId: club._id,
+              terminalId: selectedTerminalId,
+              amount: total,
+              currency,
+              purpose: "pos_sale",
+              description: displayBasket.map(i => `${i.quantity}× ${i.productName}`).join(", "),
+              ...(selectedMemberId ? { memberId: selectedMemberId } : {}),
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.json() as { error?: string };
+            throw new Error(err.error ?? "Failed to reach terminal");
+          }
         }
-        await recordSale({
-          clubId: club._id,
-          memberId: selectedMember?.userId,
-          memberName: selectedMember?.displayName,
-          items,
-          currency,
-          paymentMethod: "terminal",
-          notes: note || undefined,
-          shiftId:    openShift?._id,
-          locationId: selectedLocationId ?? undefined,
-          isGuest:    !selectedMember,
-        });
-      } else if (paymentMethod === "account") {
-        await recordSale({
-          clubId: club._id,
-          chargeAccountMemberId: selectedMemberId!,
-          items,
-          currency,
-          paymentMethod: "account",
-          notes: note || undefined,
-          shiftId:    openShift?._id,
-          locationId: selectedLocationId ?? undefined,
-          isGuest:    false,
-        });
-      } else {
-        await recordSale({
-          clubId: club._id,
-          memberId: selectedMember?.userId,
-          memberName: selectedMember?.displayName,
-          items,
-          currency,
+        await closeTabMut({
+          tabId:                 activeTabId,
           paymentMethod,
-          notes: note || undefined,
-          shiftId:    openShift?._id,
-          locationId: selectedLocationId ?? undefined,
-          isGuest:    !selectedMember,
+          currency,
+          chargeAccountMemberId: paymentMethod === "account" ? selectedMemberId! : undefined,
+          memberId:              selectedMember?.userId,
+          memberName:            selectedMember?.displayName,
+          notes:                 note || undefined,
+          isGuest:               !selectedMember,
         });
-      }
+        setSaleDone({ total, method: paymentMethod, memberName: selectedMember?.displayName });
+        setActiveTabId(null);
+        setNote("");
+        setShowNote(false);
+        setSelectedMemberId(null);
+        setMemberSearch("");
+      } else {
+        // ── Quick sale mode — existing recordSale path ────────────────────
+        const items = basket.map(i => ({
+          productId:      i.productId !== "custom" ? i.productId : undefined,
+          productName:    i.productName,
+          quantity:       i.quantity,
+          unitPricePence: i.unitPricePence,
+          subtotalPence:  i.subtotalPence,
+        }));
 
-      setSaleDone({
-        total,
-        method: paymentMethod,
-        memberName: selectedMember?.displayName,
-      });
-      setBasket([]);
-      setNote("");
-      setShowNote(false);
-      setSelectedMemberId(null);
-      setMemberSearch("");
+        if (paymentMethod === "terminal") {
+          const res = await fetch("/api/payments/terminal", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              clubId: club._id,
+              terminalId: selectedTerminalId,
+              amount: total,
+              currency,
+              purpose: "pos_sale",
+              description: basket.map(i => `${i.quantity}× ${i.productName}`).join(", "),
+              ...(selectedMemberId ? { memberId: selectedMemberId } : {}),
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.json() as { error?: string };
+            throw new Error(err.error ?? "Failed to reach terminal");
+          }
+          await recordSale({
+            clubId: club._id,
+            memberId: selectedMember?.userId,
+            memberName: selectedMember?.displayName,
+            items,
+            currency,
+            paymentMethod: "terminal",
+            notes: note || undefined,
+            shiftId:    openShift?._id,
+            locationId: selectedLocationId ?? undefined,
+            isGuest:    !selectedMember,
+          });
+        } else if (paymentMethod === "account") {
+          await recordSale({
+            clubId: club._id,
+            chargeAccountMemberId: selectedMemberId!,
+            items,
+            currency,
+            paymentMethod: "account",
+            notes: note || undefined,
+            shiftId:    openShift?._id,
+            locationId: selectedLocationId ?? undefined,
+            isGuest:    false,
+          });
+        } else {
+          await recordSale({
+            clubId: club._id,
+            memberId: selectedMember?.userId,
+            memberName: selectedMember?.displayName,
+            items,
+            currency,
+            paymentMethod,
+            notes: note || undefined,
+            shiftId:    openShift?._id,
+            locationId: selectedLocationId ?? undefined,
+            isGuest:    !selectedMember,
+          });
+        }
+
+        setSaleDone({ total, method: paymentMethod, memberName: selectedMember?.displayName });
+        setBasket([]);
+        setNote("");
+        setShowNote(false);
+        setSelectedMemberId(null);
+        setMemberSearch("");
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -584,6 +729,107 @@ export default function POSPage() {
           </div>
         </div>
 
+        {/* ── Tab switcher bar ──────────────────────────────────────────────── */}
+        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200 overflow-x-auto shrink-0 min-h-[44px]">
+          {/* Quick sale chip */}
+          <button
+            onClick={() => setActiveTabId(null)}
+            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+              activeTabId === null
+                ? "bg-gray-900 text-white border-gray-900"
+                : "bg-white text-gray-500 border-gray-300 hover:border-gray-400"
+            }`}
+          >
+            Quick sale
+            {activeTabId === null && basket.length > 0 && (
+              <span className="w-4 h-4 bg-white/20 rounded-full text-[9px] flex items-center justify-center font-black">
+                {basket.reduce((s, i) => s + i.quantity, 0)}
+              </span>
+            )}
+          </button>
+
+          {(openTabs ?? []).length > 0 && (
+            <span className="text-gray-300 text-xs select-none shrink-0">|</span>
+          )}
+
+          {/* One chip per open tab */}
+          {(openTabs ?? []).map(tab => (
+            <div
+              key={tab._id}
+              role="button"
+              onClick={() => setActiveTabId(tab._id)}
+              className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
+                activeTabId === tab._id
+                  ? "bg-green-600 text-white border-green-600"
+                  : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
+              }`}
+            >
+              {tab.name ?? "Tab"}
+              {tab.items.length > 0 && (
+                <span className={`w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-black ${
+                  activeTabId === tab._id ? "bg-white/20 text-white" : "bg-gray-200 text-gray-700"
+                }`}>
+                  {tab.items.reduce((s, i) => s + i.quantity, 0)}
+                </span>
+              )}
+              {activeTabId === tab._id && (
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    setTabNameInput(tab.name ?? "");
+                    setEditingTabName(true);
+                  }}
+                  className="ml-0.5 opacity-60 hover:opacity-100"
+                  title="Rename tab"
+                >
+                  <Pencil size={10} />
+                </button>
+              )}
+            </div>
+          ))}
+
+          {/* New tab button */}
+          <button
+            onClick={() => setShowNewTabModal(true)}
+            className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium text-gray-500 border border-dashed border-gray-300 hover:border-gray-400 hover:text-gray-700 bg-white transition-all"
+          >
+            <Plus size={11} /> New tab
+          </button>
+        </div>
+
+        {/* Rename tab inline modal */}
+        {editingTabName && activeTabId && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-white border-b border-gray-200 shrink-0">
+            <input
+              autoFocus
+              value={tabNameInput}
+              onChange={e => setTabNameInput(e.target.value)}
+              onKeyDown={async e => {
+                if (e.key === "Enter") {
+                  await renameTabMut({ tabId: activeTabId, name: tabNameInput });
+                  setEditingTabName(false);
+                } else if (e.key === "Escape") {
+                  setEditingTabName(false);
+                }
+              }}
+              placeholder="Tab name…"
+              className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-500"
+            />
+            <button
+              onClick={async () => {
+                await renameTabMut({ tabId: activeTabId, name: tabNameInput });
+                setEditingTabName(false);
+              }}
+              className="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg font-medium"
+            >
+              Save
+            </button>
+            <button onClick={() => setEditingTabName(false)} className="text-gray-400 hover:text-gray-600">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         {/* Products */}
         <div className="flex-1 overflow-y-auto p-3">
           {filteredProducts.length === 0 ? (
@@ -597,7 +843,7 @@ export default function POSPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
               {filteredProducts.map(product => {
                 const outOfStock = product.trackStock && (product.stockCount ?? 0) <= 0;
-                const inBasket = basket.find(i => i.productId === product._id);
+                const inBasket = displayBasket.find(i => i.productId === product._id);
                 return (
                   <button
                     key={product._id}
@@ -729,13 +975,15 @@ export default function POSPage() {
 
         {/* ── Basket items ── */}
         <div className="flex-1 overflow-y-auto">
-          {basket.length === 0 ? (
+          {displayBasket.length === 0 ? (
             <div className="flex items-center justify-center h-full">
-              <p className="text-gray-300 text-sm">Add items from the left</p>
+              <p className="text-gray-300 text-sm">
+                {activeTabId ? "Tab is empty — add items" : "Add items from the left"}
+              </p>
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
-              {basket.map((item, idx) => (
+              {displayBasket.map((item, idx) => (
                 <div key={`${item.productId}-${idx}`} className="flex items-center gap-2 px-4 py-3">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{item.productName}</p>
@@ -769,7 +1017,7 @@ export default function POSPage() {
         </div>
 
         {/* ── Note toggle ── */}
-        {basket.length > 0 && (
+        {displayBasket.length > 0 && (
           <div className="px-4 pb-1">
             {showNote ? (
               <div className="flex items-center gap-2">
@@ -858,7 +1106,7 @@ export default function POSPage() {
           {/* Charge button */}
           <button
             onClick={handleCharge}
-            disabled={saving || basket.length === 0 || (paymentMethod === "account" && !selectedMemberId)}
+            disabled={saving || displayBasket.length === 0 || (paymentMethod === "account" && !selectedMemberId)}
             className={`w-full py-4 font-black text-lg rounded-2xl transition-all active:scale-[0.98] disabled:opacity-40 text-white shadow-lg ${
               paymentMethod === "account" && selectedMember && (selectedMember.accountBalance ?? 0) < total
                 ? "bg-red-500 shadow-red-200"
@@ -877,19 +1125,53 @@ export default function POSPage() {
             }
           </button>
 
-          {/* Clear */}
-          {basket.length > 0 && (
+          {/* Clear / Void */}
+          {activeTabId ? (
             <button
-              onClick={clearAll}
-              className="w-full py-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              onClick={async () => {
+                if (!confirm("Void this tab? All items will be discarded.")) return;
+                await voidTabMut({ tabId: activeTabId });
+                setActiveTabId(null);
+                setNote("");
+                setShowNote(false);
+                setSelectedMemberId(null);
+                setMemberSearch("");
+              }}
+              className="w-full py-1.5 text-xs text-red-400 hover:text-red-600 transition-colors"
             >
-              Clear basket
+              Void tab
             </button>
+          ) : (
+            displayBasket.length > 0 && (
+              <button
+                onClick={clearAll}
+                className="w-full py-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                Clear basket
+              </button>
+            )
           )}
         </div>
       </div>
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
+
+      {showNewTabModal && (
+        <NewTabModal
+          onOpen={async (name) => {
+            if (!club) return;
+            const tabId = await openTabMut({
+              clubId:     club._id,
+              locationId: selectedLocationId ?? undefined,
+              shiftId:    openShift?._id,
+              name:       name.trim() || undefined,
+            });
+            setActiveTabId(tabId as Id<"posTabs">);
+            setShowNewTabModal(false);
+          }}
+          onClose={() => setShowNewTabModal(false)}
+        />
+      )}
 
       {showCustomItem && (
         <CustomItemModal

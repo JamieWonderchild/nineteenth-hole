@@ -957,6 +957,35 @@ export default defineSchema({
   // Payment Intents — provider-agnostic record of each payment (Dojo, Square, …)
   // ============================================================================
 
+  // ============================================================================
+  // POS Tabs — persistent open orders that accumulate items before payment
+  // ============================================================================
+
+  posTabs: defineTable({
+    clubId:     v.id("clubs"),
+    locationId: v.optional(v.id("posLocations")),
+    shiftId:    v.optional(v.id("posShifts")),
+    name:       v.optional(v.string()),   // "Table 4", "Jamie", etc.
+    status:     v.string(),               // "open" | "closed" | "voided"
+    items: v.array(v.object({
+      productId:      v.optional(v.id("posProducts")),
+      productName:    v.string(),
+      quantity:       v.number(),
+      unitPricePence: v.number(),
+      subtotalPence:  v.number(),
+    })),
+    closedAt:  v.optional(v.string()),
+    saleId:    v.optional(v.id("posSales")),
+    openedBy:  v.string(),
+    closedBy:  v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_club",            ["clubId"])
+    .index("by_club_and_status", ["clubId", "status"])
+    .index("by_location",        ["locationId"])
+    .index("by_shift",           ["shiftId"]),
+
   paymentIntents: defineTable({
     clubId: v.id("clubs"),
     clubMemberId: v.optional(v.id("clubMembers")),
