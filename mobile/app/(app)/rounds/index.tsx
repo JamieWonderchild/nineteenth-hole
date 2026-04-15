@@ -100,6 +100,8 @@ type Round = {
   stablefordPoints?: number;
   netScore?: number;
   differential?: number;
+  attestationStatus?: string;
+  markerName?: string;
 };
 
 function RoundRow({
@@ -135,6 +137,12 @@ function RoundRow({
             differential={round.differential}
             handicap={handicap}
           />
+          {round.attestationStatus === "pending" && (
+            <Badge variant="warning">Pending</Badge>
+          )}
+          {round.attestationStatus === "confirmed" && (
+            <Badge variant="success">Attested</Badge>
+          )}
         </View>
       </View>
       <Ionicons name="chevron-forward" size={18} color="#d1d5db" />

@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useQuery, useMutation } from "convex/react";
+import { useUser } from "@clerk/clerk-expo";
 import {
   View,
   Text,
@@ -122,12 +123,14 @@ function ScorecardTable({ holeScores }: { holeScores: number[] }) {
 export default function RoundDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useUser();
 
   const round = useQuery(
     api.rounds.get,
     id ? { roundId: id as any } : "skip"
   );
   const deleteRound = useMutation(api.rounds.deleteRound);
+  const attestRound = useMutation(api.rounds.attest);
 
   function handleDelete() {
     Alert.alert(
@@ -147,6 +150,29 @@ export default function RoundDetailScreen() {
                 "Error",
                 e?.message ?? "Failed to delete round."
               );
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  function handleAttest(decision: "confirmed" | "rejected") {
+    Alert.alert(
+      decision === "confirmed" ? "Confirm this score?" : "Reject this score?",
+      decision === "confirmed"
+        ? "This round will count towards their WHS handicap index."
+        : "This round will not count towards their handicap.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: decision === "confirmed" ? "Confirm" : "Reject",
+          style: decision === "rejected" ? "destructive" : "default",
+          onPress: async () => {
+            try {
+              await attestRound({ roundId: id as any, decision });
+            } catch (e: any) {
+              Alert.alert("Error", e?.message ?? "Failed to attest round.");
             }
           },
         },
@@ -273,6 +299,68 @@ export default function RoundDetailScreen() {
             </View>
           )}
         </View>
+
+        {/* Attestation banner */}
+        {round.markerId && (
+          <View className={`mx-4 mt-4 rounded-xl p-4 ${
+            round.attestationStatus === "confirmed" ? "bg-green-50 border border-green-200" :
+            round.attestationStatus === "rejected" ? "bg-red-50 border border-red-200" :
+            "bg-amber-50 border border-amber-200"
+          }`}>
+            <View className="flex-row items-center gap-2 mb-1">
+              <Ionicons
+                name={
+                  round.attestationStatus === "confirmed" ? "shield-checkmark" :
+                  round.attestationStatus === "rejected" ? "shield-outline" :
+                  "time-outline"
+                }
+                size={16}
+                color={
+                  round.attestationStatus === "confirmed" ? "#16a34a" :
+                  round.attestationStatus === "rejected" ? "#dc2626" :
+                  "#d97706"
+                }
+              />
+              <Text className={`text-sm font-semibold ${
+                round.attestationStatus === "confirmed" ? "text-green-800" :
+                round.attestationStatus === "rejected" ? "text-red-800" :
+                "text-amber-800"
+              }`}>
+                {round.attestationStatus === "confirmed" ? "Score attested" :
+                 round.attestationStatus === "rejected" ? "Score rejected" :
+                 "Awaiting attestation"}
+              </Text>
+            </View>
+            <Text className={`text-xs ${
+              round.attestationStatus === "confirmed" ? "text-green-600" :
+              round.attestationStatus === "rejected" ? "text-red-600" :
+              "text-amber-600"
+            }`}>
+              {round.attestationStatus === "confirmed"
+                ? `Confirmed by ${round.markerName} · counts toward handicap`
+                : round.attestationStatus === "rejected"
+                ? `Rejected by ${round.markerName} · does not count toward handicap`
+                : `Waiting for ${round.markerName} to confirm`}
+            </Text>
+            {/* Marker can confirm/reject if status is pending */}
+            {round.attestationStatus === "pending" && round.markerId === user?.id && (
+              <View className="flex-row gap-2 mt-3">
+                <TouchableOpacity
+                  onPress={() => handleAttest("confirmed")}
+                  className="flex-1 bg-green-600 rounded-xl py-2.5 items-center"
+                >
+                  <Text className="text-white font-semibold text-sm">Confirm</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleAttest("rejected")}
+                  className="flex-1 bg-white border border-gray-200 rounded-xl py-2.5 items-center"
+                >
+                  <Text className="text-gray-600 font-semibold text-sm">Reject</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Stats row */}
         <View className="mx-4 mt-4 bg-white rounded-xl border border-gray-100 shadow-sm p-4">

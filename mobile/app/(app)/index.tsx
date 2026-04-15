@@ -1,11 +1,12 @@
 import { useUser } from "@clerk/clerk-expo";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -299,6 +300,9 @@ function ClubMemberHome({
         </TouchableOpacity>
       </View>
 
+      {/* Pending attestation requests */}
+      <PendingAttestationsCard router={router} />
+
       {/* Recent Courses */}
       <RecentCoursesStrip userId={userId} router={router} />
 
@@ -358,6 +362,75 @@ function ClubMemberHome({
         )}
       </View>
     </ScrollView>
+  );
+}
+
+// ── Pending Attestations Card ─────────────────────────────────────────────────
+
+function PendingAttestationsCard({ router }: { router: ReturnType<typeof useRouter> }) {
+  const pending = useQuery(api.rounds.pendingAttestations);
+  const attest = useMutation(api.rounds.attest);
+
+  if (!pending || pending.length === 0) return null;
+
+  function handleAttest(roundId: string, decision: "confirmed" | "rejected") {
+    const verb = decision === "confirmed" ? "confirm" : "reject";
+    Alert.alert(
+      decision === "confirmed" ? "Confirm score?" : "Reject score?",
+      decision === "confirmed"
+        ? "This will count towards their handicap index."
+        : "This round will not count towards their handicap.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: decision === "confirmed" ? "Confirm" : "Reject",
+          style: decision === "rejected" ? "destructive" : "default",
+          onPress: () =>
+            attest({ roundId: roundId as any, decision }).catch((e: any) =>
+              Alert.alert("Error", e?.message ?? "Failed to attest round")
+            ),
+        },
+      ]
+    );
+  }
+
+  return (
+    <View className="px-5 mt-4">
+      <View className="flex-row items-center gap-2 mb-2">
+        <Ionicons name="shield-checkmark-outline" size={16} color="#d97706" />
+        <Text className="text-sm font-bold text-amber-700">Attestation requests</Text>
+      </View>
+      {pending.map((round: any) => (
+        <View
+          key={round._id}
+          className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-2"
+        >
+          <Text className="text-xs text-amber-600 mb-0.5">Score to attest</Text>
+          <Text className="font-semibold text-gray-900" numberOfLines={1}>
+            {round.courseNameFreetext ?? "Golf course"}
+          </Text>
+          <Text className="text-xs text-gray-500 mb-3">
+            {new Date(round.date + "T00:00:00").toLocaleDateString("en-GB", {
+              weekday: "short", day: "numeric", month: "short",
+            })} · {round.grossScore} gross
+          </Text>
+          <View className="flex-row gap-2">
+            <TouchableOpacity
+              onPress={() => handleAttest(round._id, "confirmed")}
+              className="flex-1 bg-green-600 rounded-xl py-2.5 items-center"
+            >
+              <Text className="text-white font-semibold text-sm">Confirm</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleAttest(round._id, "rejected")}
+              className="flex-1 bg-white border border-gray-200 rounded-xl py-2.5 items-center"
+            >
+              <Text className="text-gray-600 font-semibold text-sm">Reject</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -510,6 +583,9 @@ function IndividualHome({
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Pending attestation requests */}
+      <PendingAttestationsCard router={router} />
 
       {/* Recent Courses */}
       <RecentCoursesStrip userId={userId} router={router} />

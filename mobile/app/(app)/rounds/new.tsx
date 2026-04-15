@@ -20,7 +20,7 @@ import { CoursePickerSheet, CourseSelection, CourseHole } from "../../../compone
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 type Format = "strokeplay" | "stableford";
 type EntryMode = "quick" | "full";
 type TeeColour = "White" | "Yellow" | "Red" | "Blue";
@@ -949,7 +949,121 @@ function Step3Scorecard({
   );
 }
 
-// ─── Step 4: Review & Submit ──────────────────────────────────────────────────
+// ─── Step 4: Marker selection ─────────────────────────────────────────────────
+
+interface MarkerProfile {
+  _id: string;
+  userId: string;
+  displayName: string;
+  handicapIndex?: number;
+}
+
+function Step4Marker({
+  onNext,
+}: {
+  onNext: (data: { markerId?: string; markerName?: string }) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<MarkerProfile | null>(null);
+
+  const results = useQuery(
+    api.golferProfiles.search,
+    search.trim().length >= 2 ? { term: search } : "skip"
+  ) as MarkerProfile[] | undefined;
+
+  return (
+    <KeyboardAvoidingView
+      className="flex-1"
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+        <View className="px-4 pt-4 gap-5">
+          <View>
+            <Text className="text-xl font-bold text-gray-900">Add a Marker</Text>
+            <Text className="text-sm text-gray-500 mt-1">
+              Ask a playing partner to confirm your score. Attested rounds count toward your handicap index.
+            </Text>
+          </View>
+
+          {selected ? (
+            <View className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex-row items-center gap-3">
+              <View className="w-10 h-10 rounded-full bg-green-600 items-center justify-center">
+                <Text className="text-white font-bold text-base">
+                  {selected.displayName[0]?.toUpperCase() ?? "?"}
+                </Text>
+              </View>
+              <View className="flex-1">
+                <Text className="text-green-900 font-semibold">{selected.displayName}</Text>
+                {selected.handicapIndex !== undefined && (
+                  <Text className="text-green-600 text-xs">HCP {selected.handicapIndex.toFixed(1)}</Text>
+                )}
+              </View>
+              <TouchableOpacity onPress={() => setSelected(null)}>
+                <Ionicons name="close-circle" size={22} color="#16a34a" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <Input
+                label="Search by name"
+                placeholder="e.g. Jamie"
+                value={search}
+                onChangeText={setSearch}
+              />
+
+              {results && results.length > 0 && (
+                <View className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                  {results.map((p, i) => (
+                    <TouchableOpacity
+                      key={p._id}
+                      onPress={() => { setSelected(p); setSearch(""); }}
+                      className={`flex-row items-center px-4 py-3 gap-3 ${i > 0 ? "border-t border-gray-100" : ""}`}
+                    >
+                      <View className="w-9 h-9 rounded-full bg-gray-100 items-center justify-center">
+                        <Text className="text-gray-600 font-bold">
+                          {p.displayName[0]?.toUpperCase() ?? "?"}
+                        </Text>
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-gray-900 font-medium">{p.displayName}</Text>
+                        {p.handicapIndex !== undefined && (
+                          <Text className="text-gray-400 text-xs">HCP {p.handicapIndex.toFixed(1)}</Text>
+                        )}
+                      </View>
+                      <Ionicons name="add-circle-outline" size={20} color="#16a34a" />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {search.trim().length >= 2 && results !== undefined && results.length === 0 && (
+                <Text className="text-gray-400 text-sm text-center">No players found</Text>
+              )}
+            </>
+          )}
+
+          <Button
+            onPress={() =>
+              onNext(selected ? { markerId: selected.userId, markerName: selected.displayName } : {})
+            }
+            size="lg"
+            className="mt-2"
+          >
+            {selected ? "Continue" : "Skip — submit without marker"}
+          </Button>
+
+          <View className="items-center pb-8">
+            <Text className="text-xs text-gray-400 text-center">
+              Without a marker, this round is logged but won't update your handicap index.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+// ─── Step 5: Review & Submit ──────────────────────────────────────────────────
 
 function Step4Review({
   summary,
@@ -966,6 +1080,7 @@ function Step4Review({
     format: Format;
     handicap: number | null;
     holeScores?: number[];
+    markerName?: string;
   };
   onSubmit: () => void;
   submitting: boolean;
@@ -1014,6 +1129,7 @@ function Step4Review({
           { label: "Slope Rating", value: summary.slopeRating },
         ]
       : []),
+    { label: "Marker", value: summary.markerName ?? "None (won't count to handicap)" },
   ];
 
   return (
@@ -1025,7 +1141,9 @@ function Step4Review({
           {rows.map((row) => (
             <View key={row.label} className="flex-row justify-between px-4 py-3 border-b border-gray-50">
               <Text className="text-sm text-gray-500">{row.label}</Text>
-              <Text className="text-sm font-semibold text-gray-900">{row.value}</Text>
+              <Text className={`text-sm font-semibold ${row.label === "Marker" && !summary.markerName ? "text-amber-600" : "text-gray-900"}`}>
+                {row.value}
+              </Text>
             </View>
           ))}
         </Card>
@@ -1036,7 +1154,9 @@ function Step4Review({
 
         <View className="items-center pb-8">
           <Text className="text-xs text-gray-400 text-center">
-            This round will be submitted to your handicap record.
+            {summary.markerName
+              ? `${summary.markerName} will receive a notification to confirm your score.`
+              : "This round will be logged but won't count toward your handicap index without a marker."}
           </Text>
         </View>
       </View>
@@ -1078,6 +1198,11 @@ export default function NewRoundScreen() {
     notes: string;
   } | null>(null);
 
+  const [step4Data, setStep4Data] = useState<{
+    markerId?: string;
+    markerName?: string;
+  } | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
 
   function handleStep1(data: NonNullable<typeof step1Data>) {
@@ -1095,6 +1220,11 @@ export default function NewRoundScreen() {
     setStep(4);
   }
 
+  function handleStep4(data: { markerId?: string; markerName?: string }) {
+    setStep4Data(data);
+    setStep(5);
+  }
+
   async function handleSubmit() {
     if (!step1Data || !step2Data || !step3Data) return;
     setSubmitting(true);
@@ -1102,6 +1232,7 @@ export default function NewRoundScreen() {
       const gross = parseInt(step3Data.grossScore, 10);
       const cr = parseFloat(step1Data.courseRating);
       const slope = parseFloat(step1Data.slopeRating);
+      const hasMarker = !!step4Data?.markerId;
 
       await createRound({
         ...(step1Data.golfCourseId ? { golfCourseId: step1Data.golfCourseId as any } : {}),
@@ -1121,14 +1252,18 @@ export default function NewRoundScreen() {
                 .filter(Boolean),
             }
           : {}),
+        // Only count without marker if ratings were provided (handled by backend when marker present)
         isCountingRound: !step1Data.skipRatings,
         ...(step3Data.conditions ? { conditions: step3Data.conditions } : {}),
         ...(step3Data.notes ? { notes: step3Data.notes } : {}),
+        ...(step4Data?.markerId ? { markerId: step4Data.markerId, markerName: step4Data.markerName } : {}),
       });
 
       Alert.alert(
         "Round Logged!",
-        "Your round has been saved. Your handicap index will update shortly.",
+        hasMarker
+          ? `${step4Data?.markerName} has been notified to attest your score.`
+          : "Your round has been saved.",
         [
           {
             text: "View Rounds",
@@ -1148,7 +1283,7 @@ export default function NewRoundScreen() {
     else router.back();
   }
 
-  const totalSteps = step2Data?.entryMode === "full" ? 4 : 4;
+  const totalSteps = 5;
 
   return (
     <>
@@ -1182,7 +1317,8 @@ export default function NewRoundScreen() {
             onNext={handleStep3}
           />
         )}
-        {step === 4 && step1Data && step2Data && step3Data && (
+        {step === 4 && <Step4Marker onNext={handleStep4} />}
+        {step === 5 && step1Data && step2Data && step3Data && (
           <Step4Review
             summary={{
               courseName: step1Data.courseName,
@@ -1194,6 +1330,7 @@ export default function NewRoundScreen() {
               format: step2Data.format,
               handicap: handicap ?? null,
               holeScores: step3Data.holeScores,
+              markerName: step4Data?.markerName,
             }}
             onSubmit={handleSubmit}
             submitting={submitting}

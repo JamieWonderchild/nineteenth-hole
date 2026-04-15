@@ -1030,12 +1030,18 @@ export default defineSchema({
     isCountingRound: v.boolean(),              // default true; false = doesn't affect handicap
     conditions: v.optional(v.string()),        // 'fine' | 'overcast' | 'wet' | 'windy'
     notes: v.optional(v.string()),
+    // WHS Attestation
+    markerId: v.optional(v.string()),          // Clerk user ID of the attesting marker
+    markerName: v.optional(v.string()),        // display name of the marker
+    attestationStatus: v.optional(v.string()), // 'pending' | 'confirmed' | 'rejected'
+    attestedAt: v.optional(v.string()),        // ISO timestamp of marker's decision
     createdAt: v.string(),
     updatedAt: v.string(),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_date", ["userId", "date"])
-    .index("by_golf_club", ["golfClubId"]),
+    .index("by_golf_club", ["golfClubId"])
+    .index("by_marker", ["markerId"]),
 
   // ============================================================================
   // Handicap History (one row per index change)

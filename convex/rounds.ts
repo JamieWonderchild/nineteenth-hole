@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, MutationCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 
@@ -75,6 +76,19 @@ export const getStats = query({
   },
 });
 
+export const pendingAttestations = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    return ctx.db
+      .query("rounds")
+      .withIndex("by_marker", q => q.eq("markerId", identity.subject))
+      .filter(q => q.eq(q.field("attestationStatus"), "pending"))
+      .collect();
+  },
+});
+
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
 export const create = mutation({
@@ -104,6 +118,8 @@ export const create = mutation({
     isCountingRound: v.boolean(),
     conditions: v.optional(v.string()),
     notes: v.optional(v.string()),
+    markerId: v.optional(v.string()),
+    markerName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -135,6 +151,11 @@ export const create = mutation({
       differential = computeDifferential(args.grossScore, courseRating, slopeRating);
     }
 
+    // If a marker is nominated: round is pending attestation (not yet counting)
+    const hasMarker = !!args.markerId;
+    const attestationStatus = hasMarker ? "pending" : undefined;
+    const effectiveCountingRound = hasMarker ? false : args.isCountingRound;
+
     const now = new Date().toISOString();
     const roundId = await ctx.db.insert("rounds", {
       userId: identity.subject,
@@ -144,12 +165,25 @@ export const create = mutation({
       scratchScore,
       handicapAtTime,
       differential,
+      isCountingRound: effectiveCountingRound,
+      attestationStatus,
       createdAt: now,
       updatedAt: now,
     });
 
+    // Send push notification to marker if one was set
+    if (hasMarker && args.markerId) {
+      const submitterName = profile?.displayName ?? identity.subject;
+      await ctx.scheduler.runAfter(0, internal.pushNotifications.sendToUser, {
+        userId: args.markerId,
+        title: "Score attestation request",
+        body: `${submitterName} has asked you to attest their round at ${args.courseNameFreetext ?? "the course"}.`,
+        data: { roundId, type: "attestation" },
+      });
+    }
+
     // Recompute handicap index if this is a counting round with a differential
-    if (args.isCountingRound && differential !== undefined) {
+    if (effectiveCountingRound && differential !== undefined) {
       await recomputeHandicap(ctx, identity.subject, roundId);
     }
 
@@ -168,6 +202,52 @@ export const deleteRound = mutation({
     await ctx.db.delete(roundId);
     // Recompute handicap after deletion
     await recomputeHandicap(ctx, identity.subject, undefined);
+  },
+});
+
+export const attest = mutation({
+  args: {
+    roundId: v.id("rounds"),
+    decision: v.union(v.literal("confirmed"), v.literal("rejected")),
+  },
+  handler: async (ctx, { roundId, decision }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const round = await ctx.db.get(roundId);
+    if (!round) throw new Error("Round not found");
+    if (round.markerId !== identity.subject) throw new Error("Not the assigned marker");
+    if (round.attestationStatus !== "pending") throw new Error("Round already attested");
+
+    const now = new Date().toISOString();
+    const isCountingRound = decision === "confirmed";
+
+    await ctx.db.patch(roundId, {
+      attestationStatus: decision,
+      attestedAt: now,
+      isCountingRound,
+      updatedAt: now,
+    });
+
+    // If confirmed, recompute handicap for the round owner
+    if (isCountingRound && round.differential !== undefined) {
+      await recomputeHandicap(ctx, round.userId, roundId);
+    }
+
+    // Notify the round owner of the marker's decision
+    const markerProfile = await ctx.db
+      .query("golferProfiles")
+      .withIndex("by_user", q => q.eq("userId", identity.subject))
+      .first();
+    const markerName = markerProfile?.displayName ?? "Your marker";
+    const verb = decision === "confirmed" ? "confirmed" : "rejected";
+
+    await ctx.scheduler.runAfter(0, internal.pushNotifications.sendToUser, {
+      userId: round.userId,
+      title: `Round ${verb}`,
+      body: `${markerName} has ${verb} your round. ${decision === "confirmed" ? "It now counts towards your handicap." : "It will not count towards your handicap."}`,
+      data: { roundId, type: "attestation_result" },
+    });
   },
 });
 

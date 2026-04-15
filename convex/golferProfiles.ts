@@ -11,6 +11,24 @@ export const get = query({
   },
 });
 
+export const search = query({
+  args: { term: v.string() },
+  handler: async (ctx, { term }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const q = term.trim().toLowerCase();
+    if (q.length < 2) return [];
+    // Collect all profiles and filter by name (Convex doesn't have full-text search on this table yet)
+    const all = await ctx.db.query("golferProfiles").collect();
+    return all
+      .filter(p =>
+        p.userId !== identity.subject &&
+        p.displayName.toLowerCase().includes(q)
+      )
+      .slice(0, 10);
+  },
+});
+
 export const upsert = mutation({
   args: {
     displayName: v.string(),
