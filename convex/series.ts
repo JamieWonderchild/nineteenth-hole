@@ -213,10 +213,14 @@ export const computeStandings = query({
       }
     }
 
+    const MAJOR_QUOTA = 3;
+    const MEDAL_QUOTA = 4;
+    const STABLEFORD_QUOTA = 4;
+
     const standings = [...memberMap.values()].map(m => {
-      const majorTotal = sumBestN(m.majorScores, 3);
-      const medalTotal = sumBestN(m.medalScores, 4);
-      const stablefordTotal = sumBestN(m.stablefordScores, 4); // weight=1 already baked in per-comp
+      const majorTotal = sumBestN(m.majorScores, MAJOR_QUOTA);
+      const medalTotal = sumBestN(m.medalScores, MEDAL_QUOTA);
+      const stablefordTotal = sumBestN(m.stablefordScores, STABLEFORD_QUOTA);
       const total =
         majorTotal + medalTotal + stablefordTotal + m.knockoutTotal + m.trophyTotal;
 
@@ -225,10 +229,16 @@ export const computeStandings = query({
         displayName: m.displayName,
         majorTotal,
         majorPlayed: m.majorScores.length,
+        majorCounted: Math.min(m.majorScores.length, MAJOR_QUOTA),
+        majorQuota: MAJOR_QUOTA,
         medalTotal,
         medalPlayed: m.medalScores.length,
+        medalCounted: Math.min(m.medalScores.length, MEDAL_QUOTA),
+        medalQuota: MEDAL_QUOTA,
         stablefordTotal,
         stablefordPlayed: m.stablefordScores.length,
+        stablefordCounted: Math.min(m.stablefordScores.length, STABLEFORD_QUOTA),
+        stablefordQuota: STABLEFORD_QUOTA,
         knockoutTotal: m.knockoutTotal,
         trophyTotal: m.trophyTotal,
         competitionsPlayed: m.competitionsPlayed,
@@ -295,6 +305,32 @@ export const addCompetition = mutation({
       isPairsEvent: args.isPairsEvent,
       weight: args.weight,
       addedAt: new Date().toISOString(),
+    });
+  },
+});
+
+export const updateCompetitionCategory = mutation({
+  args: {
+    seriesId: v.id("series"),
+    competitionId: v.id("competitions"),
+    category: v.string(),
+    isPairsEvent: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const series = await ctx.db.get(args.seriesId);
+    if (!series) throw new Error("Series not found");
+    await assertClubAdmin(ctx, series.clubId);
+
+    const links = await ctx.db
+      .query("seriesCompetitions")
+      .withIndex("by_series", q => q.eq("seriesId", args.seriesId))
+      .collect();
+    const link = links.find(l => l.competitionId === args.competitionId);
+    if (!link) throw new Error("Competition not in series");
+
+    await ctx.db.patch(link._id, {
+      category: args.category,
+      isPairsEvent: args.isPairsEvent ?? undefined,
     });
   },
 });

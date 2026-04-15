@@ -44,10 +44,12 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
   const allClubComps = useQuery(api.competitions.listByClub, club ? { clubId: club._id } : "skip");
 
   const addCompetition = useMutation(api.series.addCompetition);
+  const updateCategory = useMutation(api.series.updateCompetitionCategory);
 
   const [addingComp, setAddingComp] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("stableford");
   const [isPairs, setIsPairs] = useState(false);
+  const [editingCompId, setEditingCompId] = useState<string | null>(null);
 
   if (!series) {
     return (
@@ -106,7 +108,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
         <p className="font-semibold text-amber-900 mb-1.5">Race to Swinley Forest scoring</p>
         <div className="text-amber-800 space-y-0.5 text-xs leading-relaxed">
           <p><strong>Majors (BF=3):</strong> (50+N)·3 / (25+N)·3 / (10+N)·3 / (5+N)·3 / max(0,N+5−pos)·3 — best 3 count</p>
-          <p><strong>Medals (BF=2):</strong> same formula · BF=2 — best 4 count</p>
+          <p><strong>Medals &amp; Named Events (BF=2):</strong> same formula · BF=2 — best 4 count</p>
           <p><strong>Stablefords (BF=1):</strong> same formula · BF=1 — best 4 count</p>
           <p><strong>Knockouts:</strong> 300 / 150 / 75 (semi) / 50 (quarter) — all count</p>
           <p><strong>Trophies:</strong> 100 / 50 — all count (÷2 for pairs events)</p>
@@ -218,26 +220,62 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
             </p>
           ) : (
             (compsWithLinks ?? []).filter(Boolean).map(({ link, competition }) => competition && (
-              <div key={competition._id} className="flex items-center justify-between bg-white border border-gray-100 rounded-lg px-4 py-2.5">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${CATEGORY_COLOURS[link.category] ?? "bg-gray-100 text-gray-600"}`}>
-                    {CATEGORIES.find(c => c.value === link.category)?.label ?? link.category}
-                    {link.isPairsEvent && " (pairs)"}
-                  </span>
-                  <span className="font-medium text-sm text-gray-900 truncate">{competition.name}</span>
-                  <span className="text-xs text-gray-400 shrink-0">
-                    {new Date(competition.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                  </span>
-                  {competition.status === "complete" && (
-                    <span className="text-xs text-purple-600 shrink-0">✓</span>
-                  )}
+              <div key={competition._id} className="bg-white border border-gray-100 rounded-lg px-4 py-2.5 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <button
+                      onClick={() => setEditingCompId(editingCompId === competition._id ? null : competition._id)}
+                      className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${CATEGORY_COLOURS[link.category] ?? "bg-gray-100 text-gray-600"} hover:opacity-80`}
+                      title="Click to change category"
+                    >
+                      {CATEGORIES.find(c => c.value === link.category)?.label ?? link.category}
+                      {link.isPairsEvent && " (pairs)"}
+                    </button>
+                    <span className="font-medium text-sm text-gray-900 truncate">{competition.name}</span>
+                    <span className="text-xs text-gray-400 shrink-0">
+                      {new Date(competition.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    </span>
+                    {competition.status === "complete" && (
+                      <span className="text-xs text-purple-600 shrink-0">✓</span>
+                    )}
+                  </div>
+                  <Link
+                    href={`/manage/competitions/${competition._id}`}
+                    className="text-xs text-green-700 hover:underline shrink-0 ml-3"
+                  >
+                    Manage →
+                  </Link>
                 </div>
-                <Link
-                  href={`/manage/competitions/${competition._id}`}
-                  className="text-xs text-green-700 hover:underline shrink-0 ml-3"
-                >
-                  Manage →
-                </Link>
+
+                {/* Inline category editor */}
+                {editingCompId === competition._id && (
+                  <div className="pt-1 border-t border-gray-50 space-y-2">
+                    <p className="text-xs text-gray-500">Change category:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {CATEGORIES.map(cat => (
+                        <button
+                          key={cat.value}
+                          onClick={async () => {
+                            await updateCategory({
+                              seriesId: seriesId as Id<"series">,
+                              competitionId: competition._id,
+                              category: cat.value,
+                              isPairsEvent: cat.value === "trophy" ? link.isPairsEvent : undefined,
+                            });
+                            setEditingCompId(null);
+                          }}
+                          className={`px-2.5 py-1 rounded border text-xs font-medium transition-colors ${
+                            link.category === cat.value
+                              ? "border-green-600 bg-green-50 text-green-800"
+                              : "border-border bg-white text-muted-foreground hover:border-green-400"
+                          }`}
+                        >
+                          {cat.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -286,19 +324,19 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
                       <td className="px-2 py-2.5 text-right text-amber-700 tabular-nums">
                         {s.majorTotal > 0 ? s.majorTotal : <span className="text-gray-300">—</span>}
                         {s.majorPlayed > 0 && (
-                          <span className="text-xs text-gray-400 ml-0.5">({s.majorPlayed})</span>
+                          <span className="text-xs text-gray-400 ml-0.5">({s.majorCounted}/{s.majorQuota})</span>
                         )}
                       </td>
                       <td className="px-2 py-2.5 text-right text-blue-700 tabular-nums">
                         {s.medalTotal > 0 ? s.medalTotal : <span className="text-gray-300">—</span>}
                         {s.medalPlayed > 0 && (
-                          <span className="text-xs text-gray-400 ml-0.5">({s.medalPlayed})</span>
+                          <span className="text-xs text-gray-400 ml-0.5">({s.medalCounted}/{s.medalQuota})</span>
                         )}
                       </td>
                       <td className="px-2 py-2.5 text-right text-green-700 tabular-nums">
                         {s.stablefordTotal > 0 ? s.stablefordTotal : <span className="text-gray-300">—</span>}
                         {s.stablefordPlayed > 0 && (
-                          <span className="text-xs text-gray-400 ml-0.5">({s.stablefordPlayed})</span>
+                          <span className="text-xs text-gray-400 ml-0.5">({s.stablefordCounted}/{s.stablefordQuota})</span>
                         )}
                       </td>
                       <td className="px-2 py-2.5 text-right text-purple-700 tabular-nums">
@@ -315,7 +353,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
                 </tbody>
               </table>
               <p className="text-xs text-gray-400 mt-3 px-2">
-                Majors: best 3 · Medals: best 4 · Stablefords: best 4 ×2 · Knockouts & Trophies: all count
+                Majors: best 3 · Medals &amp; Named Events: best 4 · Stablefords: best 4 · Knockouts &amp; Trophies: all count · brackets show quota used (counted/available)
               </p>
             </div>
           )}
