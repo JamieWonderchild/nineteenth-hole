@@ -308,7 +308,7 @@ function ClubDashboard({
             icon="people-outline"
             label="Members"
             onPress={() =>
-              Alert.alert("Coming soon", "Member directory coming soon.")
+              router.push("/(app)/club/members" as any)
             }
           />
         </View>

@@ -78,6 +78,24 @@ export const listPending = query({
   },
 });
 
+// Member directory with handicap index joined from golferProfiles
+export const listWithProfiles = query({
+  args: { clubId: v.id("clubs") },
+  handler: async (ctx, { clubId }) => {
+    const members = await ctx.db
+      .query("clubMembers")
+      .withIndex("by_club_and_status", q => q.eq("clubId", clubId).eq("status", "active"))
+      .collect();
+
+    return Promise.all(members.map(async m => {
+      const profile = m.userId
+        ? await ctx.db.query("golferProfiles").withIndex("by_user", q => q.eq("userId", m.userId!)).first()
+        : null;
+      return { ...m, handicapIndex: profile?.handicapIndex };
+    }));
+  },
+});
+
 // Leaderboard ordered by totalWon descending (active members only)
 export const leaderboard = query({
   args: { clubId: v.id("clubs") },

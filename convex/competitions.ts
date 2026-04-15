@@ -30,6 +30,31 @@ async function assertSuperAdmin(ctx: MutationCtx) {
 
 // ── Queries ─────────────────────────────────────────────────────────────────
 
+// Competition results for a given user across all competitions they've entered
+export const listResultsForUser = query({
+  args: { userId: v.string(), limit: v.optional(v.number()) },
+  handler: async (ctx, { userId, limit = 20 }) => {
+    // No by_user index on competitionScores — collect all scores for userId
+    // via by_club is too broad; instead scan by_competition_and_user isn't viable
+    // without a competition list. We filter across the table using .filter().
+    const scores = await ctx.db
+      .query("competitionScores")
+      .filter(q => q.eq(q.field("userId"), userId))
+      .order("desc")
+      .take(limit);
+
+    return Promise.all(scores.map(async s => {
+      const comp = await ctx.db.get(s.competitionId);
+      return {
+        ...s,
+        competitionName: comp?.name ?? "Competition",
+        competitionDate: comp?.startDate,
+        competitionStatus: comp?.status,
+      };
+    }));
+  },
+});
+
 export const listByClub = query({
   args: { clubId: v.id("clubs") },
   handler: async (ctx, { clubId }) => {

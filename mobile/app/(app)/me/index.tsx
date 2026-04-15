@@ -7,6 +7,7 @@ import {
   Modal,
   TextInput,
   Alert,
+  Linking,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
@@ -451,9 +452,7 @@ export default function MeScreen() {
             <MenuItem
               icon="trophy-outline"
               label="Competition History"
-              onPress={() =>
-                Alert.alert("Coming soon", "Competition history coming soon.")
-              }
+              onPress={() => router.push("/(app)/me/competition-history" as any)}
             />
             <MenuItem
               icon="card-outline"
@@ -470,7 +469,7 @@ export default function MeScreen() {
               icon="help-circle-outline"
               label="Help & Support"
               onPress={() =>
-                Alert.alert("Help", "Email support@nineteenth-hole.com")
+                Linking.openURL("mailto:support@playthepool.golf")
               }
             />
           </View>
