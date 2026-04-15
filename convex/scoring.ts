@@ -47,27 +47,42 @@ export const leaderboard = query({
 
     const format = competition.scoringFormat ?? "stableford";
 
-    // Sort: stableford = highest points first; strokeplay = lowest net first
+    // Sort: stableford = highest points first; strokeplay = lowest net/gross first,
+    // falling back to stablefordPoints (race pts) desc then stored position asc
+    // when no actual scores are entered (e.g. RTSF imported data).
     const sorted = [...scores].sort((a, b) => {
       if (format === "stableford") {
         return (b.stablefordPoints ?? 0) - (a.stablefordPoints ?? 0);
       }
-      // strokeplay — sort by net, then gross
-      const netA = a.netScore ?? a.grossScore ?? 999;
-      const netB = b.netScore ?? b.grossScore ?? 999;
-      if (netA !== netB) return netA - netB;
-      return (a.grossScore ?? 999) - (b.grossScore ?? 999);
+      // strokeplay
+      const netA = a.netScore ?? a.grossScore;
+      const netB = b.netScore ?? b.grossScore;
+      if (netA != null && netB != null) {
+        if (netA !== netB) return netA - netB;
+        return (a.grossScore ?? 999) - (b.grossScore ?? 999);
+      }
+      if (netA != null) return -1; // a has real score, b doesn't
+      if (netB != null) return 1;
+      // No actual scores — fall back to race pts desc, then stored position asc
+      if ((b.stablefordPoints ?? 0) !== (a.stablefordPoints ?? 0))
+        return (b.stablefordPoints ?? 0) - (a.stablefordPoints ?? 0);
+      return (a.position ?? 999) - (b.position ?? 999);
     });
 
-    // Assign positions (handle ties)
+    // Assign positions (handle ties); respect stored position for imported data
+    // (no actual scores entered) so it matches the source spreadsheet exactly.
+    const hasRealScores = scores.some(s => s.netScore != null || s.grossScore != null);
     return sorted.map((score, idx) => {
+      if (!hasRealScores && score.position != null) {
+        return score; // use stored position from import
+      }
       const prev = sorted[idx - 1];
       let position = idx + 1;
       if (prev) {
         const sameAs = format === "stableford"
           ? prev.stablefordPoints === score.stablefordPoints
           : (prev.netScore ?? prev.grossScore) === (score.netScore ?? score.grossScore);
-        if (sameAs) position = idx; // tied — use prev position (will show same number)
+        if (sameAs) position = idx;
       }
       return { ...score, position };
     });

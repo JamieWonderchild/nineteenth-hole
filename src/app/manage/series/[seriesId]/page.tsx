@@ -240,10 +240,12 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
                     )}
                   </div>
                   <Link
-                    href={`/manage/competitions/${competition._id}`}
+                    href={competition.status === "complete"
+                      ? `/manage/competitions/${competition._id}/scores`
+                      : `/manage/competitions/${competition._id}`}
                     className="text-xs text-green-700 hover:underline shrink-0 ml-3"
                   >
-                    Manage →
+                    {competition.status === "complete" ? "Results →" : "Manage →"}
                   </Link>
                 </div>
 

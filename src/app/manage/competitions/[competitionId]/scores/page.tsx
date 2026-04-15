@@ -542,6 +542,10 @@ export default function CompetitionScoresPage({
 
   const format = competition.scoringFormat ?? "stableford";
   const isStableford = format === "stableford";
+  // For strokeplay comps, show a Race pts column when scores have stablefordPoints
+  // but no actual gross/net (e.g. RTSF imported data where pts = race points)
+  const hasRacePts = !isStableford && leaderboard.some(s => s.stablefordPoints != null);
+  const hasRealScores = leaderboard.some(s => s.grossScore != null || s.netScore != null);
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
@@ -625,8 +629,9 @@ export default function CompetitionScoresPage({
                   <th className="px-5 py-3 font-medium text-right">Points</th>
                 ) : (
                   <>
-                    <th className="px-5 py-3 font-medium text-right hidden sm:table-cell">Gross</th>
-                    <th className="px-5 py-3 font-medium text-right">Net</th>
+                    {hasRacePts && <th className="px-5 py-3 font-medium text-right">Race pts</th>}
+                    {hasRealScores && <th className="px-5 py-3 font-medium text-right hidden sm:table-cell">Gross</th>}
+                    {hasRealScores && <th className="px-5 py-3 font-medium text-right">Net</th>}
                   </>
                 )}
                 {isAdmin && <th className="px-5 py-3 w-16" />}
@@ -650,19 +655,28 @@ export default function CompetitionScoresPage({
                       {score.countback && <p className="text-xs text-gray-400">{score.countback}</p>}
                       {score.notes && <p className="text-xs text-gray-400 italic">{score.notes}</p>}
                     </td>
-                    <td className="px-5 py-3.5 text-right text-gray-500">{score.handicap}</td>
+                    <td className="px-5 py-3.5 text-right text-gray-500">{score.handicap || "—"}</td>
                     {isStableford ? (
                       <td className="px-5 py-3.5 text-right font-bold text-gray-900">
                         {score.stablefordPoints ?? "—"}
                       </td>
                     ) : (
                       <>
-                        <td className="px-5 py-3.5 text-right text-gray-500 hidden sm:table-cell">
-                          {score.grossScore ?? "—"}
-                        </td>
-                        <td className="px-5 py-3.5 text-right font-bold text-gray-900">
-                          {score.netScore ?? "—"}
-                        </td>
+                        {hasRacePts && (
+                          <td className="px-5 py-3.5 text-right font-bold text-gray-900">
+                            {score.stablefordPoints ?? "—"}
+                          </td>
+                        )}
+                        {hasRealScores && (
+                          <td className="px-5 py-3.5 text-right text-gray-500 hidden sm:table-cell">
+                            {score.grossScore ?? "—"}
+                          </td>
+                        )}
+                        {hasRealScores && (
+                          <td className="px-5 py-3.5 text-right font-bold text-gray-900">
+                            {score.netScore ?? "—"}
+                          </td>
+                        )}
                       </>
                     )}
                     {isAdmin && (

@@ -172,6 +172,8 @@ export default defineSchema({
     drawCompletedAt: v.optional(v.string()),
     // 'stripe' (default) | 'cash' — cash means admin marks entries as paid manually
     paymentCollection: v.optional(v.string()),
+    // Total participant count (including non-racers) — used for accurate race-points calculation
+    participantCount: v.optional(v.number()),
     createdBy: v.string(),      // Clerk user ID
     createdAt: v.string(),
     updatedAt: v.string(),

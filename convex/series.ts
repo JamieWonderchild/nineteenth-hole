@@ -58,6 +58,12 @@ function sumBestN(scores: number[], n: number): number {
   return [...scores].sort((a, b) => b - a).slice(0, n).reduce((s, x) => s + x, 0);
 }
 
+// RTSF rule: the best stableford score is worth ×2; remaining are ×1
+function sumBestNStableford(scores: number[], n: number): number {
+  const sorted = [...scores].sort((a, b) => b - a).slice(0, n);
+  return sorted.reduce((acc, s, i) => acc + (i === 0 ? s * 2 : s), 0);
+}
+
 // ── Queries ──────────────────────────────────────────────────────────────────
 
 export const listByClub = query({
@@ -173,7 +179,9 @@ export const computeStandings = query({
             ? (b.stablefordPoints ?? 0) - (a.stablefordPoints ?? 0)
             : (a.netScore ?? a.grossScore ?? 999) - (b.netScore ?? b.grossScore ?? 999)
         );
-        const N = sorted.length;
+        // Use the stored participantCount (set on imported events to include non-racers)
+        // so calcPoints uses the actual field size, not just the number of imported racer scores
+        const N = comp.participantCount ?? sorted.length;
 
         sorted.forEach((score, idx) => {
           // Respect pre-stored position if present, else derive from sort order (1-based)
@@ -220,7 +228,7 @@ export const computeStandings = query({
     const standings = [...memberMap.values()].map(m => {
       const majorTotal = sumBestN(m.majorScores, MAJOR_QUOTA);
       const medalTotal = sumBestN(m.medalScores, MEDAL_QUOTA);
-      const stablefordTotal = sumBestN(m.stablefordScores, STABLEFORD_QUOTA);
+      const stablefordTotal = sumBestNStableford(m.stablefordScores, STABLEFORD_QUOTA);
       const total =
         majorTotal + medalTotal + stablefordTotal + m.knockoutTotal + m.trophyTotal;
 
@@ -334,3 +342,321 @@ export const updateCompetitionCategory = mutation({
     });
   },
 });
+
+export const removeCompetition = mutation({
+  args: {
+    seriesId: v.id("series"),
+    competitionId: v.id("competitions"),
+  },
+  handler: async (ctx, args) => {
+    const series = await ctx.db.get(args.seriesId);
+    if (!series) throw new Error("Series not found");
+    await assertClubAdmin(ctx, series.clubId);
+
+    const links = await ctx.db
+      .query("seriesCompetitions")
+      .withIndex("by_series", q => q.eq("seriesId", args.seriesId))
+      .collect();
+    const link = links.find(l => l.competitionId === args.competitionId);
+    if (!link) throw new Error("Competition not in series");
+    await ctx.db.delete(link._id);
+  },
+});
+
+// ── One-time seed: import Race to Swinley Forest 2026 historical data ────────
+// Super-admin only. Creates/updates competitions + competitionScores from
+// the imported spreadsheet data (events up to 2026-04-15).
+
+const RTSF_EVENTS = [
+  {
+    date: "2026-04-05", name: "Monthly Medal", slug: "rtsf-monthly-medal-apr05",
+    category: "medal", participantCount: 71,
+    players: [
+      { name: "Jamie Aronson",    position: 7,  pts: 138 },
+      { name: "Harley Ashcroft",  position: 23, pts: 106 },
+      { name: "Ben Benawra",      position: 57, pts: 38  },
+      { name: "Howard Bentwood",  position: 9,  pts: 134 },
+      { name: "Jonny Bentwood",   position: 6,  pts: 140 },
+      { name: "Richard Bentwood", position: 46, pts: 60  },
+      { name: "Paul Blackburn",   position: 20, pts: 112 },
+      { name: "Claude Chene",     position: 62, pts: 28  },
+      { name: "Noel Cunningham",  position: 3,  pts: 162 },
+      { name: "Steve Davies",     position: 14, pts: 124 },
+      { name: "Gus Ganduglia",    position: 48, pts: 56  },
+      { name: "Mundeep Gill",     position: 21, pts: 110 },
+      { name: "Tim Green",        position: 26, pts: 100 },
+      { name: "Sanjeev Gulati",   position: 53, pts: 46  },
+      { name: "Haydn Gush",       position: 55, pts: 42  },
+      { name: "Edward Hikmet",    position: 33, pts: 86  },
+      { name: "Ben Hodges",       position: 38, pts: 76  },
+      { name: "Matthew Hodkin",   position: 59, pts: 34  },
+      { name: "Matthew Horgan",   position: 54, pts: 44  },
+      { name: "Bobbie Jethwa",    position: 19, pts: 114 },
+      { name: "Richard Land",     position: 13, pts: 126 },
+      { name: "Scott Leaver",     position: 56, pts: 40  },
+      { name: "Wingfield Martin", position: 11, pts: 130 },
+      { name: "Will Middleton",   position: 1,  pts: 242 },
+      { name: "William Money",    position: 24, pts: 104 },
+      { name: "James Monk",       position: 29, pts: 94  },
+      { name: "David Motts",      position: 61, pts: 30  },
+      { name: "Gerry O'Donohoe", position: 17, pts: 118 },
+      { name: "Oliver Peake",     position: 18, pts: 116 },
+      { name: "Ben Plumridge",    position: 12, pts: 128 },
+      { name: "Vijay Popat",      position: 47, pts: 58  },
+      { name: "Rajiv Punja",      position: 30, pts: 92  },
+      { name: "Des Quilty",       position: 50, pts: 52  },
+      { name: "Sam Selhaoui",     position: 8,  pts: 136 },
+      { name: "Andreas Sommer",   position: 2,  pts: 192 },
+      { name: "Lewis Spencer",    position: 28, pts: 96  },
+      { name: "Alex Thomas",      position: 32, pts: 88  },
+      { name: "Tom Vale",         position: 67, pts: 18  },
+      { name: "Tom Walker",       position: 16, pts: 120 },
+      { name: "Alex Wills",       position: 39, pts: 74  },
+      { name: "Allan Yarish",     position: 22, pts: 108 },
+    ],
+  },
+  {
+    date: "2026-04-11", name: "Masters Shootout", slug: "rtsf-masters-shootout-apr11",
+    category: "medal", participantCount: 92,
+    players: [
+      { name: "Nigel Arbuthnot",     position: 36, pts: 122 },
+      { name: "Jamie Aronson",        position: 32, pts: 130 },
+      { name: "Harley Ashcroft",      position: 19, pts: 156 },
+      { name: "Samuel Auld",          position: 20, pts: 154 },
+      { name: "Edward Barrett",       position: 38, pts: 118 },
+      { name: "Howard Bentwood",      position: 51, pts: 92  },
+      { name: "Jonny Bentwood",       position: 37, pts: 120 },
+      { name: "Richard Bentwood",     position: 44, pts: 106 },
+      { name: "Peter Bernstein",      position: 74, pts: 46  },
+      { name: "Paul Blackburn",       position: 42, pts: 110 },
+      { name: "James Bliss",          position: 8,  pts: 178 },
+      { name: "Ruari Boyd",           position: 31, pts: 132 },
+      { name: "Claude Chene",         position: 59, pts: 76  },
+      { name: "Terry Cordeiro",       position: 57, pts: 80  },
+      { name: "Jamie Crocker",        position: 48, pts: 98  },
+      { name: "William Daunt",        position: 80, pts: 34  },
+      { name: "Steve Davies",         position: 12, pts: 170 },
+      { name: "Nigel Edwards",        position: 39, pts: 116 },
+      { name: "Gus Ganduglia",        position: 34, pts: 126 },
+      { name: "John Gee-Grant",       position: 75, pts: 44  },
+      { name: "Mundeep Gill",         position: 72, pts: 50  },
+      { name: "Carole Golten",        position: 2,  pts: 234 },
+      { name: "JP Gorrie",            position: 49, pts: 96  },
+      { name: "Tim Green",            position: 1,  pts: 284 },
+      { name: "Sanjeev Gulati",       position: 4,  pts: 194 },
+      { name: "Haydn Gush",           position: 63, pts: 68  },
+      { name: "Nessan Harpur",        position: 47, pts: 100 },
+      { name: "Anthony Harris",       position: 30, pts: 134 },
+      { name: "Justin Hawkins",       position: 73, pts: 48  },
+      { name: "Edward Hikmet",        position: 50, pts: 94  },
+      { name: "Sven Hoffelner",       position: 41, pts: 112 },
+      { name: "Matthew Horgan",       position: 61, pts: 72  },
+      { name: "Mudrek Hossain",       position: 66, pts: 62  },
+      { name: "Tom Huntley",          position: 7,  pts: 180 },
+      { name: "Bobbie Jethwa",        position: 62, pts: 70  },
+      { name: "Jack Keane",           position: 86, pts: 22  },
+      { name: "Scott Leaver",         position: 77, pts: 40  },
+      { name: "Wingfield Martin",     position: 10, pts: 174 },
+      { name: "Will Middleton",       position: 26, pts: 142 },
+      { name: "Oswald Miller",        position: 21, pts: 152 },
+      { name: "William Money",        position: 92, pts: 10  },
+      { name: "James Monk",           position: 6,  pts: 182 },
+      { name: "Steve Morris",         position: 53, pts: 88  },
+      { name: "Alexandra O'Donohoe", position: 46, pts: 102 },
+      { name: "Katie Olewnik",        position: 83, pts: 28  },
+      { name: "Vijay Popat",          position: 29, pts: 136 },
+      { name: "Rajiv Punja",          position: 17, pts: 160 },
+      { name: "Oliver Rawlings",      position: 25, pts: 144 },
+      { name: "Klaus Schreiner",      position: 85, pts: 24  },
+      { name: "Sam Selhaoui",         position: 90, pts: 14  },
+      { name: "Lewis Spencer",        position: 54, pts: 86  },
+      { name: "Hilary Springer",      position: 22, pts: 150 },
+      { name: "Helen Tout",           position: 16, pts: 162 },
+      { name: "John Wainwright",      position: 28, pts: 138 },
+      { name: "Alex Wills",           position: 13, pts: 168 },
+      { name: "Chris Wright",         position: 71, pts: 52  },
+      { name: "Lisa Zaferakis",       position: 89, pts: 16  },
+    ],
+  },
+  {
+    date: "2026-04-06", name: "Stableford", slug: "rtsf-stableford-apr06",
+    category: "stableford", participantCount: 35,
+    players: [
+      { name: "Jamie Aronson",    position: 17, pts: 23 },
+      { name: "Jonny Bentwood",   position: 29, pts: 11 },
+      { name: "Paul Blackburn",   position: 2,  pts: 60 },
+      { name: "James Bliss",      position: 3,  pts: 45 },
+      { name: "Claude Chene",     position: 7,  pts: 33 },
+      { name: "Noel Cunningham",  position: 4,  pts: 40 },
+      { name: "Mundeep Gill",     position: 26, pts: 14 },
+      { name: "Haydn Gush",       position: 19, pts: 21 },
+      { name: "Nessan Harpur",    position: 22, pts: 18 },
+      { name: "Edward Hikmet",    position: 30, pts: 10 },
+      { name: "Matthew Horgan",   position: 23, pts: 17 },
+      { name: "Wingfield Martin", position: 8,  pts: 32 },
+      { name: "Katie Olewnik",    position: 9,  pts: 31 },
+      { name: "Ben Plumridge",    position: 5,  pts: 35 },
+      { name: "Rajiv Punja",      position: 11, pts: 29 },
+      { name: "Kevin Redmond",    position: 31, pts: 9  },
+      { name: "Sam Selhaoui",     position: 32, pts: 8  },
+      { name: "Tom Walker",       position: 14, pts: 26 },
+    ],
+  },
+  {
+    date: "2026-04-09", name: "Stableford", slug: "rtsf-stableford-apr09",
+    category: "stableford", participantCount: 23,
+    players: [
+      { name: "Paul Blackburn",  position: 2,  pts: 48 },
+      { name: "Claude Chene",    position: 10, pts: 18 },
+      { name: "JP Gorrie",       position: 5,  pts: 23 },
+      { name: "Matthew Horgan",  position: 15, pts: 13 },
+      { name: "Rajiv Punja",     position: 1,  pts: 73 },
+      { name: "Hilary Springer", position: 3,  pts: 33 },
+      { name: "Ed Sumner",       position: 11, pts: 17 },
+    ],
+  },
+  {
+    date: "2026-04-12", name: "Stableford", slug: "rtsf-stableford-apr12",
+    category: "stableford", participantCount: 40,
+    players: [
+      { name: "Harley Ashcroft",     position: 1,  pts: 90 },
+      { name: "Ben Benawra",         position: 9,  pts: 36 },
+      { name: "Howard Bentwood",     position: 20, pts: 25 },
+      { name: "Jonny Bentwood",      position: 16, pts: 29 },
+      { name: "Richard Bentwood",    position: 37, pts: 8  },
+      { name: "Claude Chene",        position: 35, pts: 10 },
+      { name: "Jamie Crocker",       position: 18, pts: 27 },
+      { name: "Andrew Dyson",        position: 26, pts: 19 },
+      { name: "Haydn Gush",          position: 4,  pts: 45 },
+      { name: "Matthew Hodkin",      position: 10, pts: 35 },
+      { name: "Sven Hoffelner",      position: 21, pts: 24 },
+      { name: "Matthew Horgan",      position: 34, pts: 11 },
+      { name: "Keith Howlett",       position: 38, pts: 7  },
+      { name: "Richard Land",        position: 22, pts: 23 },
+      { name: "Scott Leaver",        position: 2,  pts: 65 },
+      { name: "Alexandra O'Donohoe", position: 29, pts: 16 },
+      { name: "Katie Olewnik",       position: 14, pts: 31 },
+      { name: "Oliver Peake",        position: 19, pts: 26 },
+      { name: "Ben Plumridge",       position: 8,  pts: 37 },
+      { name: "Rajiv Punja",         position: 11, pts: 34 },
+      { name: "Kevin Redmond",       position: 6,  pts: 39 },
+      { name: "Sam Selhaoui",        position: 30, pts: 15 },
+      { name: "Alex Thomas",         position: 17, pts: 28 },
+    ],
+  },
+] as const;
+
+export const seedRTSFData = mutation({
+  args: { seriesId: v.id("series") },
+  handler: async (ctx, { seriesId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    if (!identity.email || !superAdminEmails.includes(identity.email)) throw new Error("Super admin only");
+    const adminId = identity.subject;
+
+    const series = await ctx.db.get(seriesId);
+    if (!series) throw new Error("Series not found");
+    const { clubId } = series;
+    const now = new Date().toISOString();
+
+    const results: string[] = [];
+
+    // Remove stale series links — competitions linked before the import whose slugs
+    // don't match any RTSF event (e.g. manually-added "2026-masters-shootout").
+    const rtsfSlugs = new Set<string>(RTSF_EVENTS.map(e => e.slug));
+    const allLinks = await ctx.db
+      .query("seriesCompetitions")
+      .withIndex("by_series", q => q.eq("seriesId", seriesId))
+      .collect();
+    for (const link of allLinks) {
+      const comp = await ctx.db.get(link.competitionId);
+      if (comp && !rtsfSlugs.has(comp.slug ?? "")) {
+        await ctx.db.delete(link._id);
+        results.push(`removed stale link: ${comp.name} (${comp.slug})`);
+      }
+    }
+
+    for (const ev of RTSF_EVENTS) {
+      // Find or create the competition
+      let compId: import("./_generated/dataModel").Id<"competitions"> | null = null;
+      const existing = await ctx.db
+        .query("competitions")
+        .withIndex("by_club_and_slug", q => q.eq("clubId", clubId).eq("slug", ev.slug))
+        .unique();
+
+      if (existing) {
+        compId = existing._id;
+        // Ensure participantCount is set
+        if (existing.participantCount !== ev.participantCount) {
+          await ctx.db.patch(compId, { participantCount: ev.participantCount });
+        }
+        results.push(`found: ${ev.name} (${ev.date})`);
+      } else {
+        compId = await ctx.db.insert("competitions", {
+          clubId,
+          scope: "club",
+          name: ev.name,
+          slug: ev.slug,
+          status: "complete",
+          type: "club_comp",
+          startDate: ev.date,
+          endDate: ev.date,
+          entryDeadline: ev.date + "T12:00:00.000Z",
+          drawType: "random",
+          tierCount: 0,
+          playersPerTier: 0,
+          entryFee: 0,
+          currency: "GBP",
+          prizeStructure: [],
+          scoringFormat: ev.category === "medal" ? "strokeplay" : "stableford",
+          participantCount: ev.participantCount,
+          createdBy: adminId,
+          createdAt: now,
+          updatedAt: now,
+        });
+        results.push(`created: ${ev.name} (${ev.date})`);
+      }
+
+      // Link to series if not already linked
+      const existingLink = await ctx.db
+        .query("seriesCompetitions")
+        .withIndex("by_series", q => q.eq("seriesId", seriesId))
+        .collect();
+      if (!existingLink.some(l => l.competitionId === compId)) {
+        await ctx.db.insert("seriesCompetitions", {
+          seriesId,
+          competitionId: compId,
+          category: ev.category,
+          addedAt: now,
+        });
+        results.push(`linked: ${ev.name} → series`);
+      }
+
+      // Seed scores — skip players already present
+      const existingScores = await ctx.db
+        .query("competitionScores")
+        .withIndex("by_competition", q => q.eq("competitionId", compId!))
+        .collect();
+      const existingNames = new Set(existingScores.map(s => s.displayName));
+
+      for (const p of ev.players) {
+        if (existingNames.has(p.name)) continue;
+        await ctx.db.insert("competitionScores", {
+          competitionId: compId!,
+          clubId,
+          displayName: p.name,
+          handicap: 0,
+          stablefordPoints: p.pts,
+          position: p.position,
+          submittedAt: now,
+          submittedBy: adminId,
+        });
+      }
+      results.push(`seeded ${ev.players.length} players for ${ev.name}`);
+    }
+
+    return results;
+  },
+});
+
