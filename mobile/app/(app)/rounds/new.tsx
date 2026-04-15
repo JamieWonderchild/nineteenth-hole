@@ -8,8 +8,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActivityIndicator,
 } from "react-native";
-import { useRouter, Stack } from "expo-router";
+import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery } from "convex/react";
 import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
@@ -141,7 +142,21 @@ type Step1Data = {
   par?: number;
 };
 
-function Step1Course({ onNext }: { onNext: (data: Step1Data) => void }) {
+const TEE_HEX_MAP: Record<string, string> = {
+  white: "#f9fafb", yellow: "#fbbf24", red: "#ef4444",
+  blue: "#3b82f6", black: "#111827", gold: "#d97706",
+  silver: "#9ca3af", green: "#16a34a", other: "#6b7280",
+};
+
+function Step1Course({ onNext, initialCourseId }: {
+  onNext: (data: Step1Data) => void;
+  initialCourseId?: string;
+}) {
+  const preloadedCourse = useQuery(
+    api.golfCourses.getWithTees,
+    initialCourseId ? { courseId: initialCourseId as any } : "skip"
+  );
+
   const [showPicker, setShowPicker] = useState(false);
   const [courseSelection, setCourseSelection] = useState<CourseSelection | null>(null);
   const [freetext, setFreetext] = useState("");
@@ -181,6 +196,144 @@ function Step1Course({ onNext }: { onNext: (data: Step1Data) => void }) {
         skipRatings,
       });
     }
+  }
+
+  // ── Pre-loaded course tee picker (when arriving from course detail) ──────
+  if (initialCourseId && preloadedCourse !== null && !useFreetext) {
+    const course = preloadedCourse;
+    const tees = course
+      ? [...(course.tees ?? [])].sort((a: any, b: any) => {
+          const ga = a.gender === "female" ? 1 : 0;
+          const gb = b.gender === "female" ? 1 : 0;
+          if (ga !== gb) return ga - gb;
+          return (b.totalYards ?? -1) - (a.totalYards ?? -1);
+        })
+      : [];
+
+    return (
+      <>
+        <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+          <View className="px-4 pt-4 gap-4">
+            <Text className="text-xl font-bold text-gray-900">Choose Tee</Text>
+
+            {/* Course name chip */}
+            {course && (
+              <View className="flex-row items-center bg-green-50 border border-green-200 rounded-xl px-3 py-3 gap-2">
+                <Ionicons name="golf" size={18} color="#16a34a" />
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-green-900">{course.name}</Text>
+                  {(course.city || course.county) && (
+                    <Text className="text-xs text-green-600">
+                      {[course.city, course.county].filter(Boolean).join(", ")}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
+
+            {/* Loading */}
+            {!course && (
+              <View className="py-6 items-center">
+                <ActivityIndicator color="#16a34a" />
+              </View>
+            )}
+
+            {/* Tee list */}
+            {tees.length > 0 && (
+              <View className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                {tees.map((tee: any) => {
+                  const isSelected = courseSelection?.teeId === tee._id;
+                  return (
+                    <TouchableOpacity
+                      key={tee._id}
+                      onPress={() => {
+                        setCourseSelection({
+                          golfCourseId: course!._id,
+                          teeId: tee._id,
+                          courseName: course!.name,
+                          venueName: course!.venueName,
+                          teeName: tee.name,
+                          teeColour: tee.colour,
+                          gender: tee.gender,
+                          courseRating: tee.courseRating,
+                          slopeRating: tee.slopeRating,
+                          par: tee.par,
+                          totalYards: tee.totalYards,
+                          holes: tee.holes ?? [],
+                        });
+                      }}
+                      className={`flex-row items-center px-4 py-3.5 border-b border-gray-50 ${isSelected ? "bg-green-50" : ""}`}
+                    >
+                      <View
+                        style={{
+                          width: 18, height: 18, borderRadius: 9,
+                          backgroundColor: TEE_HEX_MAP[tee.colour] ?? TEE_HEX_MAP.other,
+                          borderWidth: 1.5,
+                          borderColor: tee.colour === "white" ? "#d1d5db" : (TEE_HEX_MAP[tee.colour] ?? TEE_HEX_MAP.other),
+                          marginRight: 10,
+                        }}
+                      />
+                      <View className="flex-1">
+                        <View className="flex-row items-center gap-2">
+                          <Text className="text-sm font-semibold text-gray-900">{tee.name}</Text>
+                          <View className="bg-gray-100 rounded-full px-1.5 py-0.5">
+                            <Text className="text-xs text-gray-500 capitalize">{tee.gender}</Text>
+                          </View>
+                        </View>
+                        <Text className="text-xs text-gray-400 mt-0.5">
+                          {[
+                            tee.courseRating ? `CR ${tee.courseRating}` : null,
+                            tee.slopeRating ? `Slope ${tee.slopeRating}` : null,
+                            tee.par ? `Par ${tee.par}` : null,
+                            tee.totalYards ? `${tee.totalYards} yds` : null,
+                          ].filter(Boolean).join("  ·  ")}
+                        </Text>
+                      </View>
+                      {isSelected && <Ionicons name="checkmark-circle" size={20} color="#16a34a" />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {tees.length === 0 && course && (
+              <View className="bg-gray-50 rounded-xl px-4 py-5 items-center">
+                <Text className="text-sm text-gray-400 text-center">
+                  No tee data loaded yet — searching other courses instead
+                </Text>
+                <TouchableOpacity onPress={() => setShowPicker(true)} className="mt-3">
+                  <Text className="text-green-600 font-medium text-sm">Search database →</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <TouchableOpacity
+              onPress={() => setSkipRatings(!skipRatings)}
+              className="flex-row items-center gap-2"
+            >
+              <View className={`w-4 h-4 rounded border ${skipRatings ? "bg-gray-400 border-gray-400" : "border-gray-300"}`}>
+                {skipRatings && <Ionicons name="checkmark" size={12} color="#fff" />}
+              </View>
+              <Text className="text-sm text-gray-500">Skip ratings (round won't count to handicap)</Text>
+            </TouchableOpacity>
+
+            <Button
+              onPress={handleNext}
+              disabled={!courseSelection && !skipRatings}
+              size="lg"
+              className="mt-2 mb-8"
+            >
+              Continue
+            </Button>
+          </View>
+        </ScrollView>
+        <CoursePickerSheet
+          visible={showPicker}
+          onClose={() => setShowPicker(false)}
+          onSelect={(sel) => { setCourseSelection(sel); setUseFreetext(false); setShowPicker(false); }}
+        />
+      </>
+    );
   }
 
   return (
@@ -897,6 +1050,7 @@ export default function NewRoundScreen() {
   const router = useRouter();
   const { user } = useUser();
   const userId = user?.id ?? "";
+  const { courseId } = useLocalSearchParams<{ courseId?: string }>();
 
   const handicap = useQuery(
     api.handicap.getLatest,
@@ -1010,7 +1164,7 @@ export default function NewRoundScreen() {
       />
       <View className="flex-1 bg-gray-50">
         <StepIndicator current={step} total={totalSteps} />
-        {step === 1 && <Step1Course onNext={handleStep1} />}
+        {step === 1 && <Step1Course onNext={handleStep1} initialCourseId={courseId} />}
         {step === 2 && <Step2Format onNext={handleStep2} />}
         {step === 3 && step2Data?.entryMode === "quick" && (
           <Step3Quick
