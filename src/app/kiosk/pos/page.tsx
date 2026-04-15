@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
-import { X, ChevronLeft, Search, UserCircle, Check, Lock, ArrowLeft, Maximize, Minimize } from "lucide-react";
+import { X, ChevronLeft, Search, UserCircle, Check, Lock, ArrowLeft, Maximize, Minimize, Plus, Pencil } from "lucide-react";
 
 import { PinPad } from "@/components/kiosk/PinLock";
 import { KioskShiftModal } from "@/components/kiosk/ShiftModal";
@@ -42,6 +42,44 @@ type MemberResult = {
   avatarUrl?: string;
 };
 
+// ── New tab modal ─────────────────────────────────────────────────────────────
+
+function NewTabModal({ onOpen, onClose }: { onOpen: (name: string) => void; onClose: () => void }) {
+  const [name, setName] = useState("");
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => { ref.current?.focus(); }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-sm shadow-2xl p-8">
+        <h2 className="text-xl font-bold text-white mb-5">New tab</h2>
+        <input
+          ref={ref}
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && onOpen(name)}
+          placeholder="Tab name — Table 4, Jamie… (optional)"
+          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 mb-5"
+        />
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-4 bg-gray-800 hover:bg-gray-700 rounded-xl font-semibold text-gray-200 text-lg"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onOpen(name)}
+            className="flex-1 py-4 bg-green-600 hover:bg-green-500 rounded-xl font-bold text-white text-lg transition-colors"
+          >
+            Open tab
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Member search overlay ─────────────────────────────────────────────────────
 
 function MemberSearchOverlay({
@@ -66,7 +104,6 @@ function MemberSearchOverlay({
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg shadow-2xl">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-800">
           <h2 className="text-xl font-bold">Find member</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white p-2 rounded-xl hover:bg-gray-800 transition-colors">
@@ -74,7 +111,6 @@ function MemberSearchOverlay({
           </button>
         </div>
 
-        {/* Search */}
         <div className="px-6 pt-5 pb-4">
           <div className="flex items-center gap-3 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3">
             <Search size={20} className="text-gray-400 shrink-0" />
@@ -94,7 +130,6 @@ function MemberSearchOverlay({
           </div>
         </div>
 
-        {/* Results */}
         <div className="px-4 pb-5 space-y-2 max-h-80 overflow-y-auto">
           {results === undefined && query.trim() && (
             <p className="text-center text-gray-500 py-6 text-sm">Searching…</p>
@@ -156,13 +191,7 @@ function MemberSearchOverlay({
 // ── Checkout confirm overlay ──────────────────────────────────────────────────
 
 function ConfirmOverlay({
-  method,
-  total,
-  currency,
-  member,
-  onConfirm,
-  onCancel,
-  saving,
+  method, total, currency, member, onConfirm, onCancel, saving,
 }: {
   method: "cash" | "card" | "account";
   total: number;
@@ -222,8 +251,8 @@ function ConfirmOverlay({
 
 // ── Sale complete overlay ─────────────────────────────────────────────────────
 
-function SaleCompleteOverlay({ total, currency, member, onDismiss }: {
-  total: number; currency: string; member: MemberResult | null; onDismiss: () => void;
+function SaleCompleteOverlay({ total, currency, member, tabName, onDismiss }: {
+  total: number; currency: string; member: MemberResult | null; tabName?: string; onDismiss: () => void;
 }) {
   useEffect(() => {
     const t = setTimeout(onDismiss, 3000);
@@ -238,6 +267,7 @@ function SaleCompleteOverlay({ total, currency, member, onDismiss }: {
         </div>
         <p className="text-4xl font-black text-white mb-2">{formatCurrency(total, currency)}</p>
         {member && <p className="text-xl text-gray-300 mb-1">Charged to {member.displayName}</p>}
+        {tabName && <p className="text-gray-500 text-sm">Tab: {tabName}</p>}
         <p className="text-gray-500 text-sm mt-4">Tap anywhere to continue</p>
       </div>
     </div>
@@ -246,7 +276,6 @@ function SaleCompleteOverlay({ total, currency, member, onDismiss }: {
 
 // ── Main kiosk POS ────────────────────────────────────────────────────────────
 
-// Read kioskId from URL: /kiosk/pos?kiosk=<kioskId>
 function useKioskId(): Id<"posKiosks"> | null {
   const params = useSearchParams();
   const id = params.get("kiosk");
@@ -254,17 +283,12 @@ function useKioskId(): Id<"posKiosks"> | null {
 }
 
 function KioskPOS() {
-  // ── Kiosk identity (from URL param) ────────────────────────────────────────
-  // When a kioskId is present we resolve clubId from the kiosk record itself,
-  // so no Clerk login is required for staff using the kiosk.
   const kioskId = useKioskId();
   const kioskData = useQuery(
     api.posLocations.getKioskById,
     kioskId ? { kioskId } : "skip"
   );
 
-  // Kiosk mode: clubId comes from the kiosk document — no login needed.
-  // Admin preview mode (no kioskId): fall back to the logged-in user's club.
   const { user } = useUser();
   const memberships = useQuery(
     api.clubMembers.listByUser,
@@ -272,7 +296,6 @@ function KioskPOS() {
   );
   const activeMembership = memberships?.find(m => m.status === "active");
 
-  // Resolve which clubId to use: kiosk's own club, or the logged-in user's club
   const clubId: Id<"clubs"> | null =
     kioskData?.clubId ?? activeMembership?.clubId ?? null;
 
@@ -283,8 +306,6 @@ function KioskPOS() {
       ? { clubId, ...(kioskData?.locationId ? { locationId: kioskData.locationId } : {}) }
       : "skip"
   );
-  // When running as a kiosk, filter products by the kiosk's assigned location so
-  // only that location's items (and global/unassigned items) appear on the till.
   const products = useQuery(
     api.pos.listProducts,
     clubId
@@ -292,20 +313,45 @@ function KioskPOS() {
       : "skip"
   );
   const recordSale = useMutation(api.pos.recordSale);
-  // locked = kiosk is in staff-only mode (PIN required for manager access)
-  // managerUnlocked = PIN was just entered, manager controls visible
-  const [isLocked, setIsLocked] = useState(false);
-  const [showPinPad, setShowPinPad] = useState(false);
-  const [pinMode, setPinMode] = useState<"lock" | "unlock">("unlock");
+
+  // ── Tab mutations ──────────────────────────────────────────────────────────
+  const openTabMut    = useMutation(api.posTabs.openTab);
+  const addItemMut    = useMutation(api.posTabs.addItem);
+  const updateItemMut = useMutation(api.posTabs.updateItem);
+  const removeItemMut = useMutation(api.posTabs.removeItem);
+  const closeTabMut   = useMutation(api.posTabs.closeTab);
+  const voidTabMut    = useMutation(api.posTabs.voidTab);
+  const renameTabMut  = useMutation(api.posTabs.renameTab);
+
+  const openTabs = useQuery(
+    api.posTabs.listOpenTabs,
+    clubId
+      ? { clubId, ...(kioskData?.locationId ? { locationId: kioskData.locationId } : {}) }
+      : "skip"
+  );
+
+  // ── Tab state ──────────────────────────────────────────────────────────────
+  const [activeTabId, setActiveTabId]       = useState<Id<"posTabs"> | null>(null);
+  const [showNewTabModal, setShowNewTabModal] = useState(false);
+  const [editingTabName, setEditingTabName]  = useState(false);
+  const [tabNameInput, setTabNameInput]      = useState("");
+
+  const activeTab = useQuery(
+    api.posTabs.getTab,
+    activeTabId ? { tabId: activeTabId } : "skip"
+  );
+
+  // ── Kiosk lock / fullscreen state ─────────────────────────────────────────
+  const [isLocked, setIsLocked]             = useState(false);
+  const [showPinPad, setShowPinPad]         = useState(false);
+  const [pinMode, setPinMode]               = useState<"lock" | "unlock">("unlock");
   const [managerUnlocked, setManagerUnlocked] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFullscreen, setIsFullscreen]     = useState(false);
   const [showShiftModal, setShowShiftModal] = useState(false);
 
-  // Keep fullscreen state in sync with browser
   useEffect(() => {
     function onFsChange() {
       setIsFullscreen(!!document.fullscreenElement);
-      // If user exits fullscreen via Escape, unlock the kiosk
       if (!document.fullscreenElement) {
         setIsLocked(false);
         setManagerUnlocked(false);
@@ -315,42 +361,31 @@ function KioskPOS() {
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
 
-  function enterFullscreen() {
-    document.documentElement.requestFullscreen().catch(() => {});
-  }
+  function enterFullscreen() { document.documentElement.requestFullscreen().catch(() => {}); }
+  function exitFullscreen()  { document.exitFullscreen().catch(() => {}); }
 
-  function exitFullscreen() {
-    document.exitFullscreen().catch(() => {});
-  }
-
-  // "Lock & Fullscreen" — go fullscreen then show PIN to confirm lock
   function handleLockAndFullscreen() {
     enterFullscreen();
     setPinMode("lock");
     setShowPinPad(true);
   }
 
-  // Manager button — show PIN to unlock manager mode
   function handleManagerRequest() {
     setPinMode("unlock");
     setShowPinPad(true);
   }
 
-  // PIN verified — behaviour depends on which mode triggered it
   const handlePinVerified = useCallback(() => {
     setShowPinPad(false);
     if (pinMode === "lock") {
-      // Manager confirmed the lock — hand off to staff
       setIsLocked(true);
       setManagerUnlocked(false);
     } else {
-      // Manager unlocked — show manager controls
       setManagerUnlocked(true);
       setIsLocked(false);
     }
   }, [pinMode]);
 
-  // Lock again (from manager mode)
   const handleRelock = useCallback(() => {
     setManagerUnlocked(false);
     setIsLocked(true);
@@ -366,9 +401,7 @@ function KioskPOS() {
     return () => clearTimeout(t);
   }, [managerUnlocked]);
 
-  // ── Active shift for this kiosk's location ──────────────────────────────────
-  // Looks up the open shift for the location this kiosk is assigned to.
-  // Every sale is stamped with shiftId + locationId so shift reports work.
+  // ── Shift ──────────────────────────────────────────────────────────────────
   const openShift = useQuery(
     api.posShifts.getOpenShift,
     club && kioskData?.locationId
@@ -376,21 +409,32 @@ function KioskPOS() {
       : "skip"
   );
 
-  // ── POS state ───────────────────────────────────────────────────────────────
+  // ── POS state ──────────────────────────────────────────────────────────────
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
-  const [basket, setBasket] = useState<BasketItem[]>([]);
-  const [showBasket, setShowBasket] = useState(false);
+  const [basket, setBasket]           = useState<BasketItem[]>([]);
+  const [showBasket, setShowBasket]   = useState(false);
 
-  // Checkout flow state
-  const [stage, setStage] = useState<"grid" | "memberSearch" | "confirm" | "done">("grid");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "account">("cash");
+  // Derived basket — tab mode uses Convex items; quick-sale uses local state
+  const displayBasket: BasketItem[] = activeTabId && activeTab
+    ? activeTab.items.map(i => ({
+        productId:      (i.productId ?? ("custom" as unknown as Id<"posProducts">)),
+        productName:    i.productName,
+        quantity:       i.quantity,
+        unitPricePence: i.unitPricePence,
+        subtotalPence:  i.subtotalPence,
+      }))
+    : basket;
+
+  const [stage, setStage]                   = useState<"grid" | "memberSearch" | "confirm" | "done">("grid");
+  const [paymentMethod, setPaymentMethod]   = useState<"cash" | "card" | "account">("cash");
   const [selectedMember, setSelectedMember] = useState<MemberResult | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [lastTotal, setLastTotal] = useState(0);
+  const [saving, setSaving]                 = useState(false);
+  const [lastTotal, setLastTotal]           = useState(0);
+  const [lastTabName, setLastTabName]       = useState<string | undefined>(undefined);
 
-  const currency = club?.currency ?? "GBP";
-  const total = basket.reduce((s, i) => s + i.subtotalPence, 0);
-  const itemCount = basket.reduce((s, i) => s + i.quantity, 0);
+  const currency  = club?.currency ?? "GBP";
+  const total     = displayBasket.reduce((s, i) => s + i.subtotalPence, 0);
+  const itemCount = displayBasket.reduce((s, i) => s + i.quantity, 0);
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -412,33 +456,62 @@ function KioskPOS() {
     ];
   }, [categories, products]);
 
-  function addToBasket(product: Product) {
-    setBasket(prev => {
-      const existing = prev.find(i => i.productId === product._id);
-      if (existing) {
-        return prev.map(i => i.productId === product._id
-          ? { ...i, quantity: i.quantity + 1, subtotalPence: (i.quantity + 1) * i.unitPricePence }
-          : i
-        );
-      }
-      return [...prev, {
-        productId: product._id,
-        productName: product.name,
-        quantity: 1,
+  // ── Basket helpers ─────────────────────────────────────────────────────────
+
+  async function addToBasket(product: Product) {
+    if (activeTabId) {
+      await addItemMut({
+        tabId:          activeTabId,
+        productId:      product._id,
+        productName:    product.name,
         unitPricePence: product.pricePence,
-        subtotalPence: product.pricePence,
-      }];
-    });
+        quantity:       1,
+      });
+    } else {
+      setBasket(prev => {
+        const existing = prev.find(i => i.productId === product._id);
+        if (existing) {
+          return prev.map(i => i.productId === product._id
+            ? { ...i, quantity: i.quantity + 1, subtotalPence: (i.quantity + 1) * i.unitPricePence }
+            : i
+          );
+        }
+        return [...prev, {
+          productId: product._id,
+          productName: product.name,
+          quantity: 1,
+          unitPricePence: product.pricePence,
+          subtotalPence: product.pricePence,
+        }];
+      });
+    }
   }
 
-  function changeQty(productId: Id<"posProducts">, delta: number) {
-    setBasket(prev =>
-      prev.map(i => i.productId === productId
-        ? { ...i, quantity: i.quantity + delta, subtotalPence: (i.quantity + delta) * i.unitPricePence }
-        : i
-      ).filter(i => i.quantity > 0)
-    );
+  async function changeQty(productId: Id<"posProducts">, delta: number) {
+    if (activeTabId && activeTab) {
+      const idx = activeTab.items.findIndex(i => i.productId === productId);
+      if (idx === -1) return;
+      const newQty = activeTab.items[idx].quantity + delta;
+      await updateItemMut({ tabId: activeTabId, itemIndex: idx, quantity: newQty });
+    } else {
+      setBasket(prev =>
+        prev.map(i => i.productId === productId
+          ? { ...i, quantity: i.quantity + delta, subtotalPence: (i.quantity + delta) * i.unitPricePence }
+          : i
+        ).filter(i => i.quantity > 0)
+      );
+    }
   }
+
+  async function removeBasketItem(index: number) {
+    if (activeTabId) {
+      await removeItemMut({ tabId: activeTabId, itemIndex: index });
+    } else {
+      setBasket(prev => prev.filter((_, i) => i !== index));
+    }
+  }
+
+  // ── Checkout ───────────────────────────────────────────────────────────────
 
   function startCheckout(method: "cash" | "card" | "account") {
     setPaymentMethod(method);
@@ -454,25 +527,43 @@ function KioskPOS() {
     if (!club) return;
     setSaving(true);
     try {
-      await recordSale({
-        clubId: club._id,
-        items: basket,
-        currency,
-        paymentMethod,
-        chargeAccountMemberId: paymentMethod === "account" && selectedMember ? selectedMember._id : undefined,
-        memberId: paymentMethod === "account" && selectedMember ? selectedMember._id as unknown as string : undefined,
-        memberName: selectedMember?.displayName,
-        // Stamp shift & location context so this sale appears in shift reports
-        shiftId:    openShift?._id,
-        locationId: kioskData?.locationId,
-        isGuest:    !selectedMember, // no member selected = walk-in / guest
-        // Kiosk auth — allows sale without a logged-in Clerk session
-        kioskId:    kioskId ?? undefined,
-      });
-      setLastTotal(total);
-      setBasket([]);
-      setSelectedMember(null);
-      setStage("done");
+      if (activeTabId) {
+        // Close the tab (records sale internally via recordSaleInternal)
+        await closeTabMut({
+          tabId:                 activeTabId,
+          paymentMethod,
+          currency,
+          chargeAccountMemberId: paymentMethod === "account" && selectedMember ? selectedMember._id : undefined,
+          memberName:            selectedMember?.displayName,
+          isGuest:               !selectedMember,
+          kioskId:               kioskId ?? undefined,
+        });
+        setLastTotal(total);
+        setLastTabName(activeTab?.name ?? undefined);
+        setActiveTabId(null);
+        setSelectedMember(null);
+        setStage("done");
+      } else {
+        // Quick sale
+        await recordSale({
+          clubId:                club._id,
+          items:                 basket,
+          currency,
+          paymentMethod,
+          chargeAccountMemberId: paymentMethod === "account" && selectedMember ? selectedMember._id : undefined,
+          memberId:              paymentMethod === "account" && selectedMember ? selectedMember._id as unknown as string : undefined,
+          memberName:            selectedMember?.displayName,
+          shiftId:               openShift?._id,
+          locationId:            kioskData?.locationId,
+          isGuest:               !selectedMember,
+          kioskId:               kioskId ?? undefined,
+        });
+        setLastTotal(total);
+        setLastTabName(undefined);
+        setBasket([]);
+        setSelectedMember(null);
+        setStage("done");
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Sale failed");
       setStage("grid");
@@ -500,7 +591,6 @@ function KioskPOS() {
           onUnlocked={handlePinVerified}
           onDismiss={() => {
             setShowPinPad(false);
-            // If they cancel out of the lock flow, exit fullscreen too
             if (pinMode === "lock") exitFullscreen();
           }}
         />
@@ -512,7 +602,6 @@ function KioskPOS() {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 bg-gray-900 shrink-0">
           <div className="flex items-center gap-4">
-            {/* Back to manage — only when not locked */}
             {!isLocked && !managerUnlocked && (
               <Link
                 href="/manage/pos"
@@ -530,7 +619,6 @@ function KioskPOS() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Shift status */}
             {kioskData && (
               openShift
                 ? <span className="text-[11px] text-green-500 font-medium flex items-center gap-1">
@@ -543,7 +631,6 @@ function KioskPOS() {
                   </span>
             )}
 
-            {/* ── STATE 1: Unlocked (just landed on page, no kiosk PIN yet entered) ── */}
             {kioskId && !isLocked && !managerUnlocked && (
               <button
                 onClick={handleLockAndFullscreen}
@@ -553,7 +640,6 @@ function KioskPOS() {
               </button>
             )}
 
-            {/* Fullscreen button when no kiosk ID (preview/admin mode) */}
             {!kioskId && (
               <button
                 onClick={isFullscreen ? exitFullscreen : enterFullscreen}
@@ -564,7 +650,6 @@ function KioskPOS() {
               </button>
             )}
 
-            {/* ── STATE 2: Locked (staff mode) — show small Manager button ── */}
             {isLocked && !managerUnlocked && (
               <button
                 onClick={handleManagerRequest}
@@ -574,7 +659,6 @@ function KioskPOS() {
               </button>
             )}
 
-            {/* ── STATE 3: Manager unlocked — show full manager controls ── */}
             {managerUnlocked && (
               <div className="flex items-center gap-2">
                 <button
@@ -604,10 +688,116 @@ function KioskPOS() {
               onClick={() => setShowBasket(v => !v)}
               className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-green-600 rounded-xl font-semibold text-sm"
             >
-              Basket {itemCount > 0 && <span className="bg-white text-green-700 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">{itemCount}</span>}
+              {activeTabId
+                ? <>Tab {itemCount > 0 && <span className="bg-white text-green-700 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">{itemCount}</span>}</>
+                : <>Basket {itemCount > 0 && <span className="bg-white text-green-700 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">{itemCount}</span>}</>
+              }
             </button>
           </div>
         </div>
+
+        {/* ── Tab switcher bar ──────────────────────────────────────── */}
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-950 border-b border-gray-800 overflow-x-auto shrink-0 min-h-[48px]">
+          {/* Quick sale chip */}
+          <button
+            onClick={() => setActiveTabId(null)}
+            className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
+              activeTabId === null
+                ? "bg-white text-gray-900 border-white"
+                : "bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500 hover:text-gray-200"
+            }`}
+          >
+            Quick sale
+            {activeTabId === null && basket.length > 0 && (
+              <span className="w-5 h-5 bg-green-600 rounded-full text-[10px] flex items-center justify-center font-black text-white">
+                {basket.reduce((s, i) => s + i.quantity, 0)}
+              </span>
+            )}
+          </button>
+
+          {(openTabs ?? []).length > 0 && (
+            <span className="text-gray-700 text-xs select-none shrink-0">|</span>
+          )}
+
+          {/* Per-tab chips */}
+          {(openTabs ?? []).map(tab => (
+            <div
+              key={tab._id}
+              role="button"
+              onClick={() => setActiveTabId(tab._id)}
+              className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold border transition-all cursor-pointer ${
+                activeTabId === tab._id
+                  ? "bg-green-500 text-white border-green-500"
+                  : "bg-gray-800 text-gray-300 border-gray-700 hover:border-gray-500"
+              }`}
+            >
+              {tab.name ?? "Tab"}
+              {tab.items.length > 0 && (
+                <span className={`w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-black ${
+                  activeTabId === tab._id ? "bg-white/25 text-white" : "bg-gray-700 text-gray-300"
+                }`}>
+                  {tab.items.reduce((s, i) => s + i.quantity, 0)}
+                </span>
+              )}
+              {activeTabId === tab._id && !isLocked && (
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    setTabNameInput(tab.name ?? "");
+                    setEditingTabName(true);
+                  }}
+                  className="ml-0.5 opacity-60 hover:opacity-100"
+                  title="Rename tab"
+                >
+                  <Pencil size={11} />
+                </button>
+              )}
+            </div>
+          ))}
+
+          {/* New tab button — hidden in locked mode */}
+          {!isLocked && (
+            <button
+              onClick={() => setShowNewTabModal(true)}
+              className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium text-gray-500 border border-dashed border-gray-700 hover:border-gray-500 hover:text-gray-300 bg-transparent transition-all"
+            >
+              <Plus size={12} /> New tab
+            </button>
+          )}
+        </div>
+
+        {/* Rename tab inline bar */}
+        {editingTabName && activeTabId && (
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 border-b border-gray-800 shrink-0">
+            <input
+              autoFocus
+              value={tabNameInput}
+              onChange={e => setTabNameInput(e.target.value)}
+              onKeyDown={async e => {
+                if (e.key === "Enter") {
+                  await renameTabMut({ tabId: activeTabId, name: tabNameInput });
+                  setEditingTabName(false);
+                } else if (e.key === "Escape") {
+                  setEditingTabName(false);
+                }
+              }}
+              placeholder="Tab name…"
+              className="flex-1 bg-gray-800 text-white text-sm border border-gray-700 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <button
+              onClick={async () => {
+                await renameTabMut({ tabId: activeTabId, name: tabNameInput });
+                setEditingTabName(false);
+              }}
+              className="text-sm px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl font-semibold"
+            >
+              Save
+            </button>
+            <button onClick={() => setEditingTabName(false)} className="text-gray-500 hover:text-gray-300">
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         {/* Category tabs */}
         <div className="flex gap-2 px-4 py-3 overflow-x-auto shrink-0 border-b border-gray-800 bg-gray-900">
@@ -637,7 +827,7 @@ function KioskPOS() {
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
               {filteredProducts.map(product => {
                 const outOfStock = product.trackStock && (product.stockCount ?? 0) <= 0;
-                const inBasket = basket.find(i => i.productId === product._id)?.quantity ?? 0;
+                const inBasket = displayBasket.find(i => i.productId === product._id)?.quantity ?? 0;
                 return (
                   <button
                     key={product._id}
@@ -681,21 +871,43 @@ function KioskPOS() {
 
         {/* Basket header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800 shrink-0">
-          <h2 className="font-bold text-white text-lg">
-            Basket
-            {itemCount > 0 && (
-              <span className="ml-2 text-sm bg-green-600/30 text-green-400 px-2 py-0.5 rounded-full font-bold">
-                {itemCount}
-              </span>
+          <div className="min-w-0">
+            <h2 className="font-bold text-white text-lg flex items-center gap-2">
+              {activeTabId
+                ? <span className="text-green-400 truncate max-w-[140px]">
+                    {activeTab?.name ?? "Tab"}
+                  </span>
+                : "Basket"
+              }
+              {itemCount > 0 && (
+                <span className="text-sm bg-green-600/30 text-green-400 px-2 py-0.5 rounded-full font-bold shrink-0">
+                  {itemCount}
+                </span>
+              )}
+            </h2>
+            {activeTabId && (
+              <p className="text-[11px] text-gray-600 mt-0.5">Open tab</p>
             )}
-          </h2>
+          </div>
           <div className="flex items-center gap-2">
-            {basket.length > 0 && (
+            {!activeTabId && basket.length > 0 && (
               <button
                 onClick={() => setBasket([])}
                 className="text-xs text-gray-500 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-gray-800"
               >
                 Clear
+              </button>
+            )}
+            {activeTabId && !isLocked && (
+              <button
+                onClick={async () => {
+                  if (!confirm("Void this tab? All items will be discarded.")) return;
+                  await voidTabMut({ tabId: activeTabId, kioskId: kioskId ?? undefined });
+                  setActiveTabId(null);
+                }}
+                className="text-xs text-red-500 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-gray-800"
+              >
+                Void
               </button>
             )}
             <button onClick={() => setShowBasket(false)} className="lg:hidden text-gray-500 hover:text-white p-1">
@@ -706,11 +918,13 @@ function KioskPOS() {
 
         {/* Basket items */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-          {basket.length === 0 ? (
-            <p className="text-gray-600 text-sm text-center pt-10">Tap a product to add it</p>
+          {displayBasket.length === 0 ? (
+            <p className="text-gray-600 text-sm text-center pt-10">
+              {activeTabId ? "Tab is empty — tap a product" : "Tap a product to add it"}
+            </p>
           ) : (
-            basket.map(item => (
-              <div key={item.productId} className="flex items-center gap-3 bg-gray-800 rounded-xl px-4 py-3">
+            displayBasket.map((item, idx) => (
+              <div key={`${item.productId}-${idx}`} className="flex items-center gap-3 bg-gray-800 rounded-xl px-4 py-3">
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-white text-sm truncate">{item.productName}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{formatCurrency(item.unitPricePence, currency)} each</p>
@@ -729,6 +943,12 @@ function KioskPOS() {
                 <span className="text-white font-bold text-sm w-14 text-right shrink-0">
                   {formatCurrency(item.subtotalPence, currency)}
                 </span>
+                <button
+                  onClick={() => removeBasketItem(idx)}
+                  className="text-gray-600 hover:text-red-400 transition-colors ml-1"
+                >
+                  <X size={14} />
+                </button>
               </div>
             ))
           )}
@@ -743,7 +963,7 @@ function KioskPOS() {
 
           <button
             onClick={() => startCheckout("account")}
-            disabled={basket.length === 0}
+            disabled={displayBasket.length === 0}
             className="w-full py-4 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold text-white text-base transition-colors"
           >
             Charge to Account
@@ -752,14 +972,14 @@ function KioskPOS() {
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => startCheckout("cash")}
-              disabled={basket.length === 0}
+              disabled={displayBasket.length === 0}
               className="py-4 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold text-white transition-colors"
             >
               Cash
             </button>
             <button
               onClick={() => startCheckout("card")}
-              disabled={basket.length === 0}
+              disabled={displayBasket.length === 0}
               className="py-4 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold text-white transition-colors"
             >
               Card
@@ -794,7 +1014,7 @@ function KioskPOS() {
 
       {stage === "confirm" && (
         <ConfirmOverlay
-          method={paymentMethod}
+          method={paymentMethod as "cash" | "card" | "account"}
           total={total}
           currency={currency}
           member={selectedMember}
@@ -809,7 +1029,26 @@ function KioskPOS() {
           total={lastTotal}
           currency={currency}
           member={selectedMember}
+          tabName={lastTabName}
           onDismiss={() => { setStage("grid"); setSelectedMember(null); }}
+        />
+      )}
+
+      {/* ── New tab modal ───────────────────────────────────────────── */}
+      {showNewTabModal && club && (
+        <NewTabModal
+          onOpen={async (name) => {
+            const tabId = await openTabMut({
+              clubId:     club._id,
+              locationId: kioskData?.locationId,
+              shiftId:    openShift?._id,
+              name:       name.trim() || undefined,
+              kioskId:    kioskId ?? undefined,
+            });
+            setActiveTabId(tabId as Id<"posTabs">);
+            setShowNewTabModal(false);
+          }}
+          onClose={() => setShowNewTabModal(false)}
         />
       )}
     </div>
