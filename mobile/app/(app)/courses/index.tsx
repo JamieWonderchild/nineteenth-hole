@@ -55,11 +55,6 @@ function CourseRow({
           {[course.city, course.county].filter(Boolean).join(", ")}
         </Text>
       </View>
-      {course.par && (
-        <View className="bg-gray-100 rounded-full px-2 py-0.5 mr-2">
-          <Text className="text-xs text-gray-600 font-medium">Par {course.par}</Text>
-        </View>
-      )}
       <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
     </Pressable>
   );
