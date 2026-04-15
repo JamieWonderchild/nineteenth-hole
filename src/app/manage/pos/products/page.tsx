@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
-import { Plus, X, Pencil, ArrowLeft, Package, Tag } from "lucide-react";
+import { Plus, X, Pencil, ArrowLeft, Package, Tag, Upload, Download, AlertCircle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import Papa from "papaparse";
 
 type Category = { _id: Id<"posCategories">; name: string; icon?: string; sortOrder: number; locationId?: Id<"posLocations"> };
 type Location = { _id: Id<"posLocations">; name: string; isActive: boolean };
@@ -20,6 +21,359 @@ type Product = {
   trackStock?: boolean; stockCount?: number;
   isActive: boolean;
 };
+
+// ── CSV import types ──────────────────────────────────────────────────────────
+
+type ParsedRow = {
+  name: string;
+  pricePence: number;
+  category: string;
+  sku?: string;
+  trackStock: boolean;
+  stockCount?: number;
+  /** location column value from the CSV (overrides the modal-level picker) */
+  locationName?: string;
+  error?: string;
+};
+
+function downloadTemplate() {
+  const a = document.createElement("a");
+  a.href = "/products-template.csv";
+  a.download = "products-template.csv";
+  a.click();
+}
+
+function parseRow(raw: Record<string, string>, idx: number): ParsedRow {
+  const name = (raw["name"] ?? "").trim();
+  const priceStr = (raw["price"] ?? "").trim();
+  const category = (raw["category"] ?? "").trim();
+  const sku = (raw["sku"] ?? "").trim() || undefined;
+  const trackStockStr = (raw["trackstock"] ?? raw["trackStock"] ?? "true").trim().toLowerCase();
+  const stockCountStr = (raw["stockcount"] ?? raw["stockCount"] ?? "").trim();
+  // optional per-row location (lower-cased key after transformHeader)
+  const locationName = (raw["location"] ?? "").trim() || undefined;
+
+  if (!name) return { name: `Row ${idx + 1}`, pricePence: 0, category, sku, trackStock: false, locationName, error: "Name is required" };
+  const price = parseFloat(priceStr);
+  if (isNaN(price) || price < 0) return { name, pricePence: 0, category, sku, trackStock: false, locationName, error: "Invalid price" };
+
+  const trackStock = trackStockStr !== "false" && trackStockStr !== "0" && trackStockStr !== "no";
+  const stockCount = stockCountStr !== "" ? parseInt(stockCountStr, 10) : undefined;
+
+  return { name, pricePence: Math.round(price * 100), category, sku, trackStock, stockCount, locationName };
+}
+
+// ── Import modal ──────────────────────────────────────────────────────────────
+
+function ImportCSVModal({
+  clubId,
+  currency,
+  existingCategories,
+  locations,
+  onClose,
+}: {
+  clubId: Id<"clubs">;
+  currency: string;
+  existingCategories: Category[];
+  locations: Location[];
+  onClose: () => void;
+}) {
+  const saveProduct  = useMutation(api.pos.saveProduct);
+  const saveCategory = useMutation(api.pos.saveCategory);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [rows, setRows] = useState<ParsedRow[]>([]);
+  const [fileName, setFileName] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number } | null>(null);
+  // Modal-level location override — applies to all rows that don't specify their own location
+  const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+
+  const validRows = rows.filter(r => !r.error);
+  const errorRows = rows.filter(r => r.error);
+
+  // Build a name→id map for locations (case-insensitive)
+  const locByName = new Map<string, Id<"posLocations">>();
+  for (const l of locations) locByName.set(l.name.toLowerCase(), l._id);
+
+  function handleFile(file: File) {
+    setFileName(file.name);
+    setRows([]);
+    setImportResult(null);
+
+    Papa.parse<Record<string, string>>(file, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (h: string) => h.trim().toLowerCase().replace(/\s+/g, ""),
+      complete: (result) => {
+        const parsed = (result.data as Record<string, string>[]).map((raw, i) => parseRow(raw, i));
+        setRows(parsed);
+      },
+    });
+  }
+
+  /** Resolve the locationId for a row: per-row CSV value → modal picker → undefined */
+  function resolveLocationId(row: ParsedRow): Id<"posLocations"> | undefined {
+    if (row.locationName) {
+      return locByName.get(row.locationName.toLowerCase());
+    }
+    return selectedLocationId ? selectedLocationId as Id<"posLocations"> : undefined;
+  }
+
+  async function handleImport() {
+    if (validRows.length === 0) return;
+    setImporting(true);
+
+    // Build a local map of category name → id (seeded from existing)
+    const catMap = new Map<string, Id<"posCategories">>();
+    for (const c of existingCategories) catMap.set(c.name.toLowerCase(), c._id);
+
+    let imported = 0;
+    let skipped = 0;
+
+    try {
+      for (const row of validRows) {
+        // Upsert category if needed
+        let categoryId: Id<"posCategories"> | undefined;
+        if (row.category) {
+          const key = row.category.toLowerCase();
+          if (catMap.has(key)) {
+            categoryId = catMap.get(key);
+          } else {
+            const newCatId = await saveCategory({ clubId, name: row.category });
+            catMap.set(key, newCatId);
+            categoryId = newCatId;
+          }
+        }
+
+        try {
+          await saveProduct({
+            clubId,
+            name: row.name,
+            sku: row.sku,
+            pricePence: row.pricePence,
+            currency,
+            categoryId,
+            locationId: resolveLocationId(row),
+            trackStock: row.trackStock || undefined,
+            stockCount: row.stockCount,
+            isActive: true,
+          });
+          imported++;
+        } catch {
+          skipped++;
+        }
+      }
+    } finally {
+      setImporting(false);
+      setImportResult({ imported, skipped });
+    }
+  }
+
+  const activeLocations = locations.filter(l => l.isActive);
+  const hasCsvLocations = validRows.some(r => r.locationName);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="font-semibold text-gray-900">Import products from CSV</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Upload a spreadsheet to bulk-add products to your catalogue
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
+
+          {/* Template download */}
+          <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-gray-700">Download template</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Columns: <code className="font-mono bg-gray-100 px-1 rounded text-[11px]">name, price, category, sku, trackStock, stockCount, location</code>
+              </p>
+            </div>
+            <button
+              onClick={downloadTemplate}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-white transition-colors"
+            >
+              <Download size={14} /> Template
+            </button>
+          </div>
+
+          {/* Location picker */}
+          {activeLocations.length > 0 && !importResult && (
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Assign to location
+                </label>
+                <select
+                  value={selectedLocationId}
+                  onChange={e => setSelectedLocationId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="">All locations (no restriction)</option>
+                  {activeLocations.map(l => (
+                    <option key={l._id} value={l._id}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
+              {hasCsvLocations && (
+                <p className="text-[11px] text-blue-500 mt-5 flex items-start gap-1 max-w-[180px]">
+                  <AlertCircle size={11} className="mt-0.5 shrink-0" />
+                  Some rows have a location column — those will override this selection
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* File picker */}
+          {!importResult && (
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex flex-col items-center gap-2 border-2 border-dashed border-gray-200 rounded-xl py-8 hover:border-green-400 hover:bg-green-50/30 transition-colors"
+              >
+                <Upload size={22} className="text-gray-400" />
+                <span className="text-sm text-gray-500">
+                  {fileName ? fileName : "Click to select a CSV file"}
+                </span>
+                {fileName && (
+                  <span className="text-xs text-gray-400">Click to choose a different file</span>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Success / done state */}
+          {importResult && (
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <CheckCircle2 size={40} className="text-green-500" />
+              <div>
+                <p className="font-semibold text-gray-900 text-lg">{importResult.imported} product{importResult.imported !== 1 ? "s" : ""} imported</p>
+                {importResult.skipped > 0 && (
+                  <p className="text-sm text-gray-400 mt-1">{importResult.skipped} row{importResult.skipped !== 1 ? "s" : ""} skipped due to errors</p>
+                )}
+              </div>
+              <button
+                onClick={onClose}
+                className="mt-2 px-6 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-xl"
+              >
+                Done
+              </button>
+            </div>
+          )}
+
+          {/* Preview table */}
+          {rows.length > 0 && !importResult && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-700">
+                  Preview — {rows.length} row{rows.length !== 1 ? "s" : ""} found
+                </p>
+                {errorRows.length > 0 && (
+                  <p className="text-xs text-amber-600 flex items-center gap-1">
+                    <AlertCircle size={12} /> {errorRows.length} row{errorRows.length !== 1 ? "s" : ""} with errors will be skipped
+                  </p>
+                )}
+              </div>
+              <div className="border border-gray-100 rounded-xl overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 text-gray-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium">Name</th>
+                      <th className="px-3 py-2 text-left font-medium">Category</th>
+                      <th className="px-3 py-2 text-left font-medium">SKU</th>
+                      <th className="px-3 py-2 text-right font-medium">Price</th>
+                      <th className="px-3 py-2 text-center font-medium">Stock</th>
+                      <th className="px-3 py-2 text-left font-medium">Location</th>
+                      <th className="px-3 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, i) => {
+                      // Work out the display label for location
+                      const resolvedLocId = resolveLocationId(row);
+                      const locLabel = resolvedLocId
+                        ? locations.find(l => l._id === resolvedLocId)?.name
+                        : row.locationName ?? null;
+                      return (
+                        <tr key={i} className={`border-t border-gray-50 ${row.error ? "bg-red-50" : "bg-white"}`}>
+                          <td className="px-3 py-2 font-medium text-gray-900">{row.name}</td>
+                          <td className="px-3 py-2 text-gray-500">{row.category || <span className="text-gray-300">—</span>}</td>
+                          <td className="px-3 py-2 text-gray-400 font-mono">{row.sku || <span className="text-gray-300">—</span>}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-gray-900">
+                            {row.error ? "—" : formatCurrency(row.pricePence, currency)}
+                          </td>
+                          <td className="px-3 py-2 text-center text-gray-500">
+                            {row.trackStock && row.stockCount != null
+                              ? row.stockCount
+                              : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-3 py-2 text-gray-500">
+                            {locLabel
+                              ? <span className="px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-semibold">{locLabel}</span>
+                              : <span className="text-gray-300">All</span>}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            {row.error && (
+                              <span className="text-red-500 flex items-center gap-1 justify-end">
+                                <AlertCircle size={12} /> {row.error}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {rows.length > 0 && !importResult && (
+          <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100 shrink-0">
+            <p className="text-xs text-gray-400">
+              {validRows.length} of {rows.length} rows will be imported
+              {validRows.some(r => r.category) && " · new categories created automatically"}
+            </p>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Cancel</button>
+              <button
+                onClick={handleImport}
+                disabled={importing || validRows.length === 0}
+                className="px-5 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center gap-2"
+              >
+                {importing ? (
+                  <><span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" /> Importing…</>
+                ) : (
+                  `Import ${validRows.length} product${validRows.length !== 1 ? "s" : ""}`
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Category modal ────────────────────────────────────────────────────────────
 
 function CategoryModal({
   clubId, locations, category, onClose,
@@ -109,6 +463,8 @@ function CategoryModal({
     </div>
   );
 }
+
+// ── Product modal ─────────────────────────────────────────────────────────────
 
 function ProductModal({
   clubId, currency, categories, locations, product, onClose,
@@ -253,6 +609,8 @@ function ProductModal({
   );
 }
 
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 export default function POSProductsPage() {
   const { club } = useActiveClub();
 
@@ -264,6 +622,7 @@ export default function POSProductsPage() {
   const [editCat, setEditCat] = useState<Category | undefined>();
   const [showProductModal, setShowProductModal] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | undefined>();
+  const [showImportModal, setShowImportModal] = useState(false);
 
   if (!club || !categories || !products || !locations) {
     return (
@@ -298,6 +657,12 @@ export default function POSProductsPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50"
+          >
+            <Upload size={14} /> Import CSV
+          </button>
           <button onClick={() => { setEditCat(undefined); setShowCatModal(true); }}
             className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50">
             <Tag size={14} /> Category
@@ -331,7 +696,7 @@ export default function POSProductsPage() {
       {products.length === 0 ? (
         <div className="bg-white border border-dashed border-gray-200 rounded-xl p-12 text-center">
           <Package size={28} className="text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-400 text-sm">No products yet — add your first item</p>
+          <p className="text-gray-400 text-sm">No products yet — add your first item or import from CSV</p>
         </div>
       ) : (
         Object.entries(grouped).map(([catId, catProducts]) => {
@@ -384,6 +749,15 @@ export default function POSProductsPage() {
         })
       )}
 
+      {showImportModal && (
+        <ImportCSVModal
+          clubId={club._id}
+          currency={club.currency}
+          existingCategories={categories}
+          locations={locations}
+          onClose={() => setShowImportModal(false)}
+        />
+      )}
       {showCatModal && (
         <CategoryModal
           clubId={club._id}
