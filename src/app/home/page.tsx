@@ -4,7 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
 import Link from "next/link";
-import { Trophy, TrendingDown, TrendingUp, Minus, Flag, Users, ChevronRight, Smartphone } from "lucide-react";
+import { Trophy, TrendingDown, TrendingUp, Flag, Users, ChevronRight, Smartphone, Plus } from "lucide-react";
 
 function HandicapCard({ userId }: { userId: string }) {
   const profile = useQuery(api.golferProfiles.get, { userId });
@@ -211,10 +211,13 @@ export default function IndividualHomePage() {
                 <Flag size={16} className="text-green-700" />
                 Recent Rounds
               </h2>
-              <span className="text-xs text-gray-400 flex items-center gap-1">
-                <Smartphone size={12} />
-                Logged via mobile app
-              </span>
+              <Link
+                href="/rounds/new"
+                className="flex items-center gap-1 text-sm text-green-700 hover:text-green-800 font-medium"
+              >
+                <Plus size={14} />
+                Log a Round
+              </Link>
             </div>
             {rounds === undefined ? (
               <div className="space-y-2">
@@ -226,9 +229,12 @@ export default function IndividualHomePage() {
               <div className="text-center py-12 bg-white border border-dashed border-gray-200 rounded-xl">
                 <div className="text-4xl mb-3">⛳</div>
                 <p className="text-gray-500 mb-2">No rounds logged yet</p>
-                <p className="text-sm text-gray-400">
-                  Download the 19th Hole app to log your rounds and track your handicap
-                </p>
+                <Link
+                  href="/rounds/new"
+                  className="inline-block mt-2 text-sm text-white bg-green-700 hover:bg-green-600 px-4 py-2 rounded-lg font-medium"
+                >
+                  Log your first round →
+                </Link>
               </div>
             ) : (
               <div className="space-y-2">

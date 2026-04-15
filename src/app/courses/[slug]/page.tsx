@@ -325,7 +325,7 @@ export default function CourseDetailPage() {
       {/* Log a round CTA */}
       <div className="flex justify-start">
         <Button asChild className="bg-green-700 hover:bg-green-600 text-white">
-          <Link href="/home">
+          <Link href={`/rounds/new?courseId=${course._id}`}>
             <Flag size={15} className="mr-2" />
             Log a round here
           </Link>

@@ -60,11 +60,9 @@ function CourseCard({ course }: { course: GolfCourse }) {
       )}
 
       <div className="flex items-center gap-2 flex-wrap mt-auto pt-1">
-        {course.par && (
-          <span className="text-xs text-gray-600 font-medium">
-            Par {course.par} · {course.numberOfHoles} holes
-          </span>
-        )}
+        <span className="text-xs text-gray-600 font-medium">
+          {course.numberOfHoles} holes
+        </span>
         {course.courseType && course.courseType !== "other" && (
           <Badge variant="secondary" className="text-xs capitalize px-2 py-0.5">
             {course.courseType}

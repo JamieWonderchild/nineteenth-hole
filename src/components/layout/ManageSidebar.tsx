@@ -161,6 +161,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
 
         {!superAdmin && (
           <>
+            <NavItem href="/rounds/new" icon={<Flag size={16} />} label="Log a Round" active={pathname.startsWith("/rounds")} onClick={onNav} />
             <NavItem href="/pools" icon={<Trophy size={16} />} label="Tour Pools" active={pathname.startsWith("/pools")} onClick={onNav} />
             <NavItem href="/games" icon={<Zap size={16} />} label="My Games" active={pathname.startsWith("/games")} onClick={onNav} />
             <NavItem href="/courses" icon={<Map size={16} />} label="Golf Courses" active={pathname.startsWith("/courses")} onClick={onNav} />
