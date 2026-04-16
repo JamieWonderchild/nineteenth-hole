@@ -193,7 +193,7 @@ export const submitOwnScore = mutation({
     let stablefordPoints = args.stablefordPoints;
     if (!stablefordPoints && args.holeScores && args.holeScores.length > 0) {
       stablefordPoints = args.holeScores.reduce((total, h) => {
-        const strokesReceived = Math.floor((handicap * h.strokeIndex) / 18);
+        const strokesReceived = Math.floor(handicap / 18) + (h.strokeIndex <= (handicap % 18) ? 1 : 0);
         const pts = Math.max(0, 2 + h.par - h.score + strokesReceived);
         return total + pts;
       }, 0);

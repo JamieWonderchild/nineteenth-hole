@@ -17,13 +17,15 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
-  SafeAreaView,
+  Platform,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAction, useQuery } from "convex/react";
 import { api } from "../lib/convex";
@@ -57,7 +59,7 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   onSelect: (selection: CourseSelection) => void;
-  /** Default country filter — defaults to "GB" */
+  /** Default country filter — defaults to "ENG" */
   country?: string;
 }
 
@@ -94,7 +96,7 @@ function TeeCircle({ colour }: { colour: string }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function CoursePickerSheet({ visible, onClose, onSelect, country = "GB" }: Props) {
+export function CoursePickerSheet({ visible, onClose, onSelect, country = "ENG" }: Props) {
   const [rawQuery, setRawQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
@@ -165,7 +167,11 @@ export function CoursePickerSheet({ visible, onClose, onSelect, country = "GB" }
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView className="flex-1 bg-white">
+      <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
         {/* Header */}
         <View className="flex-row items-center px-4 py-3 border-b border-gray-100">
           <TouchableOpacity
@@ -203,7 +209,6 @@ export function CoursePickerSheet({ visible, onClose, onSelect, country = "GB" }
                   placeholderTextColor="#9ca3af"
                   value={rawQuery}
                   onChangeText={setRawQuery}
-                  autoFocus
                   autoCorrect={false}
                   returnKeyType="search"
                 />
@@ -370,6 +375,7 @@ export function CoursePickerSheet({ visible, onClose, onSelect, country = "GB" }
             )}
           </View>
         )}
+      </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   );

@@ -46,6 +46,7 @@ import type * as seedMasters2026 from "../seedMasters2026.js";
 import type * as series from "../series.js";
 import type * as squadMembers from "../squadMembers.js";
 import type * as teeTimes from "../teeTimes.js";
+import type * as trips from "../trips.js";
 import type * as visitors from "../visitors.js";
 import type * as wallet from "../wallet.js";
 import type * as webhookEvents from "../webhookEvents.js";
@@ -95,6 +96,7 @@ declare const fullApi: ApiFromModules<{
   series: typeof series;
   squadMembers: typeof squadMembers;
   teeTimes: typeof teeTimes;
+  trips: typeof trips;
   visitors: typeof visitors;
   wallet: typeof wallet;
   webhookEvents: typeof webhookEvents;

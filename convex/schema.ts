@@ -1121,4 +1121,44 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_token", ["token"]),
+
+  // ============================================================================
+  // Golf Trips
+  // ============================================================================
+
+  golfTrips: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    startDate: v.string(),        // "YYYY-MM-DD"
+    endDate: v.string(),          // "YYYY-MM-DD"
+    createdBy: v.string(),        // userId
+    status: v.string(),           // "planning" | "confirmed" | "completed"
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_creator", ["createdBy"]),
+
+  golfTripDays: defineTable({
+    tripId: v.id("golfTrips"),
+    date: v.string(),             // "YYYY-MM-DD"
+    golfCourseId: v.optional(v.id("golfCourses")),
+    courseNameFreetext: v.optional(v.string()),
+    format: v.string(),           // "stableford" | "strokeplay" | "matchplay" | "scramble" | "fourball" | "rest"
+    notes: v.optional(v.string()),
+  })
+    .index("by_trip", ["tripId"])
+    .index("by_trip_and_date", ["tripId", "date"]),
+
+  golfTripMembers: defineTable({
+    tripId: v.id("golfTrips"),
+    userId: v.string(),
+    displayName: v.string(),
+    status: v.string(),           // "organiser" | "invited" | "accepted" | "declined"
+    invitedBy: v.string(),
+    invitedAt: v.string(),
+    respondedAt: v.optional(v.string()),
+  })
+    .index("by_trip", ["tripId"])
+    .index("by_user", ["userId"])
+    .index("by_trip_and_user", ["tripId", "userId"]),
 });

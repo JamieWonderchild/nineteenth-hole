@@ -67,16 +67,11 @@ function computeStableford(
   playingHandicap: number,
   strokeIndexes: number[] = STANDARD_SI
 ): number {
-  // Distribute shots across holes by SI
-  const extraShots = new Array(18).fill(0);
-  for (let i = 0; i < playingHandicap && i < 18; i++) {
-    const holeIdx = strokeIndexes.indexOf(i + 1);
-    if (holeIdx >= 0) extraShots[holeIdx] = 1;
-  }
   let total = 0;
   for (let i = 0; i < 18; i++) {
-    const npar = pars[i] + (extraShots[i] ?? 0);
-    const diff = npar - holeScores[i];
+    const si = strokeIndexes[i];
+    const shots = Math.floor(playingHandicap / 18) + (si <= (playingHandicap % 18) ? 1 : 0);
+    const diff = (pars[i] + shots) - holeScores[i];
     total += Math.max(0, diff + 2);
   }
   return total;
@@ -376,7 +371,7 @@ function Step1Course({ onNext, initialCourseId }: {
                 >
                   <Ionicons name="search-outline" size={20} color="#9ca3af" />
                   <View className="flex-1">
-                    <Text className="text-sm text-gray-500">Search course database</Text>
+                    <Text className="text-sm text-gray-500">Search for a course</Text>
                     <Text className="text-xs text-gray-400 mt-0.5">
                       2,000+ UK courses with ratings
                     </Text>
@@ -500,7 +495,12 @@ function Step2Format({
   onNext: (data: { format: Format; entryMode: EntryMode; date: string }) => void;
 }) {
   const [format, setFormat] = useState<Format>("stableford");
-  const [entryMode, setEntryMode] = useState<EntryMode>("quick");
+  const [entryMode, setEntryMode] = useState<EntryMode>("full");
+
+  function handleFormatChange(f: Format) {
+    setFormat(f);
+    if (f === "stableford") setEntryMode("full");
+  }
   const today = new Date();
   const weekDates = getThisWeekDates();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
@@ -517,7 +517,7 @@ function Step2Format({
             {(["strokeplay", "stableford"] as Format[]).map((f) => (
               <TouchableOpacity
                 key={f}
-                onPress={() => setFormat(f)}
+                onPress={() => handleFormatChange(f)}
                 className={`flex-1 py-3 rounded-xl items-center border-2 ${
                   format === f
                     ? "border-green-500 bg-green-50"
@@ -541,10 +541,13 @@ function Step2Format({
           <Text className="text-sm font-medium text-gray-700">Entry type</Text>
           <View className="flex-row gap-2">
             <TouchableOpacity
-              onPress={() => setEntryMode("quick")}
+              onPress={() => format === "strokeplay" && setEntryMode("quick")}
+              disabled={format === "stableford"}
               className={`flex-1 py-3 px-2 rounded-xl items-center border-2 ${
                 entryMode === "quick"
                   ? "border-green-500 bg-green-50"
+                  : format === "stableford"
+                  ? "border-gray-100 bg-gray-50 opacity-40"
                   : "border-gray-200 bg-white"
               }`}
             >
@@ -561,7 +564,7 @@ function Step2Format({
                 Quick entry
               </Text>
               <Text className="text-xs text-gray-400 text-center mt-0.5">
-                Total score only
+                {format === "stableford" ? "Strokeplay only" : "Total score only"}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
