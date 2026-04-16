@@ -161,7 +161,7 @@ export function CoursePickerSheet({ visible, onClose, onSelect, country = "ENG" 
       slopeRating: tee.slopeRating,
       par: tee.par,
       totalYards: tee.totalYards,
-      holes: tee.holes ?? [],
+      holes: courseWithTees.clubCourseHoles ?? tee.holes ?? [],
     });
   }
 

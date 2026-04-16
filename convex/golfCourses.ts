@@ -46,7 +46,19 @@ export const getWithTees = query({
       .query("courseTees")
       .withIndex("by_course", q => q.eq("courseId", courseId))
       .collect();
-    return { ...course, tees };
+
+    // If a club has manually entered a Course Card linked to this global entry,
+    // use those holes (correct per-hole par + SI) in preference to the API data.
+    const clubCourse = await ctx.db
+      .query("courses")
+      .withIndex("by_golf_course", q => q.eq("golfCourseId", courseId))
+      .first();
+
+    return {
+      ...course,
+      tees,
+      clubCourseHoles: clubCourse?.holes ?? null,
+    };
   },
 });
 
