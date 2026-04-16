@@ -151,7 +151,7 @@ export default function CourseDetailPage() {
 
   if (data === undefined) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-8 space-y-4">
+      <div className="px-6 py-8 space-y-4">
         <div className="h-52 rounded-2xl bg-gray-200 animate-pulse" />
         <div className="h-48 rounded-xl bg-gray-100 animate-pulse" />
         <div className="h-32 rounded-xl bg-gray-100 animate-pulse" />
@@ -161,7 +161,7 @@ export default function CourseDetailPage() {
 
   if (data === null) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-20 text-center">
+      <div className="px-6 py-20 text-center">
         <p className="text-gray-500 font-medium">Course not found</p>
         <Link href="/courses" className="text-sm text-green-700 hover:underline mt-2 inline-block">
           ← Back to courses
@@ -186,7 +186,7 @@ export default function CourseDetailPage() {
     : course.par;
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+    <div className="px-6 py-8 space-y-6">
       {/* Breadcrumb */}
       <Link href="/courses" className="text-sm text-green-700 hover:underline inline-flex items-center gap-1">
         ← Golf Courses

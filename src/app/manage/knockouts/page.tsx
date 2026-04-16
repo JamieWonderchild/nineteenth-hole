@@ -25,7 +25,7 @@ export default function KnockoutsPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+    <div className="px-6 py-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Knockouts</h1>

@@ -142,7 +142,7 @@ export default function NewCompetitionPage() {
 
   if (!adminMembership) {
     return (
-      <div className="max-w-lg mx-auto px-6 py-16 text-center">
+      <div className="px-6 py-16 text-center">
         <p className="text-muted-foreground">You need to be a club admin to create competitions.</p>
       </div>
     );
@@ -207,7 +207,7 @@ export default function NewCompetitionPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-2xl mx-auto px-6 py-8">
+    <div className="px-6 py-8">
 
       {/* Back + title */}
       <div className="flex items-center gap-3 mb-8">

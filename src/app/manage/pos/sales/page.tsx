@@ -43,7 +43,7 @@ export default function POSSalesPage() {
   const currency = club.currency;
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+    <div className="px-6 py-8 space-y-6">
       <div className="flex items-center gap-3">
         <Link href="/manage/pos" className="text-gray-400 hover:text-gray-600">
           <ArrowLeft size={20} />

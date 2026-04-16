@@ -578,7 +578,7 @@ export default function GamesPage() {
   const completed = games?.filter(g => g.status === "complete") ?? [];
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+    <div className="px-6 py-8 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2.5">
           <Zap size={22} className="text-amber-500" />

@@ -93,7 +93,7 @@ export default function CoursesPage() {
   const hasQuery = debouncedQuery.length >= 2;
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+    <div className="px-6 py-8 space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Golf Courses</h1>

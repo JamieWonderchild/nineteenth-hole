@@ -308,7 +308,7 @@ export default function CompetitionManagePage({
   const nextStatus = statusFlow[currentStep + 1];
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+    <div className="px-6 py-8 space-y-6">
       {/* Header */}
       <div className="flex items-start gap-3">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="shrink-0 mt-0.5">

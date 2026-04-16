@@ -74,7 +74,7 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-green-900 text-white px-4 sm:px-6 py-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <div>
             <div className="text-xs text-green-400 mb-0.5">⛳ {club.name}</div>
             <h1 className="font-bold text-xl">{competition.name}</h1>
@@ -88,7 +88,7 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <div className="px-4 sm:px-6 py-6 space-y-6">
         {/* Pot + prize breakdown */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">

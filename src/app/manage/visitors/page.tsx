@@ -154,7 +154,7 @@ export default function VisitorsPage() {
   const unpaidCount = filtered.filter(v => !v.paidAt && v.greenFee).length;
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+    <div className="px-6 py-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Visitors</h1>

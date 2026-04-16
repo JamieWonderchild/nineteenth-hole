@@ -518,7 +518,7 @@ export default function LeaguePage({ params }: { params: Promise<{ leagueId: str
   const ownTeam = activeMembership ? teams.find(t => t.clubId === activeMembership.clubId) : undefined;
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+    <div className="px-6 py-8 space-y-6">
       <div className="flex items-center gap-3">
         <Link href="/manage/interclub" className="text-gray-400 hover:text-gray-600"><ArrowLeft size={20} /></Link>
         <div className="flex-1">

@@ -825,7 +825,7 @@ export default function ShiftsPage() {
   const currency = club.currency ?? "GBP";
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
+    <div className="p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>

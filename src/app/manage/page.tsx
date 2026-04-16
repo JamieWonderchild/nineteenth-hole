@@ -219,7 +219,7 @@ function GolferDashboard({
   const hasProfile = profile && (profile.handicapIndex != null || profile.homeClub);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+    <div className="px-4 sm:px-6 py-8 space-y-6">
 
       {/* Hero — handicap + greeting */}
       <div className="bg-gradient-to-br from-green-800 to-green-950 rounded-2xl px-6 py-7 flex items-center justify-between gap-4">
@@ -432,7 +432,7 @@ function AdminDashboard({
   const activeComps = competitions.filter(c => c.status !== "complete" && c.status !== "draft");
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+    <div className="px-6 py-8 space-y-8">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -617,7 +617,7 @@ function MemberDashboard({
   const myPosition = sortedMembers.findIndex(m => "userId" in m ? (m as any).userId === userId : false) + 1;
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+    <div className="px-6 py-8 space-y-8">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>

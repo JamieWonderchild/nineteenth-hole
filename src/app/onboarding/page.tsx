@@ -106,7 +106,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-6 py-10">
+    <div className="px-6 py-10">
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-1">
           <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step === "search" ? "bg-green-600 text-white" : "bg-green-100 text-green-700"}`}>

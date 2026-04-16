@@ -111,7 +111,7 @@ export default function NewPlatformPoolPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-8">
+    <div className="px-6 py-8">
       <div className="flex items-center gap-3 mb-8">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft size={18} />

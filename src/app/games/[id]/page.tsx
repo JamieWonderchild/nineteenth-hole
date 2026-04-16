@@ -332,7 +332,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
 
   if (game.status === "complete" && game.result) {
     return (
-      <div className="space-y-6 max-w-3xl mx-auto px-4 py-6">
+      <div className="space-y-6 px-4 py-6">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.push("/games")}>
             <ArrowLeft size={18} />
@@ -441,7 +441,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
 
   // ── Active game ────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6 max-w-3xl mx-auto px-4 py-6">
+    <div className="space-y-6 px-4 py-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => router.push("/games")}>
           <ArrowLeft size={18} />

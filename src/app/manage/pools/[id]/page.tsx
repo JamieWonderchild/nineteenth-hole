@@ -51,7 +51,7 @@ export default function ManagePoolPage({ params }: { params: Promise<{ id: strin
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+    <div className="px-6 py-8 space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft size={18} />

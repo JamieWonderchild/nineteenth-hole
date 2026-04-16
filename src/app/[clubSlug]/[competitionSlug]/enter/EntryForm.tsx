@@ -228,7 +228,7 @@ export function EntryForm({ clubSlug, competitionSlug }: Props) {
     <div className="min-h-screen bg-gray-50 pb-32">
       {/* Header */}
       <div className="bg-green-900 text-white px-4 py-5">
-        <div className="max-w-2xl mx-auto">
+        <div className="">
           <div className="text-xs text-green-400 mb-0.5">⛳ {club.name}</div>
           <h1 className="font-bold text-xl">{competition.name}</h1>
           <p className="text-green-300 text-sm mt-1">
@@ -237,7 +237,7 @@ export function EntryForm({ clubSlug, competitionSlug }: Props) {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <div className="px-4 py-6 space-y-6">
         {/* Progress */}
         <div className="flex gap-4">
           <div className={cn("flex-1 rounded-xl p-4 text-center border", picksComplete ? "bg-green-50 border-green-300" : "bg-white border-gray-200")}>
@@ -361,7 +361,7 @@ export function EntryForm({ clubSlug, competitionSlug }: Props) {
 
       {/* Sticky footer CTA */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 safe-area-inset-bottom">
-        <div className="max-w-2xl mx-auto">
+        <div className="">
           {!user ? (
             <SignInButton mode="modal">
               <button className="w-full px-5 py-3.5 bg-green-700 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors">

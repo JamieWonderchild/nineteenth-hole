@@ -86,7 +86,7 @@ export default function PoolPage({ params }: { params: Promise<{ slug: string }>
   const totalWithFee = pool.entryFee + Math.round(pool.entryFee * 0.1);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+    <div className="px-4 sm:px-6 py-8 space-y-6">
       {/* Header */}
       <div>
         <Link href="/pools" className="text-sm text-gray-500 hover:text-gray-700 mb-3 block">← Tour Pools</Link>

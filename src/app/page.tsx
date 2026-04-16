@@ -9,7 +9,7 @@ export default async function LandingPage() {
   return (
     <main className="min-h-screen bg-[#0a1f10] text-white">
       {/* Nav */}
-      <nav className="flex items-center justify-between px-8 py-5 max-w-6xl mx-auto">
+      <nav className="flex items-center justify-between px-8 py-5">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-md bg-green-500 flex items-center justify-center text-sm font-black text-white">
             19
@@ -30,7 +30,7 @@ export default async function LandingPage() {
       </nav>
 
       {/* Hero */}
-      <section className="max-w-6xl mx-auto px-8 pt-16 pb-20 text-center">
+      <section className="px-8 pt-16 pb-20 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-900/60 border border-green-700/50 text-green-300 text-xs font-medium mb-8">
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
           Live at Finchley Golf Club
@@ -39,7 +39,7 @@ export default async function LandingPage() {
           One platform for<br />
           <span className="text-green-400">every part of your club.</span>
         </h1>
-        <p className="text-xl text-green-200 max-w-2xl mx-auto leading-relaxed mb-10">
+        <p className="text-xl text-green-200 leading-relaxed mb-10">
           Competitions, interclub, tee times, bar POS, member communications — all connected, all real-time, at a fraction of what Intelligentgolf charges.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -59,7 +59,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Feature showcase */}
-      <section className="max-w-6xl mx-auto px-8 pb-20">
+      <section className="px-8 pb-20">
         <p className="text-center text-xs font-bold uppercase tracking-widest text-green-600 mb-10">Everything your club needs</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
@@ -122,7 +122,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Two audiences */}
-      <section className="max-w-6xl mx-auto px-8 pb-20">
+      <section className="px-8 pb-20">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
           {/* For Clubs */}
@@ -201,7 +201,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Competitor comparison callout */}
-      <section className="max-w-6xl mx-auto px-8 pb-20">
+      <section className="px-8 pb-20">
         <div className="rounded-2xl bg-[#0c1a0e] border border-green-900/60 p-8 sm:p-10">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 items-center">
             <div>
@@ -240,7 +240,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Social proof */}
-      <section className="max-w-6xl mx-auto px-8 pb-20">
+      <section className="px-8 pb-20">
         <div className="rounded-2xl bg-green-950/80 border border-green-800/40 px-8 py-10 flex flex-col sm:flex-row items-center justify-between gap-8">
           <div>
             <p className="text-green-400 text-xs font-bold uppercase tracking-widest mb-2">Live today</p>
@@ -264,7 +264,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-green-900/50 px-8 py-6 max-w-6xl mx-auto flex items-center justify-between text-green-700 text-xs">
+      <footer className="border-t border-green-900/50 px-8 py-6 flex items-center justify-between text-green-700 text-xs">
         <span>© 2026 The 19th Hole</span>
         <div className="flex gap-6">
           <Link href="/privacy" className="hover:text-green-400 transition-colors">Privacy</Link>

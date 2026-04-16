@@ -548,7 +548,7 @@ export default function CompetitionScoresPage({
   const hasRealScores = leaderboard.some(s => s.grossScore != null || s.netScore != null);
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+    <div className="px-6 py-8 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link href={`/manage/competitions/${competitionId}`} className="text-gray-400 hover:text-gray-600">

@@ -513,7 +513,7 @@ export default function CoursesPage() {
 
   if (!isAdmin) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-8">
+      <div className="px-6 py-8">
         <p className="text-gray-500">Admins only.</p>
       </div>
     );
@@ -522,7 +522,7 @@ export default function CoursesPage() {
   const editingCourse = courses?.find(c => c._id === editing);
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+    <div className="px-6 py-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2.5">
