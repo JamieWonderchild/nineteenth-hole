@@ -924,31 +924,31 @@ function KioskPOS() {
             </p>
           ) : (
             displayBasket.map((item, idx) => (
-              <div key={`${item.productId}-${idx}`} className="flex items-center gap-3 bg-gray-800 rounded-xl px-4 py-3">
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-white text-sm truncate">{item.productName}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{formatCurrency(item.unitPricePence, currency)} each</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
+              <div key={`${item.productId}-${idx}`} className="flex flex-col gap-1 bg-gray-800 rounded-xl px-4 py-3">
+                <p className="font-semibold text-white text-sm leading-snug">{item.productName}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-gray-500 flex-1">{formatCurrency(item.unitPricePence, currency)} each</p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => changeQty(item.productId, -1)}
+                      className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 flex items-center justify-center text-white font-bold transition-colors text-lg"
+                    >−</button>
+                    <span className="text-white font-bold w-5 text-center">{item.quantity}</span>
+                    <button
+                      onClick={() => changeQty(item.productId, 1)}
+                      className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 flex items-center justify-center text-white font-bold transition-colors text-lg"
+                    >+</button>
+                  </div>
+                  <span className="text-white font-bold text-sm w-14 text-right shrink-0">
+                    {formatCurrency(item.subtotalPence, currency)}
+                  </span>
                   <button
-                    onClick={() => changeQty(item.productId, -1)}
-                    className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 flex items-center justify-center text-white font-bold transition-colors text-lg"
-                  >−</button>
-                  <span className="text-white font-bold w-5 text-center">{item.quantity}</span>
-                  <button
-                    onClick={() => changeQty(item.productId, 1)}
-                    className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 flex items-center justify-center text-white font-bold transition-colors text-lg"
-                  >+</button>
+                    onClick={() => removeBasketItem(idx)}
+                    className="text-gray-600 hover:text-red-400 transition-colors ml-1"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
-                <span className="text-white font-bold text-sm w-14 text-right shrink-0">
-                  {formatCurrency(item.subtotalPence, currency)}
-                </span>
-                <button
-                  onClick={() => removeBasketItem(idx)}
-                  className="text-gray-600 hover:text-red-400 transition-colors ml-1"
-                >
-                  <X size={14} />
-                </button>
               </div>
             ))
           )}

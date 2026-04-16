@@ -984,32 +984,32 @@ export default function POSPage() {
           ) : (
             <div className="divide-y divide-gray-50">
               {displayBasket.map((item, idx) => (
-                <div key={`${item.productId}-${idx}`} className="flex items-center gap-2 px-4 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{item.productName}</p>
-                    <p className="text-xs text-gray-400">{formatCurrency(item.unitPricePence, currency)} each</p>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => changeQty(item.productId, -1)}
-                      className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-500 active:scale-90 transition-all"
-                    >
-                      <Minus size={12} />
+                <div key={`${item.productId}-${idx}`} className="flex flex-col gap-1 px-4 py-3">
+                  <p className="text-sm font-medium text-gray-900 leading-snug">{item.productName}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-gray-400 flex-1">{formatCurrency(item.unitPricePence, currency)} each</p>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => changeQty(item.productId, -1)}
+                        className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-500 active:scale-90 transition-all"
+                      >
+                        <Minus size={12} />
+                      </button>
+                      <span className="text-sm font-bold text-gray-900 w-6 text-center">{item.quantity}</span>
+                      <button
+                        onClick={() => changeQty(item.productId, 1)}
+                        className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-green-50 hover:text-green-600 active:scale-90 transition-all"
+                      >
+                        <Plus size={12} />
+                      </button>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900 w-14 text-right shrink-0">
+                      {formatCurrency(item.subtotalPence, currency)}
+                    </span>
+                    <button onClick={() => removeItem(idx)} className="text-gray-200 hover:text-red-400 transition-colors ml-1">
+                      <X size={13} />
                     </button>
-                    <span className="text-sm font-bold text-gray-900 w-6 text-center">{item.quantity}</span>
-                    <button
-                      onClick={() => changeQty(item.productId, 1)}
-                      className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-green-50 hover:text-green-600 active:scale-90 transition-all"
-                    >
-                      <Plus size={12} />
-                    </button>
                   </div>
-                  <span className="text-sm font-bold text-gray-900 w-14 text-right shrink-0">
-                    {formatCurrency(item.subtotalPence, currency)}
-                  </span>
-                  <button onClick={() => removeItem(idx)} className="text-gray-200 hover:text-red-400 transition-colors ml-1">
-                    <X size={13} />
-                  </button>
                 </div>
               ))}
             </div>
