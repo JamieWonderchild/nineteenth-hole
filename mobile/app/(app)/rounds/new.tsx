@@ -512,7 +512,7 @@ function Step2Format({
             {(["strokeplay", "stableford"] as Format[]).map((f) => (
               <TouchableOpacity
                 key={f}
-                onPress={() => handleFormatChange(f)}
+                onPress={() => setFormat(f)}
                 className={`flex-1 py-3 rounded-xl items-center border-2 ${
                   format === f
                     ? "border-green-500 bg-green-50"
