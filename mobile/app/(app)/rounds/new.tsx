@@ -495,12 +495,7 @@ function Step2Format({
   onNext: (data: { format: Format; entryMode: EntryMode; date: string }) => void;
 }) {
   const [format, setFormat] = useState<Format>("stableford");
-  const [entryMode, setEntryMode] = useState<EntryMode>("full");
-
-  function handleFormatChange(f: Format) {
-    setFormat(f);
-    if (f === "stableford") setEntryMode("full");
-  }
+  const [entryMode, setEntryMode] = useState<EntryMode>("hole_by_hole");
   const today = new Date();
   const weekDates = getThisWeekDates();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
@@ -539,25 +534,18 @@ function Step2Format({
         {/* Entry mode toggle */}
         <View className="gap-2">
           <Text className="text-sm font-medium text-gray-700">Entry type</Text>
-          <View className="flex-row gap-2">
+          <View className="flex-row gap-3">
             <TouchableOpacity
-              onPress={() => format === "strokeplay" && setEntryMode("quick")}
-              disabled={format === "stableford"}
+              onPress={() => setEntryMode("hole_by_hole")}
               className={`flex-1 py-3 px-2 rounded-xl items-center border-2 ${
-                entryMode === "quick"
-                  ? "border-green-500 bg-green-50"
-                  : format === "stableford"
-                  ? "border-gray-100 bg-gray-50 opacity-40"
-                  : "border-gray-200 bg-white"
+                entryMode === "hole_by_hole" ? "border-green-500 bg-green-50" : "border-gray-200 bg-white"
               }`}
             >
-              <Ionicons name="flash-outline" size={20} color={entryMode === "quick" ? "#16a34a" : "#9ca3af"} />
-              <Text className={`text-xs font-semibold mt-1 ${entryMode === "quick" ? "text-green-700" : "text-gray-500"}`}>
-                Quick
+              <Ionicons name="golf-outline" size={20} color={entryMode === "hole_by_hole" ? "#16a34a" : "#9ca3af"} />
+              <Text className={`text-xs font-semibold mt-1 ${entryMode === "hole_by_hole" ? "text-green-700" : "text-gray-500"}`}>
+                Hole by hole
               </Text>
-              <Text className="text-xs text-gray-400 text-center mt-0.5">
-                {format === "stableford" ? "Strokeplay only" : "Total only"}
-              </Text>
+              <Text className="text-xs text-gray-400 text-center mt-0.5">One at a time</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setEntryMode("full")}
@@ -570,18 +558,6 @@ function Step2Format({
                 Scorecard
               </Text>
               <Text className="text-xs text-gray-400 text-center mt-0.5">All 18 at once</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setEntryMode("hole_by_hole")}
-              className={`flex-1 py-3 px-2 rounded-xl items-center border-2 ${
-                entryMode === "hole_by_hole" ? "border-green-500 bg-green-50" : "border-gray-200 bg-white"
-              }`}
-            >
-              <Ionicons name="golf-outline" size={20} color={entryMode === "hole_by_hole" ? "#16a34a" : "#9ca3af"} />
-              <Text className={`text-xs font-semibold mt-1 ${entryMode === "hole_by_hole" ? "text-green-700" : "text-gray-500"}`}>
-                Hole by hole
-              </Text>
-              <Text className="text-xs text-gray-400 text-center mt-0.5">One at a time</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -821,9 +797,7 @@ function Step3HoleByHole({
   // Running totals for entered holes so far
   const enteredTotal = scores.slice(0, currentHole + 1).reduce<number>((a, s) => a + (s ?? 0), 0);
   const filledSoFar = scores.map((s, i) => s ?? pars[i]);
-  const stablefordSoFar = format === "stableford"
-    ? computeStableford(filledSoFar, pars, playingHandicap, strokeIndexes)
-    : null;
+  const stablefordSoFar = computeStableford(filledSoFar, pars, playingHandicap, strokeIndexes);
 
   const diff = score !== null ? score - par : null;
   const diffLabel = diff === null ? "" : diff === -2 ? "Eagle" : diff === -1 ? "Birdie" : diff === 0 ? "Par" : diff === 1 ? "Bogey" : diff === 2 ? "Double" : `+${diff}`;
@@ -832,9 +806,7 @@ function Step3HoleByHole({
   if (showExtras) {
     const filledScores = scores.map((s, i) => s ?? pars[i]);
     const total = filledScores.reduce((a, b) => a + b, 0);
-    const stablefordFinal = format === "stableford"
-      ? computeStableford(filledScores, pars, playingHandicap, strokeIndexes)
-      : null;
+    const stablefordFinal = computeStableford(filledScores, pars, playingHandicap, strokeIndexes);
     return (
       <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
         <View className="px-4 pt-4 gap-5">
@@ -1009,10 +981,7 @@ function Step3Scorecard({
   const enteredCount = scores.filter(s => s !== null).length;
   const total = scores.reduce<number>((a, s) => a + (s ?? 0), 0);
   const playingHandicap = Math.round(handicap ?? 0);
-  const stablefordTotal =
-    format === "stableford"
-      ? computeStableford(filledScores, pars, playingHandicap, strokeIndexes)
-      : null;
+  const stablefordTotal = computeStableford(filledScores, pars, playingHandicap, strokeIndexes);
 
   const allEntered = scores.every((s) => s !== null);
 
@@ -1505,14 +1474,6 @@ export default function NewRoundScreen() {
         <StepIndicator current={step} total={totalSteps} />
         {step === 1 && <Step1Course onNext={handleStep1} initialCourseId={courseId} />}
         {step === 2 && <Step2Format onNext={handleStep2} />}
-        {step === 3 && step2Data?.entryMode === "quick" && (
-          <Step3Quick
-            format={step2Data.format}
-            handicap={handicap ?? null}
-            coursePar={step1Data?.par ?? 72}
-            onNext={handleStep3}
-          />
-        )}
         {step === 3 && step2Data?.entryMode === "full" && (
           <Step3Scorecard
             format={step2Data.format}
