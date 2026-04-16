@@ -6,7 +6,7 @@ import { api } from "convex/_generated/api";
 import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import {
-  MapPin, Monitor, Plus, Trash2, Pencil, X, Eye, EyeOff,
+  MapPin, Monitor, Terminal, Wifi, Plus, Trash2, Pencil, X, Eye, EyeOff,
   GripVertical, Copy, Check, ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
@@ -141,6 +141,19 @@ function DraggableLocations({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+type TerminalRow = {
+  _id: Id<"posTerminals">;
+  name: string;
+  provider: string;
+  terminalId: string;
+  isActive: boolean;
+};
+
+const PROVIDERS = [
+  { value: "dojo",   label: "Dojo"   },
+  { value: "square", label: "Square" },
+];
+
 export default function LocationsPage() {
   const { club } = useActiveClub();
 
@@ -152,11 +165,17 @@ export default function LocationsPage() {
     api.posLocations.listKiosks,
     club ? { clubId: club._id } : "skip"
   );
+  const terminals = useQuery(
+    api.posTerminals.listByClub,
+    club ? { clubId: club._id } : "skip"
+  );
 
   const saveLocation   = useMutation(api.posLocations.saveLocation);
   const removeLocation = useMutation(api.posLocations.removeLocation);
   const saveKiosk      = useMutation(api.posLocations.saveKiosk);
   const removeKiosk    = useMutation(api.posLocations.removeKiosk);
+  const saveTerminal   = useMutation(api.posTerminals.save);
+  const removeTerminal = useMutation(api.posTerminals.remove);
 
   // ── Location form state ────────────────────────────────────────────────────
   const [editingLoc, setEditingLoc] = useState<LocationRow | null>(null);
@@ -177,6 +196,14 @@ export default function LocationsPage() {
   const [showPin, setShowPin] = useState(false);
   const [savingKiosk, setSavingKiosk] = useState(false);
   const [kioskError, setKioskError] = useState<string | null>(null);
+
+  // ── Terminal form state ────────────────────────────────────────────────────
+  const [editingTerminal, setEditingTerminal] = useState<TerminalRow | null>(null);
+  const [showTerminalForm, setShowTerminalForm] = useState(false);
+  const [terminalForm, setTerminalForm] = useState({
+    provider: "dojo", terminalId: "", name: "", isActive: true,
+  });
+  const [savingTerminal, setSavingTerminal] = useState(false);
 
   // Auto-dismiss errors
   useEffect(() => {
@@ -317,9 +344,52 @@ export default function LocationsPage() {
     }
   }
 
+  // ── Terminal handlers ──────────────────────────────────────────────────────
+
+  function openNewTerminal() {
+    setEditingTerminal(null);
+    setTerminalForm({ provider: "dojo", terminalId: "", name: "", isActive: true });
+    setShowTerminalForm(true);
+  }
+
+  function openEditTerminal(t: TerminalRow) {
+    setEditingTerminal(t);
+    setTerminalForm({ provider: t.provider, terminalId: t.terminalId, name: t.name, isActive: t.isActive });
+    setShowTerminalForm(true);
+  }
+
+  function cancelTerminalForm() {
+    setShowTerminalForm(false);
+    setEditingTerminal(null);
+    setTerminalForm({ provider: "dojo", terminalId: "", name: "", isActive: true });
+  }
+
+  async function handleSaveTerminal() {
+    if (!club || !terminalForm.terminalId.trim() || !terminalForm.name.trim()) return;
+    setSavingTerminal(true);
+    try {
+      await saveTerminal({
+        clubId:        club._id,
+        terminalDbId:  editingTerminal?._id,
+        provider:      terminalForm.provider,
+        terminalId:    terminalForm.terminalId.trim(),
+        name:          terminalForm.name.trim(),
+        isActive:      terminalForm.isActive,
+      });
+      cancelTerminalForm();
+    } finally {
+      setSavingTerminal(false);
+    }
+  }
+
+  async function handleDeleteTerminal(id: Id<"posTerminals">) {
+    if (!confirm("Remove this terminal?")) return;
+    await removeTerminal({ terminalDbId: id });
+  }
+
   // ── Loading ────────────────────────────────────────────────────────────────
 
-  if (!club || locations === undefined || kiosks === undefined) {
+  if (!club || locations === undefined || kiosks === undefined || terminals === undefined) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" />
@@ -333,7 +403,7 @@ export default function LocationsPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-10">
+    <div className="p-6 space-y-10">
 
       {/* ── LOCATIONS ───────────────────────────────────────────────────────── */}
       <section>
@@ -637,6 +707,138 @@ export default function LocationsPage() {
             })}
           </div>
         )}
+      </section>
+
+      {/* ── TERMINALS ───────────────────────────────────────────────────────── */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Terminal size={18} /> Payment Terminals
+            </h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Register your physical card terminals so staff can send payments to them.
+            </p>
+          </div>
+          <button
+            onClick={openNewTerminal}
+            className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 shrink-0"
+          >
+            <Plus size={15} /> Add terminal
+          </button>
+        </div>
+
+        {/* Terminal form */}
+        {showTerminalForm && (
+          <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6 shadow-sm">
+            <h3 className="font-semibold text-gray-800 mb-4">
+              {editingTerminal ? "Edit terminal" : "Add terminal"}
+            </h3>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Provider</label>
+                <select
+                  value={terminalForm.provider}
+                  onChange={e => setTerminalForm(f => ({ ...f, provider: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  {PROVIDERS.map(p => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Terminal ID</label>
+                <input
+                  value={terminalForm.terminalId}
+                  onChange={e => setTerminalForm(f => ({ ...f, terminalId: e.target.value }))}
+                  placeholder="trm_xxxxxxxxxxxx"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Display name</label>
+              <input
+                value={terminalForm.name}
+                onChange={e => setTerminalForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. Bar, Pro Shop, Reception"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div className="flex items-center gap-2 mb-5">
+              <button
+                type="button"
+                onClick={() => setTerminalForm(f => ({ ...f, isActive: !f.isActive }))}
+                className={`w-9 h-5 rounded-full transition-colors ${terminalForm.isActive ? "bg-green-600" : "bg-gray-300"}`}
+              >
+                <span className={`block w-3.5 h-3.5 bg-white rounded-full shadow transition-transform mx-0.5 ${terminalForm.isActive ? "translate-x-4" : "translate-x-0"}`} />
+              </button>
+              <label className="text-sm text-gray-700">Active (visible to staff)</label>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveTerminal}
+                disabled={savingTerminal || !terminalForm.terminalId.trim() || !terminalForm.name.trim()}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+              >
+                {savingTerminal ? "Saving…" : "Save terminal"}
+              </button>
+              <button onClick={cancelTerminalForm} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Terminal list */}
+        {terminals.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">
+            <Terminal size={32} className="mx-auto mb-3 opacity-30" />
+            <p className="text-sm">No terminals registered yet.</p>
+            <button onClick={openNewTerminal} className="mt-2 text-sm text-green-600 hover:underline">
+              Add your first terminal →
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {terminals.map(t => (
+              <div key={t._id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${t.isActive ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-400"}`}>
+                    <Wifi size={18} />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900 text-sm">{t.name}</p>
+                    <p className="text-xs text-gray-400 font-mono">{t.terminalId}</p>
+                    <p className="text-xs text-gray-400 capitalize">{t.provider} · {t.isActive ? "Active" : "Inactive"}</p>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => openEditTerminal(t as TerminalRow)}
+                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                    title="Edit"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTerminal(t._id)}
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                    title="Remove"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-6 p-4 bg-blue-50 rounded-xl text-sm text-blue-700">
+          <strong>How to find your terminal ID:</strong> Log into your Dojo account at{" "}
+          <span className="font-mono">business.dojo.tech</span> → Devices → copy the terminal ID shown next to each device.
+        </div>
       </section>
     </div>
   );

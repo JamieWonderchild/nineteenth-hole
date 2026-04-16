@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/format";
 import type { Id } from "convex/_generated/dataModel";
 import {
-  MonitorPlay, Package, Terminal, ClipboardList,
+  MonitorPlay, Package, ClipboardList,
   TrendingUp, Banknote, CreditCard, ArrowRight, User,
   Gift, ChevronDown, MapPin, Clock, CalendarDays,
   ShoppingBag, AlertCircle, BarChart3, Layers,
@@ -343,7 +343,7 @@ export default function ManagePOSPage() {
   const activeLocations = locations?.filter(l => l.isActive) ?? [];
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-8">
+    <div className="p-6 space-y-8">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -631,7 +631,7 @@ export default function ManagePOSPage() {
         <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
           Manage
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <NavCard
             href="/manage/pos/products"
             icon={<Package className="w-6 h-6 text-gray-600" />}
@@ -641,14 +641,8 @@ export default function ManagePOSPage() {
           <NavCard
             href="/manage/pos/locations"
             icon={<MapPin className="w-6 h-6 text-gray-600" />}
-            label="Locations"
-            description="Bar, pro shop, etc."
-          />
-          <NavCard
-            href="/manage/pos/terminals"
-            icon={<Terminal className="w-6 h-6 text-gray-600" />}
-            label="Terminals"
-            description="Register card machines"
+            label="Locations & terminals"
+            description="Bar, pro shop, card machines"
           />
           <NavCard
             href="/manage/pos/sales"
