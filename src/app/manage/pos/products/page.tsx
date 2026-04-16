@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
+import dynamic from "next/dynamic";
+const EmojiPicker = dynamic(() => import("@emoji-mart/react"), { ssr: false });
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import { useActiveClub } from "@/lib/club-context";
@@ -427,35 +429,29 @@ function CategoryModal({
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Icon</label>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                "🍺","🍻","🥂","🍷","🥃","🍸","🍹","🧃","☕","🫖",
-                "🥤","🍔","🌮","🥪","🍕","🍟","🥗","🍰","🍫","🍬",
-                "🏌️","⛳","🏆","🎯","🛒","👕","🧢","🧤","📦","🔖",
-              ].map(e => (
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center text-2xl">
+                {icon || <span className="text-gray-300 text-sm">—</span>}
+              </div>
+              {icon && (
                 <button
-                  key={e}
                   type="button"
-                  onClick={() => setIcon(icon === e ? "" : e)}
-                  className={`w-9 h-9 text-lg rounded-lg flex items-center justify-center transition-all ${
-                    icon === e
-                      ? "bg-green-100 ring-2 ring-green-500"
-                      : "bg-gray-50 hover:bg-gray-100"
-                  }`}
+                  onClick={() => setIcon("")}
+                  className="text-xs text-gray-400 hover:text-gray-600"
                 >
-                  {e}
+                  Clear
                 </button>
-              ))}
+              )}
             </div>
-            {icon && (
-              <button
-                type="button"
-                onClick={() => setIcon("")}
-                className="mt-1.5 text-xs text-gray-400 hover:text-gray-600"
-              >
-                Clear icon
-              </button>
-            )}
+            <EmojiPicker
+              onEmojiSelect={(e: { native: string }) => setIcon(e.native)}
+              theme="light"
+              previewPosition="none"
+              skinTonePosition="none"
+              navPosition="bottom"
+              perLine={8}
+              set="native"
+            />
           </div>
           {locations.length > 0 && (
             <div>
