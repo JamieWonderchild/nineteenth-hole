@@ -209,6 +209,111 @@ export const getShiftReport = query({
   },
 });
 
+/**
+ * Scan recent closed shifts and return every product with a non-zero variance.
+ * Optionally filtered by location. Sorted by |variance| descending.
+ */
+export const getFlaggedVariances = query({
+  args: {
+    clubId:     v.id("clubs"),
+    locationId: v.optional(v.id("posLocations")),
+    limit:      v.optional(v.number()),
+  },
+  handler: async (ctx, { clubId, locationId, limit }) => {
+    let shifts = await ctx.db
+      .query("posShifts")
+      .withIndex("by_club", (q) => q.eq("clubId", clubId))
+      .order("desc")
+      .take(limit ?? 30);
+
+    if (locationId) {
+      shifts = shifts.filter((s) => s.locationId === locationId);
+    }
+
+    // Resolve location names up-front
+    const locIds = [...new Set(shifts.map((s) => s.locationId))];
+    const locs   = await Promise.all(locIds.map((id) => ctx.db.get(id)));
+    const locMap = new Map(locs.filter(Boolean).map((l) => [l!._id, l!.name]));
+
+    const flagged: Array<{
+      shiftId:       Id<"posShifts">;
+      locationName:  string;
+      shiftOpenedAt: string;
+      shiftClosedAt: string | undefined;
+      productId:     string;
+      productName:   string;
+      openCount:     number | null;
+      closeCount:    number | null;
+      sold:          number;
+      expected:      number | null;
+      variance:      number;
+    }> = [];
+
+    for (const shift of shifts) {
+      const stockTakes = await ctx.db
+        .query("posStockTakes")
+        .withIndex("by_shift", (q) => q.eq("shiftId", shift._id))
+        .collect();
+
+      const opening = stockTakes.find((t) => t.type === "opening");
+      const closing = stockTakes.find((t) => t.type === "closing");
+      if (!opening || !closing) continue; // need both to compute variance
+
+      // Units sold per product
+      const allSales = await ctx.db
+        .query("posSales")
+        .withIndex("by_shift", (q) => q.eq("shiftId", shift._id))
+        .collect();
+      const sales = allSales.filter((s) => !s.voidedAt);
+
+      const unitsSold = new Map<string, number>();
+      for (const sale of sales) {
+        for (const item of sale.items) {
+          if (item.productId) {
+            unitsSold.set(item.productId, (unitsSold.get(item.productId) ?? 0) + item.quantity);
+          }
+        }
+      }
+
+      const productIds = new Set([
+        ...opening.counts.map((c) => c.productId as string),
+        ...closing.counts.map((c) => c.productId as string),
+      ]);
+
+      for (const productId of productIds) {
+        const openCount  = opening.counts.find((c) => c.productId === productId)?.countedUnits ?? null;
+        const closeCount = closing.counts.find((c) => c.productId === productId)?.countedUnits ?? null;
+        const productName =
+          opening.counts.find((c) => c.productId === productId)?.productName ??
+          closing.counts.find((c) => c.productId === productId)?.productName ??
+          "Unknown";
+        const sold     = unitsSold.get(productId) ?? 0;
+        const expected = openCount !== null && closeCount !== null ? openCount - closeCount : null;
+        const variance = expected !== null ? sold - expected : null;
+
+        if (variance !== null && variance !== 0) {
+          flagged.push({
+            shiftId:       shift._id,
+            locationName:  locMap.get(shift.locationId) ?? "Unknown",
+            shiftOpenedAt: shift.openedAt,
+            shiftClosedAt: shift.closedAt,
+            productId,
+            productName,
+            openCount,
+            closeCount,
+            sold,
+            expected,
+            variance,
+          });
+        }
+      }
+    }
+
+    // Largest absolute variance first
+    return flagged.sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance));
+  },
+});
+
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
 /** Open a new shift for a location. Fails if one is already open. */

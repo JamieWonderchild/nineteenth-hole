@@ -247,3 +247,64 @@ export const salesSummary = query({
     return { count: sales.length, totalRevenue, cashRevenue, cardRevenue };
   },
 });
+
+/**
+ * Revenue summary for an arbitrary date range, optionally filtered by location.
+ * fromDate / toDate are "YYYY-MM-DD" strings (inclusive).
+ * Returns totals broken down by payment method, plus a per-location breakdown.
+ */
+export const salesRangeSummary = query({
+  args: {
+    clubId:     v.id("clubs"),
+    fromDate:   v.string(),   // "YYYY-MM-DD"
+    toDate:     v.string(),   // "YYYY-MM-DD" (inclusive)
+    locationId: v.optional(v.id("posLocations")),
+  },
+  handler: async (ctx, { clubId, fromDate, toDate, locationId }) => {
+    // Use the by_club_and_date index with an ISO range.
+    // createdAt is a full ISO string — prefix-compare "YYYY-MM-DD" is safe.
+    const fromISO = fromDate;          // "2025-04-01" sorts before any time on that day
+    const toISO   = toDate + "\uffff"; // append high char so "2025-04-30T23:59:59" is included
+
+    const rows = await ctx.db
+      .query("posSales")
+      .withIndex("by_club_and_date", q =>
+        q.eq("clubId", clubId).gte("createdAt", fromISO).lte("createdAt", toISO)
+      )
+      .collect();
+
+    // Filter out voided sales and apply optional location filter
+    const sales = rows.filter(s =>
+      !s.voidedAt &&
+      (!locationId || s.locationId === locationId)
+    );
+
+    // Overall totals
+    const totalRevenue   = sales.reduce((s, x) => s + x.totalPence, 0);
+    const cashRevenue    = sales.filter(s => s.paymentMethod === "cash").reduce((s, x) => s + x.totalPence, 0);
+    const cardRevenue    = sales.filter(s => s.paymentMethod === "card" || s.paymentMethod === "terminal").reduce((s, x) => s + x.totalPence, 0);
+    const accountRevenue = sales.filter(s => s.paymentMethod === "account").reduce((s, x) => s + x.totalPence, 0);
+    const compRevenue    = sales.filter(s => s.paymentMethod === "complimentary").reduce((s, x) => s + x.totalPence, 0);
+
+    // Per-location breakdown (only when not already filtered to one location)
+    const byLocation: Record<string, { locationId: string; totalPence: number; count: number }> = {};
+    if (!locationId) {
+      for (const s of sales) {
+        const key = s.locationId ?? "__none__";
+        if (!byLocation[key]) byLocation[key] = { locationId: key, totalPence: 0, count: 0 };
+        byLocation[key].totalPence += s.totalPence;
+        byLocation[key].count++;
+      }
+    }
+
+    return {
+      count: sales.length,
+      totalRevenue,
+      cashRevenue,
+      cardRevenue,
+      accountRevenue,
+      compRevenue,
+      byLocation: Object.values(byLocation),
+    };
+  },
+});
