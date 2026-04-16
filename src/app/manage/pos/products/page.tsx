@@ -467,13 +467,14 @@ function CategoryModal({
 // ── Product modal ─────────────────────────────────────────────────────────────
 
 function ProductModal({
-  clubId, currency, categories, locations, product, onClose,
+  clubId, currency, categories, locations, product, defaultCategoryId, onClose,
 }: {
   clubId: Id<"clubs">;
   currency: string;
   categories: Category[];
   locations: Location[];
   product?: Product;
+  defaultCategoryId?: string;
   onClose: () => void;
 }) {
   const saveProduct = useMutation(api.pos.saveProduct);
@@ -482,7 +483,7 @@ function ProductModal({
     sku: product?.sku ?? "",
     description: product?.description ?? "",
     price: product ? (product.pricePence / 100).toFixed(2) : "",
-    categoryId: product?.categoryId ?? "" as string,
+    categoryId: product?.categoryId ?? defaultCategoryId ?? "" as string,
     locationId: product?.locationId ?? "" as string,
     trackStock: product?.trackStock ?? true,
     stockCount: product?.stockCount?.toString() ?? "",
@@ -609,6 +610,19 @@ function ProductModal({
   );
 }
 
+// ── Card colour palette (cycles by index) ────────────────────────────────────
+
+const CARD_PALETTES = [
+  { bg: "bg-emerald-50",  border: "border-emerald-200",  label: "text-emerald-700",  count: "text-emerald-900"  },
+  { bg: "bg-blue-50",     border: "border-blue-200",     label: "text-blue-700",     count: "text-blue-900"     },
+  { bg: "bg-amber-50",    border: "border-amber-200",    label: "text-amber-700",    count: "text-amber-900"    },
+  { bg: "bg-purple-50",   border: "border-purple-200",   label: "text-purple-700",   count: "text-purple-900"   },
+  { bg: "bg-rose-50",     border: "border-rose-200",     label: "text-rose-700",     count: "text-rose-900"     },
+  { bg: "bg-cyan-50",     border: "border-cyan-200",     label: "text-cyan-700",     count: "text-cyan-900"     },
+  { bg: "bg-orange-50",   border: "border-orange-200",   label: "text-orange-700",   count: "text-orange-900"   },
+  { bg: "bg-indigo-50",   border: "border-indigo-200",   label: "text-indigo-700",   count: "text-indigo-900"   },
+];
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function POSProductsPage() {
@@ -618,10 +632,12 @@ export default function POSProductsPage() {
   const products   = useQuery(api.pos.listProducts,   club ? { clubId: club._id, includeInactive: true } : "skip");
   const locations  = useQuery(api.posLocations.listLocations, club ? { clubId: club._id } : "skip");
 
-  const [showCatModal, setShowCatModal] = useState(false);
-  const [editCat, setEditCat] = useState<Category | undefined>();
+  // null = category grid; "" = uncategorised; catId = that category's products
+  const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
+  const [showCatModal, setShowCatModal]   = useState(false);
+  const [editCat, setEditCat]             = useState<Category | undefined>();
   const [showProductModal, setShowProductModal] = useState(false);
-  const [editProduct, setEditProduct] = useState<Product | undefined>();
+  const [editProduct, setEditProduct]     = useState<Product | undefined>();
   const [showImportModal, setShowImportModal] = useState(false);
 
   if (!club || !categories || !products || !locations) {
@@ -644,111 +660,18 @@ export default function POSProductsPage() {
     grouped[key].push(p);
   }
 
-  return (
-    <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/manage/pos" className="text-gray-400 hover:text-gray-600">
-            <ArrowLeft size={20} />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Product Catalogue</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Manage pro shop and bar items</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowImportModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50"
-          >
-            <Upload size={14} /> Import CSV
-          </button>
-          <button onClick={() => { setEditCat(undefined); setShowCatModal(true); }}
-            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50">
-            <Tag size={14} /> Category
-          </button>
-          <button onClick={() => { setEditProduct(undefined); setShowProductModal(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-xl transition-colors">
-            <Plus size={15} /> Product
-          </button>
-        </div>
-      </div>
+  const sortedCats = [...categories].sort((a, b) => a.sortOrder - b.sortOrder);
+  const uncategorisedCount = grouped[""]?.length ?? 0;
 
-      {/* Categories row */}
-      {categories.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {categories.sort((a, b) => a.sortOrder - b.sortOrder).map(cat => (
-            <button key={cat._id} onClick={() => { setEditCat(cat); setShowCatModal(true); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-full text-sm text-gray-600 hover:bg-gray-50">
-              {cat.icon} {cat.name}
-              {cat.locationId && locMap.get(cat.locationId as string) && (
-                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
-                  {locMap.get(cat.locationId as string)!.name}
-                </span>
-              )}
-              <Pencil size={11} className="text-gray-300" />
-            </button>
-          ))}
-        </div>
-      )}
+  function openEditCat(cat: Category, e: React.MouseEvent) {
+    e.stopPropagation();
+    setEditCat(cat);
+    setShowCatModal(true);
+  }
 
-      {/* Products grouped by category */}
-      {products.length === 0 ? (
-        <div className="bg-white border border-dashed border-gray-200 rounded-xl p-12 text-center">
-          <Package size={28} className="text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-400 text-sm">No products yet — add your first item or import from CSV</p>
-        </div>
-      ) : (
-        Object.entries(grouped).map(([catId, catProducts]) => {
-          if (catProducts.length === 0) return null;
-          const cat = catMap.get(catId);
-          return (
-            <div key={catId}>
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                {cat ? `${cat.icon ?? ""} ${cat.name}`.trim() : "Uncategorised"}
-              </h2>
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <tbody>
-                    {catProducts.map((p, idx) => (
-                      <tr key={p._id} className={`${idx < catProducts.length - 1 ? "border-b border-gray-50" : ""} hover:bg-gray-50/50`}>
-                        <td className="px-5 py-3">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className={`font-medium ${p.isActive ? "text-gray-900" : "text-gray-400 line-through"}`}>{p.name}</p>
-                            {p.locationId && locMap.get(p.locationId as string) && (
-                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
-                                {locMap.get(p.locationId as string)!.name}
-                              </span>
-                            )}
-                          </div>
-                          {p.sku && <p className="text-xs text-gray-400">SKU: {p.sku}</p>}
-                        </td>
-                        <td className="px-5 py-3 text-gray-500 text-xs">
-                          {p.trackStock
-                            ? <span className={p.stockCount === 0 ? "text-red-500" : p.stockCount != null && p.stockCount <= 5 ? "text-amber-500" : "text-gray-500"}>
-                                {p.stockCount ?? 0} in stock
-                              </span>
-                            : "—"}
-                        </td>
-                        <td className="px-5 py-3 text-right font-bold text-gray-900">
-                          {formatCurrency(p.pricePence, p.currency)}
-                        </td>
-                        <td className="px-5 py-3 text-right">
-                          <button onClick={() => { setEditProduct(p as Product); setShowProductModal(true); }}
-                            className="text-gray-300 hover:text-gray-600 transition-colors">
-                            <Pencil size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          );
-        })
-      )}
-
+  // ── Shared modals ──────────────────────────────────────────────────────────
+  const modals = (
+    <>
       {showImportModal && (
         <ImportCSVModal
           clubId={club._id}
@@ -773,9 +696,200 @@ export default function POSProductsPage() {
           categories={categories}
           locations={locations}
           product={editProduct}
+          defaultCategoryId={selectedCatId ?? undefined}
           onClose={() => { setShowProductModal(false); setEditProduct(undefined); }}
         />
       )}
+    </>
+  );
+
+  // ── Category grid view ─────────────────────────────────────────────────────
+  if (selectedCatId === null) {
+    return (
+      <div className="px-6 py-8 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <Link href="/manage/pos" className="text-gray-400 hover:text-gray-600">
+              <ArrowLeft size={20} />
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Product Catalogue</h1>
+              <p className="text-gray-500 text-sm mt-0.5">
+                {products.length} product{products.length !== 1 ? "s" : ""} · {categories.length} categor{categories.length !== 1 ? "ies" : "y"}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50"
+            >
+              <Upload size={14} /> Import CSV
+            </button>
+            <button
+              onClick={() => { setEditCat(undefined); setShowCatModal(true); }}
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50"
+            >
+              <Tag size={14} /> New category
+            </button>
+            <button
+              onClick={() => { setEditProduct(undefined); setShowProductModal(true); }}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-xl transition-colors"
+            >
+              <Plus size={15} /> Product
+            </button>
+          </div>
+        </div>
+
+        {/* Category cards */}
+        {categories.length === 0 && uncategorisedCount === 0 ? (
+          <div className="bg-white border border-dashed border-gray-200 rounded-xl p-12 text-center">
+            <Package size={28} className="text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-400 text-sm">No products yet — add your first item or import from CSV</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {sortedCats.map((cat, i) => {
+              const palette = CARD_PALETTES[i % CARD_PALETTES.length];
+              const count = grouped[cat._id as string]?.length ?? 0;
+              const locName = cat.locationId ? locMap.get(cat.locationId as string)?.name : undefined;
+              return (
+                <div
+                  key={cat._id}
+                  onClick={() => setSelectedCatId(cat._id as string)}
+                  className={`relative cursor-pointer rounded-xl border p-5 hover:shadow-md active:scale-95 transition-all ${palette.bg} ${palette.border}`}
+                >
+                  {/* Edit pencil */}
+                  <button
+                    onClick={(e) => openEditCat(cat, e)}
+                    className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 p-0.5 rounded"
+                  >
+                    <Pencil size={13} />
+                  </button>
+
+                  <p className={`text-sm font-semibold pr-6 ${palette.label}`}>
+                    {cat.icon ? `${cat.icon} ${cat.name}` : cat.name}
+                  </p>
+                  <p className={`text-4xl font-black mt-3 ${palette.count}`}>{count}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">product{count !== 1 ? "s" : ""}</p>
+                  {locName && (
+                    <span className="inline-block mt-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-white/70 text-blue-600 border border-blue-100">
+                      {locName}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Uncategorised card */}
+            {uncategorisedCount > 0 && (
+              <div
+                onClick={() => setSelectedCatId("")}
+                className="relative cursor-pointer rounded-xl border p-5 hover:shadow-md active:scale-95 transition-all bg-gray-50 border-gray-200"
+              >
+                <p className="text-sm font-semibold text-gray-500">Uncategorised</p>
+                <p className="text-4xl font-black mt-3 text-gray-700">{uncategorisedCount}</p>
+                <p className="text-xs text-gray-400 mt-0.5">product{uncategorisedCount !== 1 ? "s" : ""}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {modals}
+      </div>
+    );
+  }
+
+  // ── Product list (drill-down) ──────────────────────────────────────────────
+  const selectedCat  = catMap.get(selectedCatId);
+  const catProducts  = grouped[selectedCatId] ?? [];
+
+  return (
+    <div className="px-6 py-8 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setSelectedCatId(null)} className="text-gray-400 hover:text-gray-600">
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-gray-900">
+                {selectedCat ? `${selectedCat.icon ?? ""} ${selectedCat.name}`.trim() : "Uncategorised"}
+              </h1>
+              {selectedCat && (
+                <button
+                  onClick={() => { setEditCat(selectedCat); setShowCatModal(true); }}
+                  className="text-gray-300 hover:text-gray-600 transition-colors"
+                  title="Edit category"
+                >
+                  <Pencil size={15} />
+                </button>
+              )}
+            </div>
+            <p className="text-gray-500 text-sm mt-0.5">
+              {catProducts.length} product{catProducts.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => { setEditProduct(undefined); setShowProductModal(true); }}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-xl transition-colors"
+        >
+          <Plus size={15} /> Product
+        </button>
+      </div>
+
+      {/* Product list */}
+      {catProducts.length === 0 ? (
+        <div className="bg-white border border-dashed border-gray-200 rounded-xl p-12 text-center">
+          <Package size={28} className="text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-400 text-sm">No products in this category yet</p>
+        </div>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <tbody>
+              {catProducts.map((p, idx) => (
+                <tr key={p._id} className={`${idx < catProducts.length - 1 ? "border-b border-gray-50" : ""} hover:bg-gray-50/50`}>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className={`font-medium ${p.isActive ? "text-gray-900" : "text-gray-400 line-through"}`}>{p.name}</p>
+                      {p.locationId && locMap.get(p.locationId as string) && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
+                          {locMap.get(p.locationId as string)!.name}
+                        </span>
+                      )}
+                    </div>
+                    {p.sku && <p className="text-xs text-gray-400">SKU: {p.sku}</p>}
+                  </td>
+                  <td className="px-5 py-3 text-gray-500 text-xs">
+                    {p.trackStock
+                      ? <span className={p.stockCount === 0 ? "text-red-500" : p.stockCount != null && p.stockCount <= 5 ? "text-amber-500" : "text-gray-500"}>
+                          {p.stockCount ?? 0} in stock
+                        </span>
+                      : "—"}
+                  </td>
+                  <td className="px-5 py-3 text-right font-bold text-gray-900">
+                    {formatCurrency(p.pricePence, p.currency)}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <button
+                      onClick={() => { setEditProduct(p as Product); setShowProductModal(true); }}
+                      className="text-gray-300 hover:text-gray-600 transition-colors"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {modals}
     </div>
   );
 }
