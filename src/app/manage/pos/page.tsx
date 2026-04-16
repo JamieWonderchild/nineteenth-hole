@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/format";
 import type { Id } from "convex/_generated/dataModel";
 import {
-  MonitorPlay, Package, Terminal, Tag, ClipboardList,
+  MonitorPlay, Package, Terminal, ClipboardList,
   TrendingUp, Banknote, CreditCard, ArrowRight, User,
   Gift, ChevronDown, MapPin, Clock, CalendarDays,
   ShoppingBag, AlertCircle, BarChart3, Layers,
@@ -631,18 +631,12 @@ export default function ManagePOSPage() {
         <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
           Manage
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <NavCard
             href="/manage/pos/products"
             icon={<Package className="w-6 h-6 text-gray-600" />}
-            label="Products"
-            description="Prices, stock, visibility"
-          />
-          <NavCard
-            href="/manage/pos/categories"
-            icon={<Tag className="w-6 h-6 text-gray-600" />}
-            label="Categories"
-            description="Organise the menu"
+            label="Products & categories"
+            description="Prices, stock, categories"
           />
           <NavCard
             href="/manage/pos/locations"

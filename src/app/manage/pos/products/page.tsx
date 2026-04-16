@@ -426,10 +426,36 @@ function CategoryModal({
               className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Icon (emoji)</label>
-            <input type="text" value={icon} onChange={e => setIcon(e.target.value)}
-              placeholder="🍺"
-              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+            <label className="block text-xs font-medium text-gray-500 mb-1">Icon</label>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                "🍺","🍻","🥂","🍷","🥃","🍸","🍹","🧃","☕","🫖",
+                "🥤","🍔","🌮","🥪","🍕","🍟","🥗","🍰","🍫","🍬",
+                "🏌️","⛳","🏆","🎯","🛒","👕","🧢","🧤","📦","🔖",
+              ].map(e => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setIcon(icon === e ? "" : e)}
+                  className={`w-9 h-9 text-lg rounded-lg flex items-center justify-center transition-all ${
+                    icon === e
+                      ? "bg-green-100 ring-2 ring-green-500"
+                      : "bg-gray-50 hover:bg-gray-100"
+                  }`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+            {icon && (
+              <button
+                type="button"
+                onClick={() => setIcon("")}
+                className="mt-1.5 text-xs text-gray-400 hover:text-gray-600"
+              >
+                Clear icon
+              </button>
+            )}
           </div>
           {locations.length > 0 && (
             <div>
@@ -825,9 +851,9 @@ export default function POSProductsPage() {
                   {/* Edit pencil */}
                   <button
                     onClick={(e) => openEditCat(cat, e)}
-                    className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 p-0.5 rounded"
+                    className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 p-2 rounded-lg hover:bg-black/5"
                   >
-                    <Pencil size={13} />
+                    <Pencil size={14} />
                   </button>
 
                   <p className={`text-sm font-semibold pr-6 ${palette.label}`}>
