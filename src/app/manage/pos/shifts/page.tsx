@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import { useActiveClub } from "@/lib/club-context";
@@ -533,12 +534,23 @@ function ShiftCard({
   shift,
   currency,
   onClose,
+  highlight,
 }: {
   shift: { _id: Id<"posShifts">; clubId: Id<"clubs">; locationId: Id<"posLocations">; locationName: string; status: string; openedAt: string; closedAt?: string };
   currency: string;
   onClose: (shiftId: Id<"posShifts">) => void;
+  highlight?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(shift.status === "open");
+  const [expanded, setExpanded] = useState(shift.status === "open" || !!highlight);
+  const [glowing, setGlowing] = useState(!!highlight);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!highlight) return;
+    cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const t = setTimeout(() => setGlowing(false), 1500);
+    return () => clearTimeout(t);
+  }, [highlight]);
   const [showStockTake, setShowStockTake] = useState<"opening" | "closing" | "spot" | null>(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -586,7 +598,12 @@ function ShiftCard({
   }
 
   return (
-    <div className={`border rounded-xl overflow-hidden ${isOpen ? "border-green-300 bg-green-50/30" : "border-gray-200 bg-white"}`}>
+    <div
+      ref={cardRef}
+      className={`border rounded-xl overflow-hidden transition-shadow duration-700 ${
+        isOpen ? "border-green-300 bg-green-50/30" : "border-gray-200 bg-white"
+      } ${glowing ? "ring-2 ring-emerald-400 shadow-lg shadow-emerald-100" : ""}`}
+    >
       {/* Header */}
       <button
         onClick={() => setExpanded((e) => !e)}
@@ -731,6 +748,8 @@ function ShiftCard({
 
 export default function ShiftsPage() {
   const { club } = useActiveClub();
+  const searchParams = useSearchParams();
+  const targetShiftId = searchParams.get("shift") as Id<"posShifts"> | null;
 
   const locations = useQuery(
     api.posLocations.listLocations,
@@ -918,6 +937,7 @@ export default function ShiftsPage() {
                 shift={shift}
                 currency={currency}
                 onClose={handleCloseShift}
+                highlight={shift._id === targetShiftId}
               />
             ))}
           </div>
@@ -953,6 +973,7 @@ export default function ShiftsPage() {
                 shift={shift}
                 currency={currency}
                 onClose={handleCloseShift}
+                highlight={shift._id === targetShiftId}
               />
             ))}
           </div>

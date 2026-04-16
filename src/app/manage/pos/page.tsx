@@ -138,7 +138,7 @@ function ShiftCard({ shift, currency }: {
               {expanded ? "Less ↑" : "Details ↓"}
             </button>
           )}
-          <Link href="/manage/pos/shifts" className="text-xs text-gray-400 hover:text-gray-600">
+          <Link href={`/manage/pos/shifts?shift=${shift._id}`} className="text-xs text-gray-400 hover:text-gray-600">
             View →
           </Link>
         </div>
