@@ -6,7 +6,7 @@ import { api } from "convex/_generated/api";
 import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
-import { Plus, X, Pencil, ArrowLeft, Package, Tag, Upload, Download, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Plus, X, Pencil, Trash2, Search, ArrowLeft, Package, Tag, Upload, Download, AlertCircle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import Papa from "papaparse";
 
@@ -610,6 +610,54 @@ function ProductModal({
   );
 }
 
+// ── Delete confirmation modal ─────────────────────────────────────────────────
+
+function DeleteProductModal({ product, onConfirm, onClose }: {
+  product: Product;
+  onConfirm: () => Promise<void>;
+  onClose: () => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    setDeleting(true);
+    try { await onConfirm(); } finally { setDeleting(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="font-semibold text-gray-900">Delete product</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="px-6 py-5">
+          <p className="text-sm text-gray-600">
+            Are you sure you want to delete <span className="font-semibold text-gray-900">{product.name}</span>?
+          </p>
+          <p className="text-xs text-gray-400 mt-2">
+            The product will be deactivated and hidden from the till. Sales history is preserved.
+          </p>
+        </div>
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Cancel</button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="px-5 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center gap-2"
+          >
+            {deleting ? (
+              <><span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" /> Deleting…</>
+            ) : (
+              <><Trash2 size={14} /> Delete</>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Card colour palette (cycles by index) ────────────────────────────────────
 
 const CARD_PALETTES = [
@@ -632,12 +680,16 @@ export default function POSProductsPage() {
   const products   = useQuery(api.pos.listProducts,   club ? { clubId: club._id, includeInactive: true } : "skip");
   const locations  = useQuery(api.posLocations.listLocations, club ? { clubId: club._id } : "skip");
 
+  const deleteProduct = useMutation(api.pos.deleteProduct);
+
   // null = category grid; "" = uncategorised; catId = that category's products
   const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
+  const [search, setSearch]               = useState("");
   const [showCatModal, setShowCatModal]   = useState(false);
   const [editCat, setEditCat]             = useState<Category | undefined>();
   const [showProductModal, setShowProductModal] = useState(false);
   const [editProduct, setEditProduct]     = useState<Product | undefined>();
+  const [deleteTarget, setDeleteTarget]   = useState<Product | undefined>();
   const [showImportModal, setShowImportModal] = useState(false);
 
   if (!club || !categories || !products || !locations) {
@@ -698,6 +750,16 @@ export default function POSProductsPage() {
           product={editProduct}
           defaultCategoryId={selectedCatId ?? undefined}
           onClose={() => { setShowProductModal(false); setEditProduct(undefined); }}
+        />
+      )}
+      {deleteTarget && (
+        <DeleteProductModal
+          product={deleteTarget}
+          onConfirm={async () => {
+            await deleteProduct({ productId: deleteTarget._id });
+            setDeleteTarget(undefined);
+          }}
+          onClose={() => setDeleteTarget(undefined)}
         />
       )}
     </>
@@ -802,15 +864,21 @@ export default function POSProductsPage() {
   }
 
   // ── Product list (drill-down) ──────────────────────────────────────────────
-  const selectedCat  = catMap.get(selectedCatId);
-  const catProducts  = grouped[selectedCatId] ?? [];
+  const selectedCat = catMap.get(selectedCatId);
+  const catProducts = grouped[selectedCatId] ?? [];
+  const filteredProducts = search.trim()
+    ? catProducts.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.sku?.toLowerCase().includes(search.toLowerCase()))
+    : catProducts;
 
   return (
     <div className="px-6 py-8 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <button onClick={() => setSelectedCatId(null)} className="text-gray-400 hover:text-gray-600">
+          <button
+            onClick={() => { setSelectedCatId(null); setSearch(""); }}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <ArrowLeft size={20} />
           </button>
           <div>
@@ -833,12 +901,33 @@ export default function POSProductsPage() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => { setEditProduct(undefined); setShowProductModal(true); }}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-xl transition-colors"
-        >
-          <Plus size={15} /> Product
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Search */}
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search products…"
+              className="pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-52"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => { setEditProduct(undefined); setShowProductModal(true); }}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            <Plus size={15} /> Product
+          </button>
+        </div>
       </div>
 
       {/* Product list */}
@@ -847,12 +936,16 @@ export default function POSProductsPage() {
           <Package size={28} className="text-gray-300 mx-auto mb-3" />
           <p className="text-gray-400 text-sm">No products in this category yet</p>
         </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-xl p-10 text-center">
+          <p className="text-gray-400 text-sm">No products match &ldquo;{search}&rdquo;</p>
+        </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <tbody>
-              {catProducts.map((p, idx) => (
-                <tr key={p._id} className={`${idx < catProducts.length - 1 ? "border-b border-gray-50" : ""} hover:bg-gray-50/50`}>
+              {filteredProducts.map((p, idx) => (
+                <tr key={p._id} className={`${idx < filteredProducts.length - 1 ? "border-b border-gray-50" : ""} hover:bg-gray-50/50`}>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className={`font-medium ${p.isActive ? "text-gray-900" : "text-gray-400 line-through"}`}>{p.name}</p>
@@ -862,6 +955,7 @@ export default function POSProductsPage() {
                         </span>
                       )}
                     </div>
+                    {p.description && <p className="text-xs text-gray-400 mt-0.5">{p.description}</p>}
                     {p.sku && <p className="text-xs text-gray-400">SKU: {p.sku}</p>}
                   </td>
                   <td className="px-5 py-3 text-gray-500 text-xs">
@@ -875,12 +969,22 @@ export default function POSProductsPage() {
                     {formatCurrency(p.pricePence, p.currency)}
                   </td>
                   <td className="px-5 py-3 text-right">
-                    <button
-                      onClick={() => { setEditProduct(p as Product); setShowProductModal(true); }}
-                      className="text-gray-300 hover:text-gray-600 transition-colors"
-                    >
-                      <Pencil size={14} />
-                    </button>
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => { setEditProduct(p as Product); setShowProductModal(true); }}
+                        className="text-gray-300 hover:text-gray-600 transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(p as Product)}
+                        className="text-gray-300 hover:text-red-500 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
