@@ -354,6 +354,7 @@ export default function POSPage() {
 
   // Numpad — "" means "use remaining balance"
   const [numpadValue, setNumpadValue] = useState("");
+  const [showNumpad, setShowNumpad] = useState(false);
 
   // Equal split
   const [splitPeople, setSplitPeople] = useState(1);
@@ -499,6 +500,7 @@ export default function POSPage() {
     setSaleDone(null);
     setPartialPayments([]);
     setNumpadValue("");
+    setShowNumpad(false);
     setSplitPeople(1);
   }
 
@@ -628,6 +630,7 @@ export default function POSPage() {
     } else {
       setPartialPayments(newPayments);
       setNumpadValue("");
+      setShowNumpad(false);
       if (splitPeople > 1) setSplitPeople(p => Math.max(1, p - 1));
     }
   }
@@ -905,7 +908,7 @@ export default function POSPage() {
       </div>
 
       {/* ── Col 3: Basket / checkout ──────────────────────────────────────── */}
-      <div className="w-80 shrink-0 flex flex-col bg-white border-l border-gray-200 relative">
+      <div className="w-80 shrink-0 flex flex-col bg-white border-l border-gray-200 relative min-w-0">
 
         {/* Sale complete overlay */}
         {saleDone && (
@@ -925,8 +928,8 @@ export default function POSPage() {
           </div>
         )}
 
-        {/* ── Customer chip ── */}
-        <div className="px-4 pt-4 pb-2 border-b border-gray-100">
+        {/* ── Customer chip — sticky at top ── */}
+        <div className="shrink-0 px-4 pt-4 pb-2 border-b border-gray-100">
           {selectedMember ? (
             <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-xl px-3.5 py-2.5">
               <div>
@@ -987,8 +990,11 @@ export default function POSPage() {
           )}
         </div>
 
-        {/* ── Basket items ── */}
+        {/* ── Scrollable body: basket + checkout ── */}
         <div className="flex-1 overflow-y-auto">
+
+        {/* Basket items */}
+        <div>
           {displayBasket.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <p className="text-gray-300 text-sm">
@@ -1057,7 +1063,7 @@ export default function POSPage() {
 
         {/* ── Checkout footer ── */}
         {displayBasket.length > 0 && (
-        <div className="border-t border-gray-100 shrink-0 overflow-y-auto">
+        <div className="border-t border-gray-100">
 
           {/* Payment history */}
           {partialPayments.length > 0 && (
@@ -1123,30 +1129,38 @@ export default function POSPage() {
             })}
           </div>
 
-          {/* Numpad display */}
+          {/* Numpad display — tap to reveal/hide numpad */}
           <div className="px-4 pb-1">
-            <div className="bg-gray-50 rounded-xl px-4 py-2 text-right flex items-center justify-between">
-              <button onClick={() => setNumpadValue("")} className="text-xs text-gray-300 hover:text-gray-500">
-                {numpadValue ? "clear" : ""}
-              </button>
-              <span className={`text-2xl font-black ${numpadValue ? "text-gray-900" : "text-gray-300"}`}>
+            <button
+              onClick={() => { setShowNumpad(s => !s); }}
+              className="w-full bg-gray-50 hover:bg-gray-100 rounded-xl px-4 py-2 flex items-center justify-between transition-colors"
+            >
+              <span className="text-xs text-gray-400">{showNumpad ? "hide keypad" : "tap to enter amount"}</span>
+              <span className={`text-2xl font-black ${numpadValue ? "text-gray-900" : "text-gray-400"}`}>
                 {numpadValue ? `£${numpadValue}` : formatCurrency(chargeAmountPence, currency)}
               </span>
-            </div>
+            </button>
+            {numpadValue && (
+              <button onClick={() => setNumpadValue("")} className="text-xs text-gray-400 hover:text-gray-600 mt-1 px-1">
+                clear entry
+              </button>
+            )}
           </div>
 
-          {/* Numpad grid */}
-          <div className="px-4 pb-3 grid grid-cols-3 gap-1.5">
-            {["7","8","9","4","5","6","1","2","3",".","0","⌫"].map(key => (
-              <button
-                key={key}
-                onClick={() => handleNumpad(key)}
-                className="h-11 bg-white border border-gray-200 rounded-xl text-gray-800 font-semibold text-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
-              >
-                {key}
-              </button>
-            ))}
-          </div>
+          {/* Numpad grid — only when open */}
+          {showNumpad && (
+            <div className="px-4 pb-3 grid grid-cols-3 gap-1.5">
+              {["7","8","9","4","5","6","1","2","3",".","0","⌫"].map(key => (
+                <button
+                  key={key}
+                  onClick={() => handleNumpad(key)}
+                  className="h-11 bg-white border border-gray-200 rounded-xl text-gray-800 font-semibold text-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                >
+                  {key}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Charge + void/clear */}
           <div className="px-4 pb-4 space-y-2">
@@ -1181,6 +1195,9 @@ export default function POSPage() {
           </div>
         </div>
         )}
+
+        {/* end scrollable body */}
+        </div>
       </div>
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
