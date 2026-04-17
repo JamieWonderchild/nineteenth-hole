@@ -534,7 +534,19 @@ function Step2Format({
         {/* Entry mode toggle */}
         <View className="gap-2">
           <Text className="text-sm font-medium text-gray-700">Entry type</Text>
-          <View className="flex-row gap-3">
+          <View className="flex-row gap-2">
+            <TouchableOpacity
+              onPress={() => setEntryMode("quick")}
+              className={`flex-1 py-3 px-2 rounded-xl items-center border-2 ${
+                entryMode === "quick" ? "border-green-500 bg-green-50" : "border-gray-200 bg-white"
+              }`}
+            >
+              <Ionicons name="calculator-outline" size={20} color={entryMode === "quick" ? "#16a34a" : "#9ca3af"} />
+              <Text className={`text-xs font-semibold mt-1 ${entryMode === "quick" ? "text-green-700" : "text-gray-500"}`}>
+                Quick
+              </Text>
+              <Text className="text-xs text-gray-400 text-center mt-0.5">Total score only</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setEntryMode("hole_by_hole")}
               className={`flex-1 py-3 px-2 rounded-xl items-center border-2 ${
@@ -545,19 +557,7 @@ function Step2Format({
               <Text className={`text-xs font-semibold mt-1 ${entryMode === "hole_by_hole" ? "text-green-700" : "text-gray-500"}`}>
                 Hole by hole
               </Text>
-              <Text className="text-xs text-gray-400 text-center mt-0.5">One at a time</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setEntryMode("full")}
-              className={`flex-1 py-3 px-2 rounded-xl items-center border-2 ${
-                entryMode === "full" ? "border-green-500 bg-green-50" : "border-gray-200 bg-white"
-              }`}
-            >
-              <Ionicons name="list-outline" size={20} color={entryMode === "full" ? "#16a34a" : "#9ca3af"} />
-              <Text className={`text-xs font-semibold mt-1 ${entryMode === "full" ? "text-green-700" : "text-gray-500"}`}>
-                Scorecard
-              </Text>
-              <Text className="text-xs text-gray-400 text-center mt-0.5">All 18 at once</Text>
+              <Text className="text-xs text-gray-400 text-center mt-0.5">Per hole scores</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -734,79 +734,67 @@ function Step3Quick({
   );
 }
 
-// ─── Step 3b: Hole by hole ────────────────────────────────────────────────────
+// ─── Step 3b: Hole scoring (hole-by-hole + scorecard, shared state) ───────────
 
-function Step3HoleByHole({
+function Step3HoleScoring({
   format,
   handicap,
   holes: holesProp,
+  roundId,
+  initialScores,
+  startHole,
   onNext,
 }: {
   format: Format;
   handicap: number | null;
   holes?: CourseHole[];
+  roundId?: string;
+  initialScores?: (number | null)[];
+  startHole?: number;
   onNext: (data: { grossScore: string; holeScores: number[]; playedWith: string; conditions: string; notes: string }) => void;
 }) {
+  const saveHoleScore = useMutation(api.rounds.saveHoleScore);
   const pars = holesProp?.length === 18 ? holesProp.map(h => h.par) : STANDARD_PARS;
   const strokeIndexes = holesProp?.length === 18 ? holesProp.map(h => h.strokeIndex) : STANDARD_SI;
 
-  const [scores, setScores] = useState<(number | null)[]>(new Array(18).fill(null));
-  const [currentHole, setCurrentHole] = useState(0);
+  const [viewMode, setViewMode] = useState<"hole_by_hole" | "scorecard">("hole_by_hole");
+  const [scores, setScores] = useState<(number | null)[]>(initialScores ?? new Array(18).fill(null));
+  const [currentHole, setCurrentHole] = useState(startHole ?? 0);
+  const [showExtras, setShowExtras] = useState(false);
   const [playedWith, setPlayedWith] = useState("");
   const [conditions, setConditions] = useState("");
   const [notes, setNotes] = useState("");
-  const [showExtras, setShowExtras] = useState(false);
 
   const playingHandicap = Math.round(handicap ?? 0);
-  const par = pars[currentHole];
-  const si = strokeIndexes[currentHole];
-  const score = scores[currentHole];
 
-  const shotsReceived = Math.floor(playingHandicap / 18) + (si <= (playingHandicap % 18) ? 1 : 0);
-
-  function updateHoleScore(delta: number) {
+  function updateScore(i: number, delta: number) {
     setScores(prev => {
       const next = [...prev];
-      if (next[currentHole] === null) {
-        next[currentHole] = delta > 0 ? par : par - 1;
+      if (next[i] === null) {
+        next[i] = delta > 0 ? pars[i] : pars[i] - 1;
       } else {
-        next[currentHole] = Math.max(1, next[currentHole]! + delta);
+        next[i] = Math.max(1, next[i]! + delta);
       }
       return next;
     });
   }
 
-  function handleNext() {
-    if (currentHole < 17) {
-      setCurrentHole(h => h + 1);
-    } else {
-      setShowExtras(true);
-    }
-  }
-
-  function handlePrev() {
-    if (currentHole > 0) setCurrentHole(h => h - 1);
-  }
+  const filledScores = scores.map((s, i) => s ?? pars[i]);
+  const enteredCount = scores.filter(s => s !== null).length;
+  const grossTotal = scores.reduce<number>((a, s) => a + (s ?? 0), 0);
+  const stablefordTotal = computeStableford(filledScores, pars, playingHandicap, strokeIndexes);
 
   function handleSubmit() {
-    const filledScores = scores.map((s, i) => s ?? pars[i]);
-    const total = filledScores.reduce((a, b) => a + b, 0);
-    onNext({ grossScore: total.toString(), holeScores: filledScores, playedWith, conditions, notes });
+    const filled = scores.map((s, i) => s ?? pars[i]);
+    const total = filled.reduce((a, b) => a + b, 0);
+    onNext({ grossScore: total.toString(), holeScores: filled, playedWith, conditions, notes });
   }
 
-  // Running totals for entered holes so far
-  const enteredTotal = scores.slice(0, currentHole + 1).reduce<number>((a, s) => a + (s ?? 0), 0);
-  const filledSoFar = scores.map((s, i) => s ?? pars[i]);
-  const stablefordSoFar = computeStableford(filledSoFar, pars, playingHandicap, strokeIndexes);
-
-  const diff = score !== null ? score - par : null;
-  const diffLabel = diff === null ? "" : diff === -2 ? "Eagle" : diff === -1 ? "Birdie" : diff === 0 ? "Par" : diff === 1 ? "Bogey" : diff === 2 ? "Double" : `+${diff}`;
-  const diffColor = diff === null ? "#d1d5db" : diff < 0 ? "#16a34a" : diff === 0 ? "#6b7280" : diff === 1 ? "#3b82f6" : "#dc2626";
-
+  // ── Extras screen (shown after all holes scored) ─────────────────────────────
   if (showExtras) {
-    const filledScores = scores.map((s, i) => s ?? pars[i]);
-    const total = filledScores.reduce((a, b) => a + b, 0);
-    const stablefordFinal = computeStableford(filledScores, pars, playingHandicap, strokeIndexes);
+    const filled = scores.map((s, i) => s ?? pars[i]);
+    const total = filled.reduce((a, b) => a + b, 0);
+    const stablefordFinal = computeStableford(filled, pars, playingHandicap, strokeIndexes);
     return (
       <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
         <View className="px-4 pt-4 gap-5">
@@ -816,12 +804,10 @@ function Step3HoleByHole({
               <Text className="text-white text-3xl font-bold">{total}</Text>
               <Text className="text-green-200 text-xs mt-1">Gross</Text>
             </View>
-            {stablefordFinal !== null && (
-              <View className="flex-1 bg-green-50 border border-green-200 rounded-xl p-4 items-center">
-                <Text className="text-green-700 text-3xl font-bold">{stablefordFinal}</Text>
-                <Text className="text-green-500 text-xs mt-1">Stableford</Text>
-              </View>
-            )}
+            <View className="flex-1 bg-green-50 border border-green-200 rounded-xl p-4 items-center">
+              <Text className="text-green-700 text-3xl font-bold">{stablefordFinal}</Text>
+              <Text className="text-green-500 text-xs mt-1">Stableford</Text>
+            </View>
           </View>
           <Input label="Playing with (optional)" placeholder="Names separated by commas" value={playedWith} onChangeText={setPlayedWith} />
           <View className="gap-2">
@@ -836,37 +822,125 @@ function Step3HoleByHole({
               ))}
             </View>
           </View>
-          <Button onPress={handleSubmit}>Continue</Button>
+          <View className="gap-1.5">
+            <Text className="text-sm font-medium text-gray-700">Notes (optional)</Text>
+            <TextInput
+              className="bg-white border border-gray-300 rounded-xl px-4 py-3 text-base text-gray-900 min-h-20"
+              value={notes} onChangeText={setNotes}
+              placeholder="How did it go?" placeholderTextColor="#9ca3af"
+              multiline numberOfLines={3} textAlignVertical="top"
+            />
+          </View>
+          <Button onPress={handleSubmit} size="lg" className="mb-8">Continue</Button>
         </View>
       </ScrollView>
     );
   }
 
+  // ── View toggle ──────────────────────────────────────────────────────────────
+  const viewToggle = (
+    <View className="flex-row mx-4 mt-2 mb-1 bg-gray-100 rounded-xl p-1">
+      {(["hole_by_hole", "scorecard"] as const).map(mode => (
+        <TouchableOpacity
+          key={mode}
+          onPress={() => setViewMode(mode)}
+          className={`flex-1 py-1.5 rounded-lg items-center ${viewMode === mode ? "bg-white" : ""}`}
+        >
+          <Text className={`text-xs font-semibold ${viewMode === mode ? "text-gray-900" : "text-gray-400"}`}>
+            {mode === "hole_by_hole" ? "Hole by hole" : "Scorecard"}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+  // ── Scorecard view ───────────────────────────────────────────────────────────
+  if (viewMode === "scorecard") {
+    return (
+      <View className="flex-1">
+        {viewToggle}
+        <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+          <View className="px-4 pt-2 pb-8 gap-4">
+            <View className="flex-row gap-3">
+              <View className="flex-1 bg-green-600 rounded-xl p-3 items-center">
+                <Text className="text-white text-2xl font-bold">{enteredCount > 0 ? grossTotal : "—"}</Text>
+                <Text className="text-green-200 text-xs">Gross · {enteredCount}/18</Text>
+              </View>
+              <View className="flex-1 bg-green-50 border border-green-200 rounded-xl p-3 items-center">
+                <Text className="text-green-700 text-2xl font-bold">{stablefordTotal}</Text>
+                <Text className="text-green-500 text-xs">Stableford</Text>
+              </View>
+            </View>
+            <Card>
+              <View className="flex-row px-3 py-2 border-b border-gray-100">
+                <Text className="text-xs font-bold text-gray-400 w-8">Hole</Text>
+                <Text className="text-xs font-bold text-gray-400 w-10">Par</Text>
+                <Text className="text-xs font-bold text-gray-400 w-10">SI</Text>
+                <Text className="text-xs font-bold text-gray-400 flex-1 text-center">Score</Text>
+              </View>
+              {pars.map((par, i) => {
+                const score = scores[i];
+                const diff = score !== null ? score - par : null;
+                const diffColor = diff === null ? "#d1d5db" : diff < 0 ? "#16a34a" : diff === 0 ? "#6b7280" : diff === 1 ? "#3b82f6" : "#dc2626";
+                return (
+                  <View key={i} className={`flex-row items-center px-3 py-2 border-b border-gray-50 last:border-0 ${i === 8 ? "border-b-2 border-gray-200" : ""}`}>
+                    <Text className="text-sm font-bold text-gray-500 w-8">{i + 1}</Text>
+                    <Text className="text-sm text-gray-500 w-10">{par}</Text>
+                    <Text className="text-sm text-gray-400 w-10">{strokeIndexes[i]}</Text>
+                    <View className="flex-1 flex-row items-center justify-center gap-3">
+                      <TouchableOpacity onPress={() => updateScore(i, -1)} className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center">
+                        <Ionicons name="remove" size={16} color="#6b7280" />
+                      </TouchableOpacity>
+                      <Text style={{ color: diffColor, fontWeight: "700", fontSize: 18, minWidth: 24, textAlign: "center" }}>
+                        {score !== null ? score : "—"}
+                      </Text>
+                      <TouchableOpacity onPress={() => updateScore(i, 1)} className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center">
+                        <Ionicons name="add" size={16} color="#6b7280" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </Card>
+            <Button onPress={() => setShowExtras(true)} size="lg">Continue</Button>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── Hole-by-hole view ────────────────────────────────────────────────────────
+  const par = pars[currentHole];
+  const si = strokeIndexes[currentHole];
+  const score = scores[currentHole];
+  const shotsReceived = Math.floor(playingHandicap / 18) + (si <= (playingHandicap % 18) ? 1 : 0);
+  const diff = score !== null ? score - par : null;
+  const diffLabel = diff === null ? "" : diff === -2 ? "Eagle" : diff === -1 ? "Birdie" : diff === 0 ? "Par" : diff === 1 ? "Bogey" : diff === 2 ? "Double" : `+${diff}`;
+  const diffColor = diff === null ? "#d1d5db" : diff < 0 ? "#16a34a" : diff === 0 ? "#6b7280" : diff === 1 ? "#3b82f6" : "#dc2626";
+  const enteredTotal = scores.slice(0, currentHole + 1).reduce<number>((a, s) => a + (s ?? 0), 0);
+
   return (
     <View className="flex-1 bg-white">
-      {/* Progress bar */}
-      <View className="flex-row px-4 pt-3 gap-1">
+      {viewToggle}
+      {/* Progress bar — tappable to jump to hole */}
+      <View className="flex-row px-4 pt-1 gap-1">
         {pars.map((_, i) => (
-          <View key={i} className={`flex-1 h-1 rounded-full ${
-            i < currentHole ? "bg-green-500" : i === currentHole ? "bg-green-300" : "bg-gray-100"
-          }`} />
+          <TouchableOpacity key={i} onPress={() => setCurrentHole(i)} className="flex-1 py-1">
+            <View className={`h-1.5 rounded-full ${i < currentHole ? "bg-green-500" : i === currentHole ? "bg-green-300" : "bg-gray-100"}`} />
+          </TouchableOpacity>
         ))}
       </View>
-
       {/* Running total */}
-      <View className="flex-row px-4 pt-3 pb-1 gap-3">
+      <View className="flex-row px-4 pt-2 pb-1 gap-3">
         <View className="flex-1 bg-green-600 rounded-xl px-3 py-2 items-center">
           <Text className="text-white text-lg font-bold">{enteredTotal > 0 ? enteredTotal : "—"}</Text>
           <Text className="text-green-200 text-xs">Gross · {currentHole + (score !== null ? 1 : 0)}/18</Text>
         </View>
-        {stablefordSoFar !== null && (
-          <View className="flex-1 bg-green-50 border border-green-200 rounded-xl px-3 py-2 items-center">
-            <Text className="text-green-700 text-lg font-bold">{stablefordSoFar}</Text>
-            <Text className="text-green-500 text-xs">Stableford</Text>
-          </View>
-        )}
+        <View className="flex-1 bg-green-50 border border-green-200 rounded-xl px-3 py-2 items-center">
+          <Text className="text-green-700 text-lg font-bold">{stablefordTotal}</Text>
+          <Text className="text-green-500 text-xs">Stableford</Text>
+        </View>
       </View>
-
       {/* Hole info */}
       <View className="flex-1 items-center justify-center px-8 gap-6">
         <View className="items-center gap-1">
@@ -875,14 +949,10 @@ function Step3HoleByHole({
             <Text className="text-base text-gray-500">Par {par}</Text>
             <Text className="text-base text-gray-400">SI {si}</Text>
             {shotsReceived > 0 && (
-              <View className="flex-row items-center gap-1">
-                <Text className="text-base text-green-600 font-semibold">+{shotsReceived} shot{shotsReceived > 1 ? "s" : ""}</Text>
-              </View>
+              <Text className="text-base text-green-600 font-semibold">+{shotsReceived} shot{shotsReceived > 1 ? "s" : ""}</Text>
             )}
           </View>
         </View>
-
-        {/* Score display */}
         <View className="items-center gap-2">
           <Text style={{ fontSize: 80, fontWeight: "800", color: diffColor, lineHeight: 88 }}>
             {score !== null ? score : "—"}
@@ -891,234 +961,50 @@ function Step3HoleByHole({
             <Text style={{ color: diffColor, fontWeight: "600", fontSize: 18 }}>{diffLabel}</Text>
           )}
         </View>
-
-        {/* +/- buttons */}
         <View className="flex-row gap-8 items-center">
-          <TouchableOpacity
-            onPress={() => updateHoleScore(-1)}
-            style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center" }}
-          >
+          <TouchableOpacity onPress={() => updateScore(currentHole, -1)}
+            style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center" }}>
             <Ionicons name="remove" size={32} color="#374151" />
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => updateHoleScore(1)}
-            style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center" }}
-          >
+          <TouchableOpacity onPress={() => updateScore(currentHole, 1)}
+            style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center" }}>
             <Ionicons name="add" size={32} color="#374151" />
           </TouchableOpacity>
         </View>
       </View>
-
       {/* Navigation */}
       <View className="flex-row px-4 pb-6 gap-3">
-        <TouchableOpacity
-          onPress={handlePrev}
+        <TouchableOpacity onPress={() => currentHole > 0 && setCurrentHole(h => h - 1)}
           disabled={currentHole === 0}
-          className={`flex-1 py-3.5 rounded-xl items-center border ${currentHole === 0 ? "border-gray-100 bg-gray-50" : "border-gray-200 bg-white"}`}
-        >
+          className={`flex-1 py-3.5 rounded-xl items-center border ${currentHole === 0 ? "border-gray-100 bg-gray-50" : "border-gray-200 bg-white"}`}>
           <Text className={`font-semibold ${currentHole === 0 ? "text-gray-300" : "text-gray-700"}`}>← Back</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={handleNext}
+          onPress={() => {
+            // Auto-save this hole to Convex before advancing
+            if (roundId && score !== null) {
+              saveHoleScore({
+                roundId: roundId as any,
+                hole: currentHole + 1,
+                par,
+                strokeIndex: si,
+                score,
+              }).catch(() => {}); // fire-and-forget
+            }
+            if (currentHole < 17) {
+              setCurrentHole(h => h + 1);
+            } else {
+              setShowExtras(true);
+            }
+          }}
           disabled={score === null}
-          className={`flex-[2] py-3.5 rounded-xl items-center ${score === null ? "bg-gray-100" : "bg-green-600"}`}
-        >
+          className={`flex-[2] py-3.5 rounded-xl items-center ${score === null ? "bg-gray-100" : "bg-green-600"}`}>
           <Text className={`font-semibold ${score === null ? "text-gray-400" : "text-white"}`}>
             {currentHole === 17 ? "Finish round" : "Next hole →"}
           </Text>
         </TouchableOpacity>
       </View>
     </View>
-  );
-}
-
-// ─── Step 3c: Scorecard (all holes) ──────────────────────────────────────────
-
-function Step3Scorecard({
-  format,
-  handicap,
-  holes: holesProp,
-  onNext,
-}: {
-  format: Format;
-  handicap: number | null;
-  holes?: CourseHole[];
-  onNext: (data: {
-    grossScore: string;
-    holeScores: number[];
-    playedWith: string;
-    conditions: string;
-    notes: string;
-  }) => void;
-}) {
-  // Use real course hole data when available, fall back to standard layout
-  const pars = holesProp?.length === 18
-    ? holesProp.map(h => h.par)
-    : STANDARD_PARS;
-  const strokeIndexes = holesProp?.length === 18
-    ? holesProp.map(h => h.strokeIndex)
-    : STANDARD_SI;
-
-  const [scores, setScores] = useState<(number | null)[]>(new Array(18).fill(null));
-  const [playedWith, setPlayedWith] = useState("");
-  const [conditions, setConditions] = useState("");
-  const [notes, setNotes] = useState("");
-
-  function updateScore(i: number, delta: number) {
-    setScores((prev) => {
-      const next = [...prev];
-      if (next[i] === null) {
-        // First tap: + → par, - → birdie
-        next[i] = delta > 0 ? pars[i] : pars[i] - 1;
-      } else {
-        next[i] = Math.max(1, next[i]! + delta);
-      }
-      return next;
-    });
-  }
-
-  const filledScores = scores.map((s, i) => s ?? pars[i]);
-  const enteredCount = scores.filter(s => s !== null).length;
-  const total = scores.reduce<number>((a, s) => a + (s ?? 0), 0);
-  const playingHandicap = Math.round(handicap ?? 0);
-  const stablefordTotal = computeStableford(filledScores, pars, playingHandicap, strokeIndexes);
-
-  const allEntered = scores.every((s) => s !== null);
-
-  function handleNext() {
-    onNext({
-      grossScore: total.toString(),
-      holeScores: filledScores,
-      playedWith,
-      conditions,
-      notes,
-    });
-  }
-
-  return (
-    <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
-      <View className="px-4 pt-4 gap-4">
-        <Text className="text-xl font-bold text-gray-900">Scorecard</Text>
-
-        {/* Running totals */}
-        <View className="flex-row gap-3">
-          <View className="flex-1 bg-green-600 rounded-xl p-3 items-center">
-            <Text className="text-white text-2xl font-bold">{enteredCount > 0 ? total : "—"}</Text>
-            <Text className="text-green-200 text-xs">Gross · {enteredCount}/18</Text>
-          </View>
-          {stablefordTotal !== null && (
-            <View className="flex-1 bg-green-50 border border-green-200 rounded-xl p-3 items-center">
-              <Text className="text-green-700 text-2xl font-bold">{stablefordTotal}</Text>
-              <Text className="text-green-500 text-xs">Stableford</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Hole rows */}
-        <Card>
-          {/* Header */}
-          <View className="flex-row px-3 py-2 border-b border-gray-100">
-            <Text className="text-xs font-bold text-gray-400 w-8">Hole</Text>
-            <Text className="text-xs font-bold text-gray-400 w-10">Par</Text>
-            <Text className="text-xs font-bold text-gray-400 w-10">SI</Text>
-            <Text className="text-xs font-bold text-gray-400 flex-1 text-center">Score</Text>
-          </View>
-          {pars.map((par, i) => {
-            const score = scores[i];
-            const diff = score !== null ? score - par : null;
-            const diffColor =
-              diff === null
-                ? "#d1d5db"
-                : diff < 0
-                ? "#16a34a"
-                : diff === 0
-                ? "#6b7280"
-                : diff === 1
-                ? "#3b82f6"
-                : "#dc2626";
-            return (
-              <View
-                key={i}
-                className={`flex-row items-center px-3 py-2 ${
-                  i < 17 ? "border-b border-gray-50" : ""
-                } ${i === 8 ? "border-b-2 border-gray-200" : ""}`}
-              >
-                <Text className="text-sm font-bold text-gray-500 w-8">{i + 1}</Text>
-                <Text className="text-sm text-gray-500 w-10">{par}</Text>
-                <Text className="text-sm text-gray-400 w-10">{strokeIndexes[i]}</Text>
-                <View className="flex-1 flex-row items-center justify-center gap-3">
-                  <TouchableOpacity
-                    onPress={() => updateScore(i, -1)}
-                    className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center"
-                  >
-                    <Ionicons name="remove" size={16} color="#6b7280" />
-                  </TouchableOpacity>
-                  <Text style={{ color: diffColor, fontWeight: "700", fontSize: 18, minWidth: 24, textAlign: "center" }}>
-                    {score !== null ? score : "—"}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => updateScore(i, 1)}
-                    className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center"
-                  >
-                    <Ionicons name="add" size={16} color="#6b7280" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          })}
-        </Card>
-
-        {/* Playing with */}
-        <Input
-          label="Playing with (optional)"
-          placeholder="Names separated by commas"
-          value={playedWith}
-          onChangeText={setPlayedWith}
-        />
-
-        {/* Conditions */}
-        <View className="gap-2">
-          <Text className="text-sm font-medium text-gray-700">Conditions</Text>
-          <View className="flex-row gap-2">
-            {CONDITIONS.map((c) => (
-              <TouchableOpacity
-                key={c.key}
-                onPress={() => setConditions(conditions === c.key ? "" : c.key)}
-                className={`flex-1 py-2.5 rounded-xl items-center border ${
-                  conditions === c.key
-                    ? "border-green-500 bg-green-50"
-                    : "border-gray-200 bg-white"
-                }`}
-              >
-                <Text className="text-xl">{c.emoji}</Text>
-                <Text className={`text-xs mt-0.5 ${conditions === c.key ? "text-green-700 font-semibold" : "text-gray-500"}`}>
-                  {c.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Notes */}
-        <View className="gap-1.5">
-          <Text className="text-sm font-medium text-gray-700">Notes (optional)</Text>
-          <TextInput
-            className="bg-white border border-gray-300 rounded-xl px-4 py-3 text-base text-gray-900 min-h-20"
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="How did it go?"
-            placeholderTextColor="#9ca3af"
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
-        </View>
-
-        <Button onPress={handleNext} size="lg" className="mt-2 mb-8">
-          Review Round
-        </Button>
-      </View>
-    </ScrollView>
   );
 }
 
@@ -1351,8 +1237,11 @@ export default function NewRoundScreen() {
   );
 
   const createRound = useMutation(api.rounds.create);
+  const startRoundMutation = useMutation(api.rounds.startRound);
+  const completeRoundMutation = useMutation(api.rounds.completeRound);
 
   const [step, setStep] = useState<Step>(1);
+  const [inProgressRoundId, setInProgressRoundId] = useState<string | null>(null);
 
   // Collected data
   const [step1Data, setStep1Data] = useState<Step1Data | null>(null);
@@ -1383,8 +1272,26 @@ export default function NewRoundScreen() {
     setStep(2);
   }
 
-  function handleStep2(data: NonNullable<typeof step2Data>) {
+  async function handleStep2(data: NonNullable<typeof step2Data>) {
     setStep2Data(data);
+    if (data.entryMode === "hole_by_hole" && step1Data) {
+      try {
+        const roundId = await startRoundMutation({
+          courseNameFreetext: step1Data.courseName,
+          ...(step1Data.golfCourseId ? { golfCourseId: step1Data.golfCourseId as any } : {}),
+          ...(step1Data.teeId ? { teeId: step1Data.teeId as any } : {}),
+          tees: step1Data.tee,
+          ...(!step1Data.skipRatings && step1Data.courseRating ? { courseRating: parseFloat(step1Data.courseRating) } : {}),
+          ...(!step1Data.skipRatings && step1Data.slopeRating ? { slopeRating: parseFloat(step1Data.slopeRating) } : {}),
+          date: data.date,
+          format: data.format,
+          isCountingRound: !step1Data.skipRatings,
+        });
+        setInProgressRoundId(roundId);
+      } catch (e) {
+        // non-fatal — round still works, just won't be resumable
+      }
+    }
     setStep(3);
   }
 
@@ -1406,6 +1313,32 @@ export default function NewRoundScreen() {
       const cr = parseFloat(step1Data.courseRating);
       const slope = parseFloat(step1Data.slopeRating);
       const hasMarker = !!step4Data?.markerId;
+
+      // Hole-by-hole rounds use completeRound (the round is already started in Convex)
+      if (step2Data.entryMode === "hole_by_hole" && inProgressRoundId && step3Data.holeScores) {
+        await completeRoundMutation({
+          roundId: inProgressRoundId as any,
+          holeScores: step3Data.holeScores.map((score, i) => ({
+            hole: i + 1,
+            par: step1Data.holes?.[i]?.par ?? 4,
+            strokeIndex: step1Data.holes?.[i]?.strokeIndex ?? (i + 1),
+            score,
+          })),
+          ...(step3Data.playedWith.trim() ? { playedWith: step3Data.playedWith.split(",").map(s => s.trim()).filter(Boolean) } : {}),
+          ...(step3Data.conditions ? { conditions: step3Data.conditions } : {}),
+          ...(step3Data.notes ? { notes: step3Data.notes } : {}),
+          ...(step4Data?.markerId ? { markerId: step4Data.markerId, markerName: step4Data.markerName } : {}),
+        });
+
+        Alert.alert(
+          "Round Complete!",
+          hasMarker
+            ? `${step4Data?.markerName} has been notified to attest your score.`
+            : "Your round has been saved.",
+          [{ text: "View Rounds", onPress: () => router.replace("/(app)/rounds") }]
+        );
+        return;
+      }
 
       await createRound({
         ...(step1Data.golfCourseId ? { golfCourseId: step1Data.golfCourseId as any } : {}),
@@ -1474,19 +1407,20 @@ export default function NewRoundScreen() {
         <StepIndicator current={step} total={totalSteps} />
         {step === 1 && <Step1Course onNext={handleStep1} initialCourseId={courseId} />}
         {step === 2 && <Step2Format onNext={handleStep2} />}
-        {step === 3 && step2Data?.entryMode === "full" && (
-          <Step3Scorecard
+        {step === 3 && step2Data?.entryMode === "quick" && (
+          <Step3Quick
             format={step2Data.format}
             handicap={handicap ?? null}
-            holes={step1Data?.holes}
+            coursePar={step1Data?.par ?? 72}
             onNext={handleStep3}
           />
         )}
         {step === 3 && step2Data?.entryMode === "hole_by_hole" && (
-          <Step3HoleByHole
+          <Step3HoleScoring
             format={step2Data.format}
             handicap={handicap ?? null}
             holes={step1Data?.holes}
+            roundId={inProgressRoundId ?? undefined}
             onNext={handleStep3}
           />
         )}

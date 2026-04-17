@@ -11,8 +11,22 @@ export const list = query({
     const q = ctx.db
       .query("rounds")
       .withIndex("by_user_and_date", q => q.eq("userId", userId))
-      .order("desc");
+      .order("desc")
+      .filter(q => q.neq(q.field("status"), "in_progress"));
     return limit ? q.take(limit) : q.collect();
+  },
+});
+
+export const getInProgress = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    return ctx.db
+      .query("rounds")
+      .withIndex("by_user", q => q.eq("userId", identity.subject))
+      .filter(q => q.eq(q.field("status"), "in_progress"))
+      .first();
   },
 });
 
@@ -248,6 +262,163 @@ export const attest = mutation({
       body: `${markerName} has ${verb} your round. ${decision === "confirmed" ? "It now counts towards your handicap." : "It will not count towards your handicap."}`,
       data: { roundId, type: "attestation_result" },
     });
+  },
+});
+
+export const startRound = mutation({
+  args: {
+    courseNameFreetext: v.optional(v.string()),
+    golfCourseId: v.optional(v.id("golfCourses")),
+    teeId: v.optional(v.id("courseTees")),
+    tees: v.string(),
+    courseRating: v.optional(v.number()),
+    slopeRating: v.optional(v.number()),
+    date: v.string(),
+    format: v.string(),
+    isCountingRound: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    // Abandon any existing in-progress round
+    const existing = await ctx.db
+      .query("rounds")
+      .withIndex("by_user", q => q.eq("userId", identity.subject))
+      .filter(q => q.eq(q.field("status"), "in_progress"))
+      .first();
+    if (existing) await ctx.db.delete(existing._id);
+
+    const now = new Date().toISOString();
+    return ctx.db.insert("rounds", {
+      userId: identity.subject,
+      courseNameFreetext: args.courseNameFreetext,
+      golfCourseId: args.golfCourseId,
+      teeId: args.teeId,
+      tees: args.tees,
+      courseRating: args.courseRating,
+      slopeRating: args.slopeRating,
+      date: args.date,
+      format: args.format,
+      grossScore: 0,
+      status: "in_progress",
+      isCountingRound: args.isCountingRound,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+export const saveHoleScore = mutation({
+  args: {
+    roundId: v.id("rounds"),
+    hole: v.number(),
+    par: v.number(),
+    strokeIndex: v.number(),
+    score: v.number(),
+  },
+  handler: async (ctx, { roundId, hole, par, strokeIndex, score }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const round = await ctx.db.get(roundId);
+    if (!round || round.userId !== identity.subject) throw new Error("Round not found");
+    if (round.status !== "in_progress") return; // silently ignore if already complete
+
+    const existing = (round.holeScores ?? []).filter(h => h.hole !== hole);
+    existing.push({ hole, par, strokeIndex, score });
+    existing.sort((a, b) => a.hole - b.hole);
+
+    await ctx.db.patch(roundId, {
+      holeScores: existing as any,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+export const completeRound = mutation({
+  args: {
+    roundId: v.id("rounds"),
+    holeScores: v.array(v.object({
+      hole: v.number(),
+      par: v.number(),
+      strokeIndex: v.number(),
+      score: v.number(),
+    })),
+    playedWith: v.optional(v.array(v.string())),
+    conditions: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    markerId: v.optional(v.string()),
+    markerName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const round = await ctx.db.get(args.roundId);
+    if (!round || round.userId !== identity.subject) throw new Error("Round not found");
+    if (round.status !== "in_progress") throw new Error("Round already complete");
+
+    const grossScore = args.holeScores.reduce((a, h) => a + h.score, 0);
+
+    // Auto-fill ratings from teeId if not already set
+    let courseRating = round.courseRating;
+    let slopeRating = round.slopeRating;
+    if (round.teeId) {
+      const tee = await ctx.db.get(round.teeId);
+      if (tee) {
+        courseRating = tee.courseRating ?? courseRating;
+        slopeRating = tee.slopeRating ?? slopeRating;
+      }
+    }
+
+    let differential: number | undefined;
+    if (courseRating !== undefined && slopeRating !== undefined) {
+      differential = computeDifferential(grossScore, courseRating, slopeRating);
+    }
+
+    const profile = await ctx.db
+      .query("golferProfiles")
+      .withIndex("by_user", q => q.eq("userId", identity.subject))
+      .first();
+    const handicapAtTime = profile?.handicapIndex;
+
+    const hasMarker = !!args.markerId;
+    const isCountingRound = hasMarker ? false : round.isCountingRound;
+    const attestationStatus = hasMarker ? "pending" : undefined;
+
+    const now = new Date().toISOString();
+    await ctx.db.patch(args.roundId, {
+      grossScore,
+      status: "complete",
+      holeScores: args.holeScores as any,
+      courseRating,
+      slopeRating,
+      handicapAtTime,
+      differential,
+      isCountingRound,
+      attestationStatus,
+      ...(args.playedWith ? { playedWith: args.playedWith } : {}),
+      ...(args.conditions ? { conditions: args.conditions } : {}),
+      ...(args.notes ? { notes: args.notes } : {}),
+      ...(args.markerId ? { markerId: args.markerId } : {}),
+      ...(args.markerName ? { markerName: args.markerName } : {}),
+      updatedAt: now,
+    });
+
+    if (hasMarker && args.markerId) {
+      const submitterName = profile?.displayName ?? identity.subject;
+      await ctx.scheduler.runAfter(0, internal.pushNotifications.sendToUser, {
+        userId: args.markerId,
+        title: "Score attestation request",
+        body: `${submitterName} has asked you to attest their round at ${round.courseNameFreetext ?? "the course"}.`,
+        data: { roundId: args.roundId, type: "attestation" },
+      });
+    }
+
+    if (isCountingRound && differential !== undefined) {
+      await recomputeHandicap(ctx, identity.subject, args.roundId);
+    }
+
+    return args.roundId;
   },
 });
 

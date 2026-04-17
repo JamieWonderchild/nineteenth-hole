@@ -268,6 +268,9 @@ function ClubMemberHome({
         </View>
       </View>
 
+      {/* In-progress round */}
+      <InProgressRoundBanner router={router} />
+
       {/* Quick Game */}
       <View className="px-5 mt-5 mb-5">
         <TouchableOpacity
@@ -362,6 +365,47 @@ function ClubMemberHome({
         )}
       </View>
     </ScrollView>
+  );
+}
+
+// ── In-Progress Round Banner ──────────────────────────────────────────────────
+
+function InProgressRoundBanner({ router }: { router: ReturnType<typeof useRouter> }) {
+  const round = useQuery(api.rounds.getInProgress);
+  if (!round) return null;
+
+  const holesScored = round.holeScores?.length ?? 0;
+  const courseName = round.courseNameFreetext ?? "Golf course";
+
+  return (
+    <View className="px-5 mt-4">
+      <TouchableOpacity
+        onPress={() => router.push(`/(app)/rounds/score?roundId=${round._id}` as any)}
+        activeOpacity={0.85}
+        className="flex-row items-center gap-3 bg-green-600 rounded-2xl px-4 py-3.5"
+        style={{
+          shadowColor: "#16a34a",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 10,
+          elevation: 4,
+        }}
+      >
+        <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center shrink-0">
+          <Ionicons name="golf" size={20} color="#fff" />
+        </View>
+        <View className="flex-1">
+          <Text className="text-white font-bold text-sm">Round in progress</Text>
+          <Text className="text-green-200 text-xs mt-0.5" numberOfLines={1}>
+            {courseName} · {holesScored}/18 holes
+          </Text>
+        </View>
+        <View className="flex-row items-center gap-1">
+          <Text className="text-green-200 text-xs font-medium">Resume</Text>
+          <Ionicons name="chevron-forward" size={14} color="#86efac" />
+        </View>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -583,6 +627,9 @@ function IndividualHome({
           </TouchableOpacity>
         )}
       </View>
+
+      {/* In-progress round */}
+      <InProgressRoundBanner router={router} />
 
       {/* Pending attestation requests */}
       <PendingAttestationsCard router={router} />

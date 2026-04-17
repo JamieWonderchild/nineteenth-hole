@@ -1064,6 +1064,9 @@ export default defineSchema({
     markerName: v.optional(v.string()),        // display name of the marker
     attestationStatus: v.optional(v.string()), // 'pending' | 'confirmed' | 'rejected'
     attestedAt: v.optional(v.string()),        // ISO timestamp of marker's decision
+    // Round lifecycle
+    status: v.optional(v.union(v.literal("in_progress"), v.literal("complete"))),
+    format: v.optional(v.string()),            // 'stableford' | 'strokeplay'
     createdAt: v.string(),
     updatedAt: v.string(),
   })
