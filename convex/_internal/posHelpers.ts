@@ -11,6 +11,8 @@ export type SaleItem = {
   subtotalPence: number;
 };
 
+export type SplitEntry = { method: string; amountPence: number };
+
 export type RecordSaleArgs = {
   clubId: Id<"clubs">;
   memberId?: string;
@@ -19,6 +21,7 @@ export type RecordSaleArgs = {
   items: SaleItem[];
   currency: string;
   paymentMethod: string;
+  splits?: SplitEntry[];
   notes?: string;
   shiftId?: Id<"posShifts">;
   locationId?: Id<"posLocations">;
@@ -82,6 +85,77 @@ export async function recordSaleInternal(
       createdAt:   now,
     });
 
+    await decrementStock(ctx, args.items, now);
+    return saleId;
+  }
+
+  // Split payment — handle account portion if present
+  if (args.paymentMethod === "split" && args.splits) {
+    const accountSplit = args.splits.find((s) => s.method === "account");
+    if (accountSplit) {
+      if (!args.chargeAccountMemberId) throw new Error("Member account not specified for account split");
+      const member = await ctx.db.get(args.chargeAccountMemberId);
+      if (!member) throw new Error("Member not found");
+      const balance = member.accountBalance ?? 0;
+      if (balance < accountSplit.amountPence) {
+        throw new Error(
+          `Insufficient balance (${(balance / 100).toFixed(2)} available, ${(accountSplit.amountPence / 100).toFixed(2)} needed from account)`,
+        );
+      }
+      const newBalance = balance - accountSplit.amountPence;
+      await ctx.db.patch(args.chargeAccountMemberId, { accountBalance: newBalance });
+      const saleId = await ctx.db.insert("posSales", {
+        clubId:          args.clubId,
+        memberId:        member.userId,
+        clubMemberId:    args.chargeAccountMemberId,
+        memberName:      member.displayName,
+        items:           args.items,
+        subtotalPence,
+        totalPence:      subtotalPence,
+        currency:        args.currency,
+        paymentMethod:   "split",
+        splits:          args.splits,
+        notes:           args.notes,
+        servedBy:        args.servedBy,
+        shiftId:         args.shiftId,
+        locationId:      args.locationId,
+        isGuest:         false,
+        createdAt:       now,
+      });
+      await ctx.db.insert("memberAccountTransactions", {
+        clubId:       args.clubId,
+        memberId:     args.chargeAccountMemberId,
+        userId:       member.userId,
+        type:         "charge",
+        amount:       -accountSplit.amountPence,
+        balanceAfter: newBalance,
+        description:  args.items.map((i) => `${i.quantity}× ${i.productName}`).join(", ") + " (split)",
+        saleId,
+        processedBy:  args.servedBy,
+        createdAt:    now,
+      });
+      await decrementStock(ctx, args.items, now);
+      return saleId;
+    }
+
+    // Split with no account portion — just record it
+    const saleId = await ctx.db.insert("posSales", {
+      clubId:        args.clubId,
+      memberId:      args.memberId,
+      memberName:    args.memberName,
+      items:         args.items,
+      subtotalPence,
+      totalPence:    subtotalPence,
+      currency:      args.currency,
+      paymentMethod: "split",
+      splits:        args.splits,
+      notes:         args.notes,
+      servedBy:      args.servedBy,
+      shiftId:       args.shiftId,
+      locationId:    args.locationId,
+      isGuest:       args.isGuest,
+      createdAt:     now,
+    });
     await decrementStock(ctx, args.items, now);
     return saleId;
   }

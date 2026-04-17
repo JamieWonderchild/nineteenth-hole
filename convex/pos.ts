@@ -185,6 +185,10 @@ export const recordSale = mutation({
     })),
     currency: v.string(),
     paymentMethod: v.string(),
+    splits: v.optional(v.array(v.object({
+      method:      v.string(),
+      amountPence: v.number(),
+    }))),
     notes: v.optional(v.string()),
     // Shift & location context
     shiftId:    v.optional(v.id("posShifts")),

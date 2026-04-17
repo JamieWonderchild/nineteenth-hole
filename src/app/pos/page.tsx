@@ -349,6 +349,13 @@ export default function POSPage() {
   const [selectedTerminalId, setSelectedTerminalId] = useState<string>("");
   const [showTerminalPicker, setShowTerminalPicker] = useState(false);
 
+  // Change calculation (cash) — derived values computed after `total` below
+  const [cashTendered, setCashTendered] = useState("");
+
+  // Split payment
+  const [splitMode, setSplitMode] = useState(false);
+  const [splitAmounts, setSplitAmounts] = useState<Record<string, string>>({});
+
   // Customer (member)
   const [memberSearch, setMemberSearch] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState<Id<"clubMembers"> | null>(null);
@@ -391,6 +398,16 @@ export default function POSPage() {
   const total = displayBasket.reduce((s, i) => s + i.subtotalPence, 0);
   const currency = club?.currency ?? "GBP";
   const itemCount = displayBasket.reduce((s, i) => s + i.quantity, 0);
+
+  // Change calculation
+  const cashTenderedPence = Math.round((parseFloat(cashTendered) || 0) * 100);
+  const changeDuePence = cashTenderedPence - total;
+
+  // Split derived
+  const splitTotalPence = Object.values(splitAmounts)
+    .reduce((s, v) => s + Math.round((parseFloat(v) || 0) * 100), 0);
+  const splitRemainingPence = total - splitTotalPence;
+  const splitsValid = splitRemainingPence === 0 && splitTotalPence > 0;
 
   // ── Category tabs ──────────────────────────────────────────────────────────
 
@@ -481,6 +498,9 @@ export default function POSPage() {
     setSelectedMemberId(null);
     setMemberSearch("");
     setSaleDone(null);
+    setCashTendered("");
+    setSplitMode(false);
+    setSplitAmounts({});
   }
 
   // ── Charge ─────────────────────────────────────────────────────────────────
@@ -488,13 +508,22 @@ export default function POSPage() {
   async function handleCharge() {
     if (!club || displayBasket.length === 0 || saving) return;
 
-    if (paymentMethod === "terminal" && !selectedTerminalId) {
-      setShowTerminalPicker(true);
-      return;
-    }
-    if (paymentMethod === "account" && !selectedMemberId) {
-      setError("Select a member to charge their account");
-      return;
+    if (splitMode) {
+      if (!splitsValid) { setError("Split amounts must add up to the total"); return; }
+      const accountSplit = Object.entries(splitAmounts).find(([m]) => m === "account");
+      if (accountSplit && !selectedMemberId) {
+        setError("Select a member for the account portion");
+        return;
+      }
+    } else {
+      if (paymentMethod === "terminal" && !selectedTerminalId) {
+        setShowTerminalPicker(true);
+        return;
+      }
+      if (paymentMethod === "account" && !selectedMemberId) {
+        setError("Select a member to charge their account");
+        return;
+      }
     }
 
     setSaving(true);
@@ -539,7 +568,7 @@ export default function POSPage() {
         setSelectedMemberId(null);
         setMemberSearch("");
       } else {
-        // ── Quick sale mode — existing recordSale path ────────────────────
+        // ── Quick sale mode ───────────────────────────────────────────────
         const items = basket.map(i => ({
           productId:      i.productId !== "custom" ? i.productId : undefined,
           productName:    i.productName,
@@ -548,7 +577,27 @@ export default function POSPage() {
           subtotalPence:  i.subtotalPence,
         }));
 
-        if (paymentMethod === "terminal") {
+        if (splitMode) {
+          const splits = Object.entries(splitAmounts)
+            .filter(([, v]) => parseFloat(v) > 0)
+            .map(([method, v]) => ({ method, amountPence: Math.round(parseFloat(v) * 100) }));
+          const accountSplit = splits.find(s => s.method === "account");
+          await recordSale({
+            clubId: club._id,
+            memberId:              selectedMember?.userId,
+            memberName:            selectedMember?.displayName,
+            chargeAccountMemberId: accountSplit ? selectedMemberId! : undefined,
+            items,
+            currency,
+            paymentMethod: "split",
+            splits,
+            notes: note || undefined,
+            shiftId:    openShift?._id,
+            locationId: selectedLocationId ?? undefined,
+            isGuest:    !selectedMember,
+          });
+          setSaleDone({ total, method: "split", memberName: selectedMember?.displayName });
+        } else if (paymentMethod === "terminal") {
           const res = await fetch("/api/payments/terminal", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -578,6 +627,7 @@ export default function POSPage() {
             locationId: selectedLocationId ?? undefined,
             isGuest:    !selectedMember,
           });
+          setSaleDone({ total, method: paymentMethod, memberName: selectedMember?.displayName });
         } else if (paymentMethod === "account") {
           await recordSale({
             clubId: club._id,
@@ -590,6 +640,7 @@ export default function POSPage() {
             locationId: selectedLocationId ?? undefined,
             isGuest:    false,
           });
+          setSaleDone({ total, method: paymentMethod, memberName: selectedMember?.displayName });
         } else {
           await recordSale({
             clubId: club._id,
@@ -603,14 +654,17 @@ export default function POSPage() {
             locationId: selectedLocationId ?? undefined,
             isGuest:    !selectedMember,
           });
+          setSaleDone({ total, method: paymentMethod, memberName: selectedMember?.displayName });
         }
 
-        setSaleDone({ total, method: paymentMethod, memberName: selectedMember?.displayName });
         setBasket([]);
         setNote("");
         setShowNote(false);
         setSelectedMemberId(null);
         setMemberSearch("");
+        setCashTendered("");
+        setSplitMode(false);
+        setSplitAmounts({});
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -1054,74 +1108,174 @@ export default function POSPage() {
             </span>
           </div>
 
-          {/* Payment methods — 2×2 + 1 */}
-          <div className="grid grid-cols-2 gap-2">
-            {PAYMENT_METHODS.slice(0, 4).map(m => {
-              const Icon = m.icon;
-              const active = paymentMethod === m.id;
-              return (
+          {splitMode ? (
+            /* ── Split payment mode ─────────────────────────────────────── */
+            <div className="space-y-2">
+              {PAYMENT_METHODS.map(m => {
+                const Icon = m.icon;
+                const val = splitAmounts[m.id] ?? "";
+                return (
+                  <div key={m.id} className="flex items-center gap-2">
+                    <Icon size={14} className="text-gray-400 shrink-0 w-4" />
+                    <span className="text-sm text-gray-600 w-20 shrink-0">{m.label}</span>
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">£</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={val}
+                        onChange={e => setSplitAmounts(prev => ({ ...prev, [m.id]: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg pl-7 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              <div className={`flex items-center justify-between text-sm px-1 font-medium ${
+                splitRemainingPence === 0 ? "text-green-600" : "text-amber-600"
+              }`}>
+                <span>Remaining</span>
+                <span>{formatCurrency(Math.abs(splitRemainingPence), currency)}{splitRemainingPence < 0 ? " over" : ""}</span>
+              </div>
+              <button
+                onClick={() => { setSplitMode(false); setSplitAmounts({}); }}
+                className="w-full py-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                Cancel split
+              </button>
+            </div>
+          ) : (
+            /* ── Normal payment method picker ───────────────────────────── */
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                {PAYMENT_METHODS.slice(0, 4).map(m => {
+                  const Icon = m.icon;
+                  const active = paymentMethod === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => {
+                        setPaymentMethod(m.id);
+                        setCashTendered("");
+                        if (m.id === "terminal" && activeTerminals.length > 0 && !selectedTerminalId) {
+                          setShowTerminalPicker(true);
+                        }
+                      }}
+                      className={`flex items-center gap-2 px-3 py-3 rounded-xl border-2 font-semibold text-sm transition-all active:scale-95 ${
+                        active
+                          ? `${m.colour} border-current`
+                          : "border-gray-200 text-gray-600 bg-white hover:border-gray-300"
+                      }`}
+                    >
+                      <Icon size={16} />
+                      {m.id === "terminal" && selectedTerminalId && active
+                        ? activeTerminals.find(t => t.terminalId === selectedTerminalId)?.name ?? m.label
+                        : m.label
+                      }
+                      {m.id === "terminal" && active && selectedTerminalId && (
+                        <button
+                          onClick={e => { e.stopPropagation(); setShowTerminalPicker(true); }}
+                          className="ml-auto text-current opacity-60 hover:opacity-100"
+                        >
+                          <Settings size={12} />
+                        </button>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
                 <button
-                  key={m.id}
-                  onClick={() => {
-                    setPaymentMethod(m.id);
-                    if (m.id === "terminal" && activeTerminals.length > 0 && !selectedTerminalId) {
-                      setShowTerminalPicker(true);
-                    }
-                  }}
-                  className={`flex items-center gap-2 px-3 py-3 rounded-xl border-2 font-semibold text-sm transition-all active:scale-95 ${
-                    active
-                      ? `${m.colour} border-current`
-                      : "border-gray-200 text-gray-600 bg-white hover:border-gray-300"
+                  onClick={() => setPaymentMethod("complimentary")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-sm font-medium transition-all ${
+                    paymentMethod === "complimentary"
+                      ? "border-gray-400 bg-gray-100 text-gray-700"
+                      : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
                   }`}
                 >
-                  <Icon size={16} />
-                  {m.id === "terminal" && selectedTerminalId && active
-                    ? activeTerminals.find(t => t.terminalId === selectedTerminalId)?.name ?? m.label
-                    : m.label
-                  }
-                  {m.id === "terminal" && active && selectedTerminalId && (
-                    <button
-                      onClick={e => { e.stopPropagation(); setShowTerminalPicker(true); }}
-                      className="ml-auto text-current opacity-60 hover:opacity-100"
-                    >
-                      <Settings size={12} />
-                    </button>
-                  )}
+                  <Gift size={14} /> Complimentary
                 </button>
-              );
-            })}
-          </div>
-          {/* Comp — full width, subtle */}
-          <button
-            onClick={() => setPaymentMethod("complimentary")}
-            className={`w-full flex items-center justify-center gap-2 py-2 rounded-xl border text-sm font-medium transition-all ${
-              paymentMethod === "complimentary"
-                ? "border-gray-400 bg-gray-100 text-gray-700"
-                : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
-            }`}
-          >
-            <Gift size={14} /> Complimentary
-          </button>
+                <button
+                  onClick={() => { setSplitMode(true); setSplitAmounts({}); }}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 text-sm font-medium transition-all"
+                >
+                  ⊕ Split
+                </button>
+              </div>
+
+              {/* Cash tendered + change */}
+              {paymentMethod === "cash" && total > 0 && (
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-amber-700 font-medium w-20 shrink-0">Tendered</span>
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 text-sm">£</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={cashTendered}
+                        onChange={e => setCashTendered(e.target.value)}
+                        className="w-full border border-amber-200 bg-white rounded-lg pl-7 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {[
+                      { label: "Exact", value: (total / 100).toFixed(2) },
+                      { label: "£10",  value: "10.00" },
+                      { label: "£20",  value: "20.00" },
+                      { label: "£50",  value: "50.00" },
+                    ].map(({ label, value }) => (
+                      <button
+                        key={label}
+                        onClick={() => setCashTendered(value)}
+                        className="flex-1 py-1 text-xs font-semibold rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-800 transition-colors"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {cashTenderedPence >= total && cashTenderedPence > 0 && (
+                    <div className="flex items-center justify-between text-sm font-bold text-green-700 pt-0.5">
+                      <span>Change due</span>
+                      <span>{formatCurrency(changeDuePence, currency)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
 
           {/* Charge button */}
           <button
             onClick={handleCharge}
-            disabled={saving || displayBasket.length === 0 || (paymentMethod === "account" && !selectedMemberId)}
+            disabled={
+              saving ||
+              displayBasket.length === 0 ||
+              (splitMode && !splitsValid) ||
+              (!splitMode && paymentMethod === "account" && !selectedMemberId)
+            }
             className={`w-full py-4 font-black text-lg rounded-2xl transition-all active:scale-[0.98] disabled:opacity-40 text-white shadow-lg ${
-              paymentMethod === "account" && selectedMember && (selectedMember.accountBalance ?? 0) < total
+              !splitMode && paymentMethod === "account" && selectedMember && (selectedMember.accountBalance ?? 0) < total
                 ? "bg-red-500 shadow-red-200"
                 : "bg-green-600 hover:bg-green-500 shadow-green-200"
             }`}
           >
             {saving
               ? "Processing…"
-              : paymentMethod === "terminal" && !selectedTerminalId
-                ? "Select terminal →"
-                : paymentMethod === "account" && !selectedMemberId
-                  ? "Select member →"
-                  : paymentMethod === "terminal"
-                    ? "Send to terminal"
-                    : `Charge ${formatCurrency(total, currency)}`
+              : splitMode
+                ? splitsValid ? `Charge ${formatCurrency(total, currency)}` : `${formatCurrency(Math.abs(splitRemainingPence), currency)} remaining`
+                : paymentMethod === "terminal" && !selectedTerminalId
+                  ? "Select terminal →"
+                  : paymentMethod === "account" && !selectedMemberId
+                    ? "Select member →"
+                    : paymentMethod === "terminal"
+                      ? "Send to terminal"
+                      : `Charge ${formatCurrency(total, currency)}`
             }
           </button>
 

@@ -950,8 +950,13 @@ export default defineSchema({
     subtotalPence:   v.number(),                        // sum of line items
     totalPence:      v.number(),                        // subtotal (no tax split yet)
     currency:        v.string(),
-    // 'cash' | 'card' | 'account' | 'terminal' | 'complimentary'
+    // 'cash' | 'card' | 'account' | 'terminal' | 'complimentary' | 'split'
     paymentMethod:   v.string(),
+    // populated when paymentMethod === 'split'
+    splits: v.optional(v.array(v.object({
+      method:      v.string(),
+      amountPence: v.number(),
+    }))),
     paymentIntentId: v.optional(v.id("paymentIntents")),// set when terminal payment
     notes:           v.optional(v.string()),
     voidedAt:        v.optional(v.string()),
