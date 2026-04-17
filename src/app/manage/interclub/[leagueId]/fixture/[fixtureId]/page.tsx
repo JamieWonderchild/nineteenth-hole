@@ -128,7 +128,7 @@ function PlayerSearchInput({
   const term = value.trim();
   const results = useQuery(
     api.golferProfiles.search,
-    focused && term.length >= 2 ? { term } : "skip"
+    focused && term.length >= 2 ? { term, includeSelf: true } : "skip"
   );
 
   const filteredSquad = (squadSuggestions ?? [])

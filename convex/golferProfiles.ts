@@ -12,8 +12,8 @@ export const get = query({
 });
 
 export const search = query({
-  args: { term: v.string() },
-  handler: async (ctx, { term }) => {
+  args: { term: v.string(), includeSelf: v.optional(v.boolean()) },
+  handler: async (ctx, { term, includeSelf }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
     const q = term.trim().toLowerCase();
@@ -22,7 +22,7 @@ export const search = query({
     const all = await ctx.db.query("golferProfiles").collect();
     return all
       .filter(p =>
-        p.userId !== identity.subject &&
+        (includeSelf || p.userId !== identity.subject) &&
         p.displayName.toLowerCase().includes(q)
       )
       .slice(0, 10);
