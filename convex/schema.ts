@@ -787,6 +787,20 @@ export default defineSchema({
     winner: v.optional(v.string()),
     homePoints: v.optional(v.number()), // 1 for win, 0.5 for half, 0
     awayPoints: v.optional(v.number()),
+    // Live hole-by-hole scoring
+    holeResults: v.optional(v.array(v.object({
+      hole: v.number(),
+      homeScore: v.optional(v.number()),
+      homeScore2: v.optional(v.number()),
+      awayScore: v.optional(v.number()),
+      awayScore2: v.optional(v.number()),
+      holeWinner: v.optional(v.union(v.literal("home"), v.literal("away"), v.literal("halved"))),
+    }))),
+    matchStatus: v.optional(v.union(v.literal("in_progress"), v.literal("complete"))),
+    homeHandicap: v.optional(v.number()),
+    homeHandicap2: v.optional(v.number()),
+    awayHandicap: v.optional(v.number()),
+    awayHandicap2: v.optional(v.number()),
   })
     .index("by_fixture", ["fixtureId"])
     .index("by_league", ["leagueId"]),

@@ -108,6 +108,29 @@ export default function PlayScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Interclub section */}
+        <View>
+          <SectionHeader
+            title="Interclub"
+            action={{ label: "My Fixtures", onPress: () => router.push("/play/interclub" as any) }}
+          />
+          <Text className="text-gray-500 text-sm mb-4">County league & matchplay fixtures</Text>
+          <TouchableOpacity onPress={() => router.push("/play/interclub" as any)}>
+            <Card className="px-4 py-3 flex-row items-center justify-between">
+              <View className="flex-row items-center gap-3">
+                <View className="w-9 h-9 rounded-full bg-green-100 items-center justify-center">
+                  <Ionicons name="trophy-outline" size={18} color="#16a34a" />
+                </View>
+                <View>
+                  <Text className="font-semibold text-gray-900">My Fixtures</Text>
+                  <Text className="text-xs text-gray-500">Score and follow matches live</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
+            </Card>
+          </TouchableOpacity>
+        </View>
+
         {/* Course Directory section */}
         <View>
           <SectionHeader title="Course Directory" />

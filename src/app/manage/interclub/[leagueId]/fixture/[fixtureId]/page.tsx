@@ -107,9 +107,88 @@ function AvailabilityPanel({
   );
 }
 
-// ── MatchRow ───────────────────────────────────────────────────────────────────
+// ── PlayerSearchInput ──────────────────────────────────────────────────────────
 
-type AvailableSquadMember = { _id: Id<"clubMembers">; displayName: string; handicap?: number };
+type AvailableSquadMember = { _id: Id<"clubMembers">; displayName: string; handicap?: number; userId?: string };
+
+function PlayerSearchInput({
+  value,
+  onChange,
+  placeholder,
+  autoFocus,
+  squadSuggestions,
+}: {
+  value: string;
+  onChange: (name: string, userId?: string) => void;
+  placeholder?: string;
+  autoFocus?: boolean;
+  squadSuggestions?: AvailableSquadMember[];
+}) {
+  const [focused, setFocused] = useState(false);
+  const term = value.trim();
+  const results = useQuery(
+    api.golferProfiles.search,
+    focused && term.length >= 2 ? { term } : "skip"
+  );
+
+  const filteredSquad = (squadSuggestions ?? [])
+    .filter(m => term === "" || m.displayName.toLowerCase().includes(term.toLowerCase()))
+    .slice(0, 5);
+  const filteredDir = (results ?? [])
+    .filter(d => !filteredSquad.some(s => s.userId === d.userId))
+    .slice(0, 5);
+  const showDropdown = focused && (filteredSquad.length > 0 || filteredDir.length > 0);
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value, undefined)}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setTimeout(() => setFocused(false), 150)}
+        className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+      />
+      {showDropdown && (
+        <div className="absolute z-20 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+          {filteredSquad.length > 0 && (
+            <>
+              <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 bg-gray-50 uppercase tracking-wide">Squad</div>
+              {filteredSquad.map(m => (
+                <button key={m._id} type="button"
+                  onMouseDown={e => { e.preventDefault(); onChange(m.displayName, m.userId); }}
+                  className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-gray-50 text-left transition-colors">
+                  <span className="font-medium text-gray-900">{m.displayName}</span>
+                  {m.handicap != null && <span className="text-gray-400">HCP {m.handicap}</span>}
+                </button>
+              ))}
+            </>
+          )}
+          {filteredDir.length > 0 && (
+            <>
+              <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 bg-gray-50 uppercase tracking-wide">Platform directory</div>
+              {filteredDir.map(d => (
+                <button key={d._id} type="button"
+                  onMouseDown={e => { e.preventDefault(); onChange(d.displayName, d.userId); }}
+                  className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-gray-50 text-left transition-colors">
+                  <span className="font-medium text-gray-900">{d.displayName}</span>
+                  <div className="flex items-center gap-1.5">
+                    {(d as any).handicapIndex != null && <span className="text-gray-400">HCP {(d as any).handicapIndex}</span>}
+                    <span className="text-green-600 text-[10px] font-medium">Member</span>
+                  </div>
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── MatchRow ───────────────────────────────────────────────────────────────────
 
 function MatchRow({
   fixtureId,
@@ -135,8 +214,12 @@ function MatchRow({
     matchType?: string;
     homePlayer: string;
     homePlayer2?: string;
+    homeUserId?: string;
+    homeUserId2?: string;
     awayPlayer: string;
     awayPlayer2?: string;
+    awayUserId?: string;
+    awayUserId2?: string;
     result?: string;
     winner?: string;
     homePoints?: number;
@@ -156,12 +239,15 @@ function MatchRow({
 
   const [homePlayer, setHomePlayer] = useState(existing?.homePlayer ?? "");
   const [homePlayer2, setHomePlayer2] = useState(existing?.homePlayer2 ?? "");
+  const [homeUserId, setHomeUserId] = useState(existing?.homeUserId);
+  const [homeUserId2, setHomeUserId2] = useState(existing?.homeUserId2);
   const [awayPlayer, setAwayPlayer] = useState(existing?.awayPlayer ?? "");
   const [awayPlayer2, setAwayPlayer2] = useState(existing?.awayPlayer2 ?? "");
+  const [awayUserId, setAwayUserId] = useState(existing?.awayUserId);
+  const [awayUserId2, setAwayUserId2] = useState(existing?.awayUserId2);
   const [result, setResult] = useState(existing?.result ?? "");
   const [winner, setWinner] = useState(existing?.winner ?? "");
   const [saving, setSaving] = useState(false);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const homeLabel = isBetterball
     ? [homePlayer, homePlayer2].filter(Boolean).join(" & ") || homeClubName
@@ -181,8 +267,12 @@ function MatchRow({
         matchType,
         homePlayer: homePlayer.trim(),
         homePlayer2: isBetterball ? (homePlayer2.trim() || undefined) : undefined,
+        homeUserId: homeUserId || undefined,
+        homeUserId2: isBetterball ? (homeUserId2 || undefined) : undefined,
         awayPlayer: awayPlayer.trim(),
         awayPlayer2: isBetterball ? (awayPlayer2.trim() || undefined) : undefined,
+        awayUserId: awayUserId || undefined,
+        awayUserId2: isBetterball ? (awayUserId2 || undefined) : undefined,
         result: result || undefined,
         winner: winner || undefined,
       });
@@ -251,79 +341,36 @@ function MatchRow({
           {/* Home side */}
           <div className="space-y-1.5">
             <label className="block text-xs text-gray-400">{homeClubName} {isBetterball ? "pair" : "player"}</label>
-            {/* homePlayer input with squad suggestion */}
-            <div className="relative">
-              <input
-                type="text"
-                value={homePlayer}
-                onChange={e => setHomePlayer(e.target.value)}
-                placeholder={isBetterball ? "Player 1" : "Name"}
-                autoFocus
-                onFocus={() => setFocusedField("homePlayer")}
-                onBlur={() => setTimeout(() => setFocusedField(null), 150)}
-                className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
-              />
-              {focusedField === "homePlayer" && availableSquadMembers && availableSquadMembers.length > 0 && (
-                <div className="absolute z-10 top-full left-0 right-0 mt-0.5 bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-40 overflow-y-auto">
-                  {availableSquadMembers
-                    .filter(m => homePlayer === "" || m.displayName.toLowerCase().includes(homePlayer.toLowerCase()))
-                    .slice(0, 6)
-                    .map(m => (
-                      <button
-                        key={m._id}
-                        type="button"
-                        onMouseDown={e => { e.preventDefault(); setHomePlayer(m.displayName); setFocusedField(null); }}
-                        className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-accent text-left transition-colors"
-                      >
-                        <span className="font-medium text-foreground">{m.displayName}</span>
-                        {m.handicap != null && <span className="text-muted-foreground">HCP {m.handicap}</span>}
-                      </button>
-                    ))}
-                </div>
-              )}
-            </div>
+            <PlayerSearchInput
+              value={homePlayer}
+              onChange={(name, uid) => { setHomePlayer(name); setHomeUserId(uid); }}
+              placeholder={isBetterball ? "Player 1" : "Name"}
+              autoFocus
+              squadSuggestions={availableSquadMembers}
+            />
             {isBetterball && (
-              <div className="relative">
-                <input
-                  type="text"
-                  value={homePlayer2}
-                  onChange={e => setHomePlayer2(e.target.value)}
-                  placeholder="Player 2"
-                  onFocus={() => setFocusedField("homePlayer2")}
-                  onBlur={() => setTimeout(() => setFocusedField(null), 150)}
-                  className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
-                />
-                {focusedField === "homePlayer2" && availableSquadMembers && availableSquadMembers.length > 0 && (
-                  <div className="absolute z-10 top-full left-0 right-0 mt-0.5 bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-40 overflow-y-auto">
-                    {availableSquadMembers
-                      .filter(m => homePlayer2 === "" || m.displayName.toLowerCase().includes(homePlayer2.toLowerCase()))
-                      .slice(0, 6)
-                      .map(m => (
-                        <button
-                          key={m._id}
-                          type="button"
-                          onMouseDown={e => { e.preventDefault(); setHomePlayer2(m.displayName); setFocusedField(null); }}
-                          className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-accent text-left transition-colors"
-                        >
-                          <span className="font-medium text-foreground">{m.displayName}</span>
-                          {m.handicap != null && <span className="text-muted-foreground">HCP {m.handicap}</span>}
-                        </button>
-                      ))}
-                  </div>
-                )}
-              </div>
+              <PlayerSearchInput
+                value={homePlayer2}
+                onChange={(name, uid) => { setHomePlayer2(name); setHomeUserId2(uid); }}
+                placeholder="Player 2"
+                squadSuggestions={availableSquadMembers}
+              />
             )}
           </div>
           {/* Away side */}
           <div className="space-y-1.5">
             <label className="block text-xs text-gray-400">{awayClubName} {isBetterball ? "pair" : "player"}</label>
-            <input type="text" value={awayPlayer} onChange={e => setAwayPlayer(e.target.value)}
+            <PlayerSearchInput
+              value={awayPlayer}
+              onChange={(name, uid) => { setAwayPlayer(name); setAwayUserId(uid); }}
               placeholder={isBetterball ? "Player 1" : "Name"}
-              className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500" />
+            />
             {isBetterball && (
-              <input type="text" value={awayPlayer2} onChange={e => setAwayPlayer2(e.target.value)}
+              <PlayerSearchInput
+                value={awayPlayer2}
+                onChange={(name, uid) => { setAwayPlayer2(name); setAwayUserId2(uid); }}
                 placeholder="Player 2"
-                className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500" />
+              />
             )}
           </div>
         </div>
@@ -437,7 +484,8 @@ export default function FixturePage({ params }: { params: Promise<{ leagueId: st
     .map(s => ({
       _id: s.member!._id,
       displayName: s.member!.displayName,
-      handicap: (s.member as { handicap?: number } | null)?.handicap,
+      handicap: (s.member as any)?.handicap,
+      userId: (s.member as any)?.userId,
     }));
 
   // Handler to mark availability

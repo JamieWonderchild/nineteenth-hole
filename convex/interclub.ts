@@ -402,6 +402,141 @@ export const standings = query({
   },
 });
 
+// ── Mobile: match queries & scoring ───────────────────────────────────────────
+
+export const getMatch = query({
+  args: { matchId: v.id("interclubMatches") },
+  handler: async (ctx, { matchId }) => {
+    const match = await ctx.db.get(matchId);
+    if (!match) return null;
+    const fixture = await ctx.db.get(match.fixtureId);
+    if (!fixture) return null;
+    const [homeTeam, awayTeam, league] = await Promise.all([
+      ctx.db.get(fixture.homeTeamId),
+      ctx.db.get(fixture.awayTeamId),
+      ctx.db.get(fixture.leagueId),
+    ]);
+    return { ...match, fixture: { ...fixture, homeTeam, awayTeam, league } };
+  },
+});
+
+// Fixtures where the current user is a selected player
+export const listMyFixtures = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const userId = identity.subject;
+
+    const allMatches = await ctx.db.query("interclubMatches").collect();
+    const myMatches = allMatches.filter(m =>
+      m.homeUserId === userId || m.homeUserId2 === userId ||
+      m.awayUserId === userId || m.awayUserId2 === userId
+    );
+    if (myMatches.length === 0) return [];
+
+    const fixtureIds = [...new Set(myMatches.map(m => m.fixtureId as string))];
+
+    const fixtures = await Promise.all(fixtureIds.map(async (fid) => {
+      const fixtureId = fid as Id<"interclubFixtures">;
+      const fixture = await ctx.db.get(fixtureId);
+      if (!fixture) return null;
+      const [homeTeam, awayTeam, league] = await Promise.all([
+        ctx.db.get(fixture.homeTeamId),
+        ctx.db.get(fixture.awayTeamId),
+        ctx.db.get(fixture.leagueId),
+      ]);
+      const allFixtureMatches = await ctx.db
+        .query("interclubMatches")
+        .withIndex("by_fixture", q => q.eq("fixtureId", fixtureId))
+        .collect();
+      const myMatchIds = myMatches
+        .filter(m => (m.fixtureId as string) === fid)
+        .map(m => m._id);
+      return { ...fixture, homeTeam, awayTeam, league, matches: allFixtureMatches, myMatchIds };
+    }));
+
+    return fixtures
+      .filter((f): f is NonNullable<typeof f> => f !== null)
+      .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  },
+});
+
+export const saveMatchHoleResult = mutation({
+  args: {
+    matchId: v.id("interclubMatches"),
+    hole: v.number(),
+    holeWinner: v.union(v.literal("home"), v.literal("away"), v.literal("halved")),
+    homeScore: v.optional(v.number()),
+    homeScore2: v.optional(v.number()),
+    awayScore: v.optional(v.number()),
+    awayScore2: v.optional(v.number()),
+  },
+  handler: async (ctx, { matchId, hole, holeWinner, homeScore, homeScore2, awayScore, awayScore2 }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const userId = identity.subject;
+    const match = await ctx.db.get(matchId);
+    if (!match) throw new Error("Match not found");
+
+    const isPlayer = [match.homeUserId, match.homeUserId2, match.awayUserId, match.awayUserId2].includes(userId);
+    if (!isPlayer) await assertCanManageFixture(ctx, match.fixtureId);
+
+    const existing = match.holeResults ?? [];
+    const idx = existing.findIndex(h => h.hole === hole);
+    const entry = { hole, holeWinner, homeScore, homeScore2, awayScore, awayScore2 };
+    const updated = idx >= 0
+      ? existing.map((h, i) => (i === idx ? entry : h))
+      : [...existing, entry];
+    updated.sort((a, b) => a.hole - b.hole);
+
+    await ctx.db.patch(matchId, { holeResults: updated, matchStatus: "in_progress" });
+  },
+});
+
+export const finishMatch = mutation({
+  args: { matchId: v.id("interclubMatches") },
+  handler: async (ctx, { matchId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const userId = identity.subject;
+    const match = await ctx.db.get(matchId);
+    if (!match) throw new Error("Match not found");
+
+    const isPlayer = [match.homeUserId, match.homeUserId2, match.awayUserId, match.awayUserId2].includes(userId);
+    if (!isPlayer) await assertCanManageFixture(ctx, match.fixtureId);
+
+    const decided = (match.holeResults ?? []).filter(h => h.holeWinner != null);
+    let homeUp = 0;
+    for (const h of decided) {
+      if (h.holeWinner === "home") homeUp++;
+      else if (h.holeWinner === "away") homeUp--;
+    }
+    const holesPlayed = decided.length;
+    const holesRemaining = 18 - holesPlayed;
+
+    let result: string;
+    let winner: "home" | "away" | "halved";
+    if (homeUp === 0) {
+      result = "halved";
+      winner = "halved";
+    } else {
+      winner = homeUp > 0 ? "home" : "away";
+      const margin = Math.abs(homeUp);
+      result = holesRemaining === 0 ? `${margin} up` : `${margin}&${holesRemaining}`;
+    }
+
+    await ctx.db.patch(matchId, {
+      matchStatus: "complete",
+      result,
+      winner,
+      homePoints: winner === "home" ? 1 : winner === "halved" ? 0.5 : 0,
+      awayPoints: winner === "away" ? 1 : winner === "halved" ? 0.5 : 0,
+    });
+    await recomputeFixtureScore(ctx, match.fixtureId);
+  },
+});
+
 // ── AI bulk fixture import ─────────────────────────────────────────────────────
 
 export const bulkCreateFixtures = mutation({
