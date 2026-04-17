@@ -128,7 +128,7 @@ export default function AppLayout() {
           title: "Rounds",
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="stats-chart-outline" size={size} color={color} />
+            <Ionicons name="bar-chart-outline" size={size} color={color} />
           ),
         }}
       />
@@ -187,8 +187,22 @@ export default function AppLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="courses" options={{ href: null, headerShown: false }} />
-      <Tabs.Screen name="onboarding" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen
+        name="courses"
+        options={{
+          href: null,
+          headerShown: false,
+          tabBarButton: () => null,
+        }}
+      />
+      <Tabs.Screen
+        name="onboarding"
+        options={{
+          href: null,
+          headerShown: false,
+          tabBarButton: () => null,
+        }}
+      />
     </Tabs>
   );
 }
