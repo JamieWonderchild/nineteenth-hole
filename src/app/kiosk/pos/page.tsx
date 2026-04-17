@@ -426,15 +426,28 @@ function KioskPOS() {
     : basket;
 
   const [stage, setStage]                   = useState<"grid" | "memberSearch" | "confirm" | "done">("grid");
-  const [paymentMethod, setPaymentMethod]   = useState<"cash" | "card" | "account">("cash");
+  const [paymentMethod, setPaymentMethod]   = useState<string>("cash");
   const [selectedMember, setSelectedMember] = useState<MemberResult | null>(null);
   const [saving, setSaving]                 = useState(false);
   const [lastTotal, setLastTotal]           = useState(0);
   const [lastTabName, setLastTabName]       = useState<string | undefined>(undefined);
 
+  // Partial payments
+  const [partialPayments, setPartialPayments] = useState<Array<{ method: string; amountPence: number }>>([]);
+  const [numpadValue, setNumpadValue]         = useState("");
+  const [showNumpad, setShowNumpad]           = useState(false);
+  const [splitPeople, setSplitPeople]         = useState(1);
+  const [pendingAmount, setPendingAmount]     = useState(0);
+
   const currency  = club?.currency ?? "GBP";
   const total     = displayBasket.reduce((s, i) => s + i.subtotalPence, 0);
   const itemCount = displayBasket.reduce((s, i) => s + i.quantity, 0);
+
+  const paidSoFar         = partialPayments.reduce((s, p) => s + p.amountPence, 0);
+  const remainingPence    = total - paidSoFar;
+  const perPersonPence    = splitPeople > 1 ? Math.ceil(remainingPence / splitPeople) : null;
+  const numpadPence       = numpadValue ? Math.round(parseFloat(numpadValue) * 100) : (perPersonPence ?? remainingPence);
+  const chargeAmountPence = Math.min(Math.max(numpadPence, 0), remainingPence);
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -511,9 +524,27 @@ function KioskPOS() {
     }
   }
 
+  // ── Numpad ─────────────────────────────────────────────────────────────────
+
+  function handleNumpad(key: string) {
+    setNumpadValue(prev => {
+      if (key === "⌫") return prev.slice(0, -1);
+      if (key === ".") {
+        if (prev.includes(".")) return prev;
+        return (prev || "0") + ".";
+      }
+      const dot = prev.indexOf(".");
+      if (dot !== -1 && prev.length - dot > 2) return prev;
+      if (prev === "0") return key;
+      return prev + key;
+    });
+  }
+
   // ── Checkout ───────────────────────────────────────────────────────────────
 
-  function startCheckout(method: "cash" | "card" | "account") {
+  function startCheckout(method: string) {
+    const amount = chargeAmountPence;
+    setPendingAmount(amount);
     setPaymentMethod(method);
     if (method === "account") {
       setStage("memberSearch");
@@ -523,52 +554,72 @@ function KioskPOS() {
     }
   }
 
-  async function confirmSale() {
+  async function completeSale(payments: Array<{ method: string; amountPence: number }>) {
     if (!club) return;
     setSaving(true);
+    const uniqueMethods = [...new Set(payments.map(p => p.method))];
+    const effectiveMethod = uniqueMethods.length === 1 ? uniqueMethods[0] : "split";
+    const splits = uniqueMethods.length > 1 ? payments : undefined;
+    const accountPayment = payments.find(p => p.method === "account");
     try {
       if (activeTabId) {
-        // Close the tab (records sale internally via recordSaleInternal)
         await closeTabMut({
           tabId:                 activeTabId,
-          paymentMethod,
+          paymentMethod:         effectiveMethod,
           currency,
-          chargeAccountMemberId: paymentMethod === "account" && selectedMember ? selectedMember._id : undefined,
+          chargeAccountMemberId: accountPayment && selectedMember ? selectedMember._id : undefined,
           memberName:            selectedMember?.displayName,
           isGuest:               !selectedMember,
           kioskId:               kioskId ?? undefined,
+          splits,
         });
         setLastTotal(total);
         setLastTabName(activeTab?.name ?? undefined);
         setActiveTabId(null);
-        setSelectedMember(null);
-        setStage("done");
       } else {
-        // Quick sale
         await recordSale({
           clubId:                club._id,
           items:                 basket,
           currency,
-          paymentMethod,
-          chargeAccountMemberId: paymentMethod === "account" && selectedMember ? selectedMember._id : undefined,
-          memberId:              paymentMethod === "account" && selectedMember ? selectedMember._id as unknown as string : undefined,
+          paymentMethod:         effectiveMethod,
+          chargeAccountMemberId: accountPayment && selectedMember ? selectedMember._id : undefined,
+          memberId:              accountPayment && selectedMember ? selectedMember._id as unknown as string : undefined,
           memberName:            selectedMember?.displayName,
           shiftId:               openShift?._id,
           locationId:            kioskData?.locationId,
           isGuest:               !selectedMember,
           kioskId:               kioskId ?? undefined,
+          splits,
         });
         setLastTotal(total);
         setLastTabName(undefined);
         setBasket([]);
-        setSelectedMember(null);
-        setStage("done");
       }
+      setPartialPayments([]);
+      setNumpadValue("");
+      setShowNumpad(false);
+      setSplitPeople(1);
+      setSelectedMember(null);
+      setStage("done");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Sale failed");
       setStage("grid");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function confirmPartialCharge() {
+    const newPayments = [...partialPayments, { method: paymentMethod, amountPence: pendingAmount }];
+    const newRemaining = total - newPayments.reduce((s, p) => s + p.amountPence, 0);
+    if (newRemaining <= 0) {
+      await completeSale(newPayments);
+    } else {
+      setPartialPayments(newPayments);
+      setNumpadValue("");
+      setShowNumpad(false);
+      if (splitPeople > 1) setSplitPeople(p => Math.max(1, p - 1));
+      setStage("grid");
     }
   }
 
@@ -916,76 +967,121 @@ function KioskPOS() {
           </div>
         </div>
 
-        {/* Basket items */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-          {displayBasket.length === 0 ? (
-            <p className="text-gray-600 text-sm text-center pt-10">
-              {activeTabId ? "Tab is empty — tap a product" : "Tap a product to add it"}
-            </p>
-          ) : (
-            displayBasket.map((item, idx) => (
-              <div key={`${item.productId}-${idx}`} className="flex flex-col gap-1 bg-gray-800 rounded-xl px-4 py-3">
-                <p className="font-semibold text-white text-sm leading-snug">{item.productName}</p>
-                <div className="flex items-center gap-2">
-                  <p className="text-xs text-gray-500 flex-1">{formatCurrency(item.unitPricePence, currency)} each</p>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => changeQty(item.productId, -1)}
-                      className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 flex items-center justify-center text-white font-bold transition-colors text-lg"
-                    >−</button>
-                    <span className="text-white font-bold w-5 text-center">{item.quantity}</span>
-                    <button
-                      onClick={() => changeQty(item.productId, 1)}
-                      className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 flex items-center justify-center text-white font-bold transition-colors text-lg"
-                    >+</button>
+        {/* Scrollable body: basket items + checkout */}
+        <div className="flex-1 overflow-y-auto">
+
+          {/* Basket items */}
+          <div className="px-4 py-3 space-y-2">
+            {displayBasket.length === 0 ? (
+              <p className="text-gray-600 text-sm text-center pt-10">
+                {activeTabId ? "Tab is empty — tap a product" : "Tap a product to add it"}
+              </p>
+            ) : (
+              displayBasket.map((item, idx) => (
+                <div key={`${item.productId}-${idx}`} className="flex flex-col gap-1 bg-gray-800 rounded-xl px-4 py-3">
+                  <p className="font-semibold text-white text-sm leading-snug">{item.productName}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-gray-500 flex-1">{formatCurrency(item.unitPricePence, currency)} each</p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => changeQty(item.productId, -1)} className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 flex items-center justify-center text-white font-bold transition-colors text-lg">−</button>
+                      <span className="text-white font-bold w-5 text-center">{item.quantity}</span>
+                      <button onClick={() => changeQty(item.productId, 1)} className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 flex items-center justify-center text-white font-bold transition-colors text-lg">+</button>
+                    </div>
+                    <span className="text-white font-bold text-sm w-14 text-right shrink-0">{formatCurrency(item.subtotalPence, currency)}</span>
+                    <button onClick={() => removeBasketItem(idx)} className="text-gray-600 hover:text-red-400 transition-colors ml-1"><X size={14} /></button>
                   </div>
-                  <span className="text-white font-bold text-sm w-14 text-right shrink-0">
-                    {formatCurrency(item.subtotalPence, currency)}
-                  </span>
-                  <button
-                    onClick={() => removeBasketItem(idx)}
-                    className="text-gray-600 hover:text-red-400 transition-colors ml-1"
-                  >
-                    <X size={14} />
-                  </button>
                 </div>
+              ))
+            )}
+          </div>
+
+          {/* Payment */}
+          {displayBasket.length > 0 && (
+            <div className="border-t border-gray-800 px-4 pt-4 pb-5 space-y-3">
+
+              {/* Payment history */}
+              {partialPayments.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Payment history</p>
+                  {partialPayments.map((p, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <span className="text-gray-400 flex-1 capitalize">{p.method}</span>
+                      <span className="font-semibold text-blue-400">{formatCurrency(p.amountPence, currency)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Remaining balance */}
+              <div className={`rounded-2xl px-4 py-3 text-center ${partialPayments.length > 0 ? "bg-green-900/40" : "bg-gray-800"}`}>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-0.5">
+                  {partialPayments.length > 0 ? "Remaining Balance" : "Order Total"}
+                </p>
+                <p className="text-3xl font-black text-white">{formatCurrency(remainingPence, currency)}</p>
               </div>
-            ))
+
+              {/* Equal split */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Split equally</span>
+                <button onClick={() => setSplitPeople(p => Math.max(1, p - 1))} className="w-7 h-7 rounded-full bg-gray-700 text-white flex items-center justify-center font-bold hover:bg-gray-600">−</button>
+                <span className="text-sm font-semibold text-white w-4 text-center">{splitPeople}</span>
+                <button onClick={() => setSplitPeople(p => p + 1)} className="w-7 h-7 rounded-full bg-gray-700 text-white flex items-center justify-center font-bold hover:bg-gray-600">+</button>
+                {splitPeople > 1 && perPersonPence && (
+                  <span className="text-xs text-green-400 font-semibold ml-1">{formatCurrency(perPersonPence, currency)} each</span>
+                )}
+              </div>
+
+              {/* Method buttons */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: "cash",          label: "Cash",    cls: "bg-amber-600 hover:bg-amber-500" },
+                  { id: "card",          label: "Card",    cls: "bg-blue-600  hover:bg-blue-500"  },
+                  { id: "account",       label: "Account", cls: "bg-purple-600 hover:bg-purple-500" },
+                  { id: "complimentary", label: "Comp",    cls: "bg-gray-700  hover:bg-gray-600"  },
+                ].map(m => (
+                  <button
+                    key={m.id}
+                    onClick={() => startCheckout(m.id)}
+                    disabled={chargeAmountPence <= 0}
+                    className={`py-3 ${m.cls} disabled:opacity-30 rounded-2xl font-bold text-white text-sm transition-colors active:scale-95`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Numpad display */}
+              <button
+                onClick={() => setShowNumpad(s => !s)}
+                className="w-full bg-gray-800 hover:bg-gray-750 rounded-xl px-4 py-2 flex items-center justify-between transition-colors border border-gray-700"
+              >
+                <span className="text-xs text-gray-500">{showNumpad ? "hide keypad" : "tap to enter amount"}</span>
+                <span className={`text-xl font-black ${numpadValue ? "text-white" : "text-gray-500"}`}>
+                  {numpadValue ? `£${numpadValue}` : formatCurrency(chargeAmountPence, currency)}
+                </span>
+              </button>
+              {numpadValue && (
+                <button onClick={() => setNumpadValue("")} className="text-xs text-gray-500 hover:text-gray-300 px-1">clear entry</button>
+              )}
+
+              {/* Numpad grid */}
+              {showNumpad && (
+                <div className="grid grid-cols-3 gap-1.5">
+                  {["7","8","9","4","5","6","1","2","3",".","0","⌫"].map(key => (
+                    <button
+                      key={key}
+                      onClick={() => handleNumpad(key)}
+                      className="h-12 bg-gray-800 border border-gray-700 rounded-xl text-white font-semibold text-lg hover:bg-gray-700 active:bg-gray-600 transition-colors"
+                    >
+                      {key}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
-        </div>
 
-        {/* Payment */}
-        <div className="border-t border-gray-800 px-4 py-5 space-y-3 shrink-0">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-gray-400 text-sm">Total</span>
-            <span className="text-3xl font-black text-white">{formatCurrency(total, currency)}</span>
-          </div>
-
-          <button
-            onClick={() => startCheckout("account")}
-            disabled={displayBasket.length === 0}
-            className="w-full py-4 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold text-white text-base transition-colors"
-          >
-            Charge to Account
-          </button>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => startCheckout("cash")}
-              disabled={displayBasket.length === 0}
-              className="py-4 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold text-white transition-colors"
-            >
-              Cash
-            </button>
-            <button
-              onClick={() => startCheckout("card")}
-              disabled={displayBasket.length === 0}
-              className="py-4 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl font-bold text-white transition-colors"
-            >
-              Card
-            </button>
-          </div>
-        </div>
+        </div>{/* end scrollable body */}
       </div>
 
       {/* ── Shift modal ────────────────────────────────────────────── */}
@@ -1006,7 +1102,7 @@ function KioskPOS() {
         <MemberSearchOverlay
           clubId={club._id}
           currency={currency}
-          total={total}
+          total={pendingAmount}
           onSelect={member => { setSelectedMember(member); setStage("confirm"); }}
           onClose={() => setStage("grid")}
         />
@@ -1015,10 +1111,10 @@ function KioskPOS() {
       {stage === "confirm" && (
         <ConfirmOverlay
           method={paymentMethod as "cash" | "card" | "account"}
-          total={total}
+          total={pendingAmount}
           currency={currency}
           member={selectedMember}
-          onConfirm={confirmSale}
+          onConfirm={confirmPartialCharge}
           onCancel={() => setStage("grid")}
           saving={saving}
         />
