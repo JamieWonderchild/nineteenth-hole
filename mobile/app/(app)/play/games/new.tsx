@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../lib/convex";
 import { Button, Card } from "../../../../components/ui";
 import { CoursePickerSheet, CourseSelection } from "../../../../components/CoursePickerSheet";
@@ -24,6 +24,7 @@ interface Player {
   id: string;
   name: string;
   handicap?: number;
+  userId?: string;
 }
 
 const FORMATS: Array<{
@@ -70,8 +71,6 @@ export default function NewGameScreen() {
   const [gameName, setGameName] = useState("Saturday game");
   const [date, setDate] = useState(todayISO());
   const [players, setPlayers] = useState<Player[]>([]);
-  const [playerNameInput, setPlayerNameInput] = useState("");
-  const [playerHcpInput, setPlayerHcpInput] = useState("");
 
   // Step 3
   const [withStakes, setWithStakes] = useState(false);
@@ -85,16 +84,10 @@ export default function NewGameScreen() {
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
-  function addPlayer() {
-    const name = playerNameInput.trim();
-    if (!name) return;
-    const hcp = playerHcpInput.trim() ? parseFloat(playerHcpInput.trim()) : undefined;
-    setPlayers((prev) => [
-      ...prev,
-      { id: newPlayerId(), name, handicap: hcp },
-    ]);
-    setPlayerNameInput("");
-    setPlayerHcpInput("");
+  function addPlayer(name: string, handicap?: number, userId?: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setPlayers((prev) => [...prev, { id: newPlayerId(), name: trimmed, handicap, userId }]);
   }
 
   function removePlayer(id: string) {
@@ -142,7 +135,7 @@ export default function NewGameScreen() {
         players: players.map((p) => ({
           id: p.id,
           name: p.name,
-          userId: undefined,
+          userId: p.userId,
           handicap: p.handicap,
         })),
         date: new Date(date).toISOString(),
@@ -188,10 +181,6 @@ export default function NewGameScreen() {
               date={date}
               setDate={setDate}
               players={players}
-              playerNameInput={playerNameInput}
-              setPlayerNameInput={setPlayerNameInput}
-              playerHcpInput={playerHcpInput}
-              setPlayerHcpInput={setPlayerHcpInput}
               onAddPlayer={addPlayer}
               onRemovePlayer={removePlayer}
             />
@@ -296,10 +285,6 @@ function Step2Players({
   date,
   setDate,
   players,
-  playerNameInput,
-  setPlayerNameInput,
-  playerHcpInput,
-  setPlayerHcpInput,
   onAddPlayer,
   onRemovePlayer,
 }: {
@@ -308,13 +293,43 @@ function Step2Players({
   date: string;
   setDate: (v: string) => void;
   players: Player[];
-  playerNameInput: string;
-  setPlayerNameInput: (v: string) => void;
-  playerHcpInput: string;
-  setPlayerHcpInput: (v: string) => void;
-  onAddPlayer: () => void;
+  onAddPlayer: (name: string, handicap?: number, userId?: string) => void;
   onRemovePlayer: (id: string) => void;
 }) {
+  const [nameInput, setNameInput] = useState("");
+  const [hcpInput, setHcpInput] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const searchResults = useQuery(
+    api.golferProfiles.search,
+    nameInput.trim().length >= 2 ? { term: nameInput.trim() } : "skip"
+  );
+
+  const suggestions = showSuggestions && searchResults && searchResults.length > 0
+    ? searchResults
+    : [];
+
+  function handleAddManual() {
+    const name = nameInput.trim();
+    if (!name) return;
+    const hcp = hcpInput.trim() ? parseFloat(hcpInput.trim()) : undefined;
+    onAddPlayer(name, hcp, undefined);
+    setNameInput("");
+    setHcpInput("");
+    setShowSuggestions(false);
+  }
+
+  function handleSelectProfile(profile: any) {
+    onAddPlayer(
+      profile.displayName,
+      profile.handicapIndex != null ? profile.handicapIndex : undefined,
+      profile.userId
+    );
+    setNameInput("");
+    setHcpInput("");
+    setShowSuggestions(false);
+  }
+
   return (
     <View className="gap-5">
       <Text className="text-xl font-bold text-gray-900">Game details</Text>
@@ -348,27 +363,58 @@ function Step2Players({
         {/* Add player row */}
         <View className="flex-row gap-2">
           <TextInput
-            value={playerNameInput}
-            onChangeText={setPlayerNameInput}
-            placeholder="Name"
+            value={nameInput}
+            onChangeText={(v) => { setNameInput(v); setShowSuggestions(true); }}
+            placeholder="Name or search platform"
             className="flex-1 bg-white border border-gray-200 rounded-xl px-3 py-3 text-gray-900"
-            onSubmitEditing={onAddPlayer}
+            onSubmitEditing={handleAddManual}
             returnKeyType="done"
           />
           <TextInput
-            value={playerHcpInput}
-            onChangeText={setPlayerHcpInput}
+            value={hcpInput}
+            onChangeText={setHcpInput}
             placeholder="HCP"
             keyboardType="decimal-pad"
             className="w-20 bg-white border border-gray-200 rounded-xl px-3 py-3 text-gray-900"
           />
           <TouchableOpacity
-            onPress={onAddPlayer}
+            onPress={handleAddManual}
             className="bg-green-600 rounded-xl px-4 items-center justify-center"
           >
             <Text className="text-white font-bold text-lg">+</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Platform member suggestions */}
+        {suggestions.length > 0 && (
+          <View className="bg-white border border-gray-200 rounded-xl overflow-hidden -mt-1">
+            {suggestions.map((profile: any, idx: number) => (
+              <TouchableOpacity
+                key={profile._id}
+                onPress={() => handleSelectProfile(profile)}
+                className={`flex-row items-center px-3 py-2.5 gap-3 ${
+                  idx < suggestions.length - 1 ? "border-b border-gray-50" : ""
+                }`}
+              >
+                <View className="w-8 h-8 rounded-full bg-green-100 items-center justify-center">
+                  <Text className="text-green-700 text-xs font-bold">
+                    {profile.displayName.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm font-medium text-gray-900">{profile.displayName}</Text>
+                  {profile.handicapIndex != null && (
+                    <Text className="text-xs text-gray-400">
+                      HCP {profile.handicapIndex.toFixed(1)}
+                      {profile.homeClub ? ` · ${profile.homeClub}` : ""}
+                    </Text>
+                  )}
+                </View>
+                <Ionicons name="person-add-outline" size={16} color="#9ca3af" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* Player chips */}
         {players.length > 0 && (
@@ -378,6 +424,9 @@ function Step2Players({
                 key={p.id}
                 className="flex-row items-center bg-green-100 rounded-full px-3 py-1.5 gap-1.5"
               >
+                {p.userId && (
+                  <Ionicons name="person-circle" size={14} color="#15803d" />
+                )}
                 <Text className="text-green-800 font-medium text-sm">
                   {p.name}
                   {p.handicap != null ? ` (${p.handicap})` : ""}
