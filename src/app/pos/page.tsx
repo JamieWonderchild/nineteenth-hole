@@ -1298,7 +1298,7 @@ export default function POSPage() {
           ) : (
             displayBasket.length > 0 && (
               <button
-                onClick={clearAll}
+                onClick={() => { if (confirm("Clear basket?")) clearAll(); }}
                 className="w-full py-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
               >
                 Clear basket
