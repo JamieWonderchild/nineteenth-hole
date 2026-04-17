@@ -65,12 +65,12 @@ function ScorecardTable({ holeScores }: { holeScores: number[] }) {
     return (
       <View className="mb-3">
         {/* Header row */}
-        <View className="flex-row bg-gray-50 rounded-t-lg px-2 py-1.5">
-          <Text className="text-xs font-bold text-gray-400 w-7">H</Text>
-          <Text className="text-xs font-bold text-gray-400 w-8">Par</Text>
-          <Text className="text-xs font-bold text-gray-400 w-8">SI</Text>
+        <View className="flex-row bg-gray-50 rounded-t-lg px-2 py-2">
+          <Text className="text-sm font-bold text-gray-400 w-9">H</Text>
+          <Text className="text-sm font-bold text-gray-400 w-10">Par</Text>
+          <Text className="text-sm font-bold text-gray-400 w-10">SI</Text>
           <View className="flex-1 items-center">
-            <Text className="text-xs font-bold text-gray-400">{label}</Text>
+            <Text className="text-sm font-bold text-gray-400">{label}</Text>
           </View>
         </View>
         {/* Hole rows */}
@@ -81,25 +81,25 @@ function ScorecardTable({ holeScores }: { holeScores: number[] }) {
           return (
             <View
               key={holeNum}
-              className={`flex-row items-center px-2 py-1.5 ${
+              className={`flex-row items-center px-2 py-2.5 ${
                 i < scores.length - 1 ? "border-b border-gray-50" : ""
               }`}
             >
-              <Text className="text-sm font-medium text-gray-600 w-7">{holeNum}</Text>
-              <Text className="text-sm text-gray-400 w-8">{par}</Text>
-              <Text className="text-sm text-gray-300 w-8">{si}</Text>
+              <Text className="text-base font-semibold text-gray-700 w-9">{holeNum}</Text>
+              <Text className="text-base text-gray-500 w-10">{par}</Text>
+              <Text className="text-base text-gray-300 w-10">{si}</Text>
               <View className="flex-1 items-center">
-                <ScoreChip score={score} par={par} size="sm" />
+                <ScoreChip score={score} par={par} size="md" />
               </View>
             </View>
           );
         })}
         {/* Subtotal row */}
-        <View className="flex-row items-center px-2 py-2 bg-gray-50 rounded-b-lg border-t border-gray-100">
-          <Text className="text-sm font-bold text-gray-500 flex-1">
+        <View className="flex-row items-center px-2 py-2.5 bg-gray-50 rounded-b-lg border-t border-gray-100">
+          <Text className="text-base font-bold text-gray-500 flex-1">
             {label} Total
           </Text>
-          <Text className="text-base font-bold text-gray-900 mr-1">{subtotal}</Text>
+          <Text className="text-lg font-bold text-gray-900 mr-1">{subtotal}</Text>
         </View>
       </View>
     );
