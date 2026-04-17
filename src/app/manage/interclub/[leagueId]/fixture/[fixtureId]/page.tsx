@@ -137,7 +137,11 @@ function PlayerSearchInput({
   const filteredDir = (results ?? [])
     .filter(d => !filteredSquad.some(s => s.userId === d.userId))
     .slice(0, 5);
-  const showDropdown = focused && (filteredSquad.length > 0 || filteredDir.length > 0);
+
+  const isSearching = focused && term.length >= 2;
+  const hasResults = filteredSquad.length > 0 || filteredDir.length > 0;
+  const noResults = isSearching && results !== undefined && !hasResults;
+  const showDropdown = focused && (hasResults || (term === "" && filteredSquad.length > 0) || noResults);
 
   return (
     <div className="relative">
@@ -181,6 +185,11 @@ function PlayerSearchInput({
                 </button>
               ))}
             </>
+          )}
+          {noResults && (
+            <div className="px-3 py-2.5 text-xs text-gray-400 italic">
+              No platform members found — name will be saved as entered
+            </div>
           )}
         </div>
       )}
