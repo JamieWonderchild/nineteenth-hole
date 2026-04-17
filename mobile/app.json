@@ -19,6 +19,7 @@
       }
     },
     "android": {
+      "package": "golf.handicaphub.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#14532d"
