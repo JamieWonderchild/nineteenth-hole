@@ -6,7 +6,11 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsucGxheXRoZXBvb2wuZ29sZiQ",
+        "EXPO_PUBLIC_CONVEX_URL": "https://polite-cassowary-357.eu-west-1.convex.cloud"
+      }
     },
     "internal": {
       "distribution": "internal",
@@ -15,19 +19,31 @@
       },
       "ios": {
         "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsucGxheXRoZXBvb2wuZ29sZiQ",
+        "EXPO_PUBLIC_CONVEX_URL": "https://polite-cassowary-357.eu-west-1.convex.cloud"
       }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsucGxheXRoZXBvb2wuZ29sZiQ",
+        "EXPO_PUBLIC_CONVEX_URL": "https://polite-cassowary-357.eu-west-1.convex.cloud"
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
       },
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsucGxheXRoZXBvb2wuZ29sZiQ",
+        "EXPO_PUBLIC_CONVEX_URL": "https://polite-cassowary-357.eu-west-1.convex.cloud"
+      }
     }
   },
   "submit": {
