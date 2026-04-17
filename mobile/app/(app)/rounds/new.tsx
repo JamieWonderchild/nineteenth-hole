@@ -1236,6 +1236,15 @@ export default function NewRoundScreen() {
     userId ? { userId } : "skip"
   );
 
+  const inProgressRound = useQuery(api.rounds.getInProgress);
+
+  // If there's already a round in progress, go straight to it
+  useEffect(() => {
+    if (inProgressRound) {
+      router.replace(`/(app)/rounds/score?roundId=${inProgressRound._id}` as any);
+    }
+  }, [inProgressRound?._id]);
+
   const createRound = useMutation(api.rounds.create);
   const startRoundMutation = useMutation(api.rounds.startRound);
   const completeRoundMutation = useMutation(api.rounds.completeRound);
