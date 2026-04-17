@@ -194,6 +194,10 @@ export const closeTab = mutation({
     notes:                 v.optional(v.string()),
     isGuest:               v.optional(v.boolean()),
     kioskId:               v.optional(v.id("posKiosks")),
+    splits: v.optional(v.array(v.object({
+      method:      v.string(),
+      amountPence: v.number(),
+    }))),
   },
   handler: async (ctx, args) => {
     const tab = await ctx.db.get(args.tabId);
@@ -211,6 +215,7 @@ export const closeTab = mutation({
       items:                 tab.items,
       currency:              args.currency,
       paymentMethod:         args.paymentMethod,
+      splits:                args.splits,
       notes:                 args.notes,
       shiftId:               tab.shiftId,
       locationId:            tab.locationId,

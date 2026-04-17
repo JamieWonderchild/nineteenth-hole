@@ -349,12 +349,14 @@ export default function POSPage() {
   const [selectedTerminalId, setSelectedTerminalId] = useState<string>("");
   const [showTerminalPicker, setShowTerminalPicker] = useState(false);
 
-  // Change calculation (cash) — derived values computed after `total` below
-  const [cashTendered, setCashTendered] = useState("");
+  // Partial payments (cash/card/etc collected so far for this sale)
+  const [partialPayments, setPartialPayments] = useState<Array<{ method: string; amountPence: number }>>([]);
 
-  // Split payment
-  const [splitMode, setSplitMode] = useState(false);
-  const [splitAmounts, setSplitAmounts] = useState<Record<string, string>>({});
+  // Numpad — "" means "use remaining balance"
+  const [numpadValue, setNumpadValue] = useState("");
+
+  // Equal split
+  const [splitPeople, setSplitPeople] = useState(1);
 
   // Customer (member)
   const [memberSearch, setMemberSearch] = useState("");
@@ -399,15 +401,12 @@ export default function POSPage() {
   const currency = club?.currency ?? "GBP";
   const itemCount = displayBasket.reduce((s, i) => s + i.quantity, 0);
 
-  // Change calculation
-  const cashTenderedPence = Math.round((parseFloat(cashTendered) || 0) * 100);
-  const changeDuePence = cashTenderedPence - total;
-
-  // Split derived
-  const splitTotalPence = Object.values(splitAmounts)
-    .reduce((s, v) => s + Math.round((parseFloat(v) || 0) * 100), 0);
-  const splitRemainingPence = total - splitTotalPence;
-  const splitsValid = splitRemainingPence === 0 && splitTotalPence > 0;
+  // Partial payment derived values
+  const paidSoFar    = partialPayments.reduce((s, p) => s + p.amountPence, 0);
+  const remainingPence = total - paidSoFar;
+  const perPersonPence = splitPeople > 1 ? Math.ceil(remainingPence / splitPeople) : null;
+  const numpadPence    = numpadValue ? Math.round(parseFloat(numpadValue) * 100) : (perPersonPence ?? remainingPence);
+  const chargeAmountPence = Math.min(Math.max(numpadPence, 0), remainingPence);
 
   // ── Category tabs ──────────────────────────────────────────────────────────
 
@@ -498,180 +497,141 @@ export default function POSPage() {
     setSelectedMemberId(null);
     setMemberSearch("");
     setSaleDone(null);
-    setCashTendered("");
-    setSplitMode(false);
-    setSplitAmounts({});
+    setPartialPayments([]);
+    setNumpadValue("");
+    setSplitPeople(1);
   }
 
-  // ── Charge ─────────────────────────────────────────────────────────────────
+  // ── Numpad ─────────────────────────────────────────────────────────────────
 
-  async function handleCharge() {
-    if (!club || displayBasket.length === 0 || saving) return;
+  function handleNumpad(key: string) {
+    setNumpadValue(prev => {
+      if (key === "⌫") return prev.slice(0, -1);
+      if (key === ".") {
+        if (prev.includes(".")) return prev;
+        return (prev || "0") + ".";
+      }
+      // Max 2 decimal places
+      const dot = prev.indexOf(".");
+      if (dot !== -1 && prev.length - dot > 2) return prev;
+      // No leading zeros before decimal
+      if (prev === "0") return key;
+      return prev + key;
+    });
+  }
 
-    if (splitMode) {
-      if (!splitsValid) { setError("Split amounts must add up to the total"); return; }
-      const accountSplit = Object.entries(splitAmounts).find(([m]) => m === "account");
-      if (accountSplit && !selectedMemberId) {
-        setError("Select a member for the account portion");
-        return;
-      }
-    } else {
-      if (paymentMethod === "terminal" && !selectedTerminalId) {
-        setShowTerminalPicker(true);
-        return;
-      }
-      if (paymentMethod === "account" && !selectedMemberId) {
-        setError("Select a member to charge their account");
-        return;
-      }
-    }
+  // ── Complete sale (all payments collected) ─────────────────────────────────
+
+  async function completeSale(payments: Array<{ method: string; amountPence: number }>) {
+    if (!club) return;
+    const uniqueMethods = [...new Set(payments.map(p => p.method))];
+    const effectiveMethod = uniqueMethods.length === 1 ? uniqueMethods[0] : "split";
+    const splits = uniqueMethods.length > 1 ? payments : undefined;
+    const accountPayment = payments.find(p => p.method === "account");
 
     setSaving(true);
     setError(null);
-
     try {
       if (activeTabId) {
-        // ── Tab mode — close the tab (records the sale internally) ──────────
-        if (paymentMethod === "terminal") {
+        if (effectiveMethod === "terminal") {
           const res = await fetch("/api/payments/terminal", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              clubId: club._id,
-              terminalId: selectedTerminalId,
-              amount: total,
-              currency,
-              purpose: "pos_sale",
+              clubId: club._id, terminalId: selectedTerminalId, amount: total,
+              currency, purpose: "pos_sale",
               description: displayBasket.map(i => `${i.quantity}× ${i.productName}`).join(", "),
               ...(selectedMemberId ? { memberId: selectedMemberId } : {}),
             }),
           });
-          if (!res.ok) {
-            const err = await res.json() as { error?: string };
-            throw new Error(err.error ?? "Failed to reach terminal");
-          }
+          if (!res.ok) { const e = await res.json() as { error?: string }; throw new Error(e.error ?? "Terminal error"); }
         }
         await closeTabMut({
-          tabId:                 activeTabId,
-          paymentMethod,
+          tabId: activeTabId,
+          paymentMethod: effectiveMethod,
           currency,
-          chargeAccountMemberId: paymentMethod === "account" ? selectedMemberId! : undefined,
-          memberId:              selectedMember?.userId,
-          memberName:            selectedMember?.displayName,
-          notes:                 note || undefined,
-          isGuest:               !selectedMember,
+          chargeAccountMemberId: accountPayment ? selectedMemberId! : undefined,
+          memberId:  selectedMember?.userId,
+          memberName: selectedMember?.displayName,
+          notes: note || undefined,
+          isGuest: !selectedMember,
+          splits,
         });
-        setSaleDone({ total, method: paymentMethod, memberName: selectedMember?.displayName });
         setActiveTabId(null);
-        setNote("");
-        setShowNote(false);
-        setSelectedMemberId(null);
-        setMemberSearch("");
       } else {
-        // ── Quick sale mode ───────────────────────────────────────────────
         const items = basket.map(i => ({
-          productId:      i.productId !== "custom" ? i.productId : undefined,
+          productId:      i.productId !== "custom" ? i.productId as Id<"posProducts"> : undefined,
           productName:    i.productName,
           quantity:       i.quantity,
           unitPricePence: i.unitPricePence,
           subtotalPence:  i.subtotalPence,
         }));
-
-        if (splitMode) {
-          const splits = Object.entries(splitAmounts)
-            .filter(([, v]) => parseFloat(v) > 0)
-            .map(([method, v]) => ({ method, amountPence: Math.round(parseFloat(v) * 100) }));
-          const accountSplit = splits.find(s => s.method === "account");
-          await recordSale({
-            clubId: club._id,
-            memberId:              selectedMember?.userId,
-            memberName:            selectedMember?.displayName,
-            chargeAccountMemberId: accountSplit ? selectedMemberId! : undefined,
-            items,
-            currency,
-            paymentMethod: "split",
-            splits,
-            notes: note || undefined,
-            shiftId:    openShift?._id,
-            locationId: selectedLocationId ?? undefined,
-            isGuest:    !selectedMember,
-          });
-          setSaleDone({ total, method: "split", memberName: selectedMember?.displayName });
-        } else if (paymentMethod === "terminal") {
+        if (effectiveMethod === "terminal") {
           const res = await fetch("/api/payments/terminal", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              clubId: club._id,
-              terminalId: selectedTerminalId,
-              amount: total,
-              currency,
-              purpose: "pos_sale",
+              clubId: club._id, terminalId: selectedTerminalId, amount: total,
+              currency, purpose: "pos_sale",
               description: basket.map(i => `${i.quantity}× ${i.productName}`).join(", "),
               ...(selectedMemberId ? { memberId: selectedMemberId } : {}),
             }),
           });
-          if (!res.ok) {
-            const err = await res.json() as { error?: string };
-            throw new Error(err.error ?? "Failed to reach terminal");
-          }
-          await recordSale({
-            clubId: club._id,
-            memberId: selectedMember?.userId,
-            memberName: selectedMember?.displayName,
-            items,
-            currency,
-            paymentMethod: "terminal",
-            notes: note || undefined,
-            shiftId:    openShift?._id,
-            locationId: selectedLocationId ?? undefined,
-            isGuest:    !selectedMember,
-          });
-          setSaleDone({ total, method: paymentMethod, memberName: selectedMember?.displayName });
-        } else if (paymentMethod === "account") {
-          await recordSale({
-            clubId: club._id,
-            chargeAccountMemberId: selectedMemberId!,
-            items,
-            currency,
-            paymentMethod: "account",
-            notes: note || undefined,
-            shiftId:    openShift?._id,
-            locationId: selectedLocationId ?? undefined,
-            isGuest:    false,
-          });
-          setSaleDone({ total, method: paymentMethod, memberName: selectedMember?.displayName });
-        } else {
-          await recordSale({
-            clubId: club._id,
-            memberId: selectedMember?.userId,
-            memberName: selectedMember?.displayName,
-            items,
-            currency,
-            paymentMethod,
-            notes: note || undefined,
-            shiftId:    openShift?._id,
-            locationId: selectedLocationId ?? undefined,
-            isGuest:    !selectedMember,
-          });
-          setSaleDone({ total, method: paymentMethod, memberName: selectedMember?.displayName });
+          if (!res.ok) { const e = await res.json() as { error?: string }; throw new Error(e.error ?? "Terminal error"); }
         }
-
-        setBasket([]);
-        setNote("");
-        setShowNote(false);
-        setSelectedMemberId(null);
-        setMemberSearch("");
-        setCashTendered("");
-        setSplitMode(false);
-        setSplitAmounts({});
+        await recordSale({
+          clubId: club._id,
+          memberId:              selectedMember?.userId,
+          memberName:            selectedMember?.displayName,
+          chargeAccountMemberId: accountPayment ? selectedMemberId! : undefined,
+          items,
+          currency,
+          paymentMethod: effectiveMethod,
+          splits,
+          notes: note || undefined,
+          shiftId:    openShift?._id,
+          locationId: selectedLocationId ?? undefined,
+          isGuest:    !selectedMember,
+        });
       }
+      setSaleDone({ total, method: effectiveMethod, memberName: selectedMember?.displayName });
+      setBasket([]);
+      setNote("");
+      setShowNote(false);
+      setSelectedMemberId(null);
+      setMemberSearch("");
+      setPartialPayments([]);
+      setNumpadValue("");
+      setSplitPeople(1);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSaving(false);
     }
   }
+
+  // ── Partial charge ──────────────────────────────────────────────────────────
+
+  async function handlePartialCharge() {
+    if (!club || displayBasket.length === 0 || saving) return;
+    if (chargeAmountPence <= 0) return;
+
+    if (paymentMethod === "terminal" && !selectedTerminalId) { setShowTerminalPicker(true); return; }
+    if (paymentMethod === "account" && !selectedMemberId) { setError("Select a member to charge their account"); return; }
+
+    const newPayment = { method: paymentMethod, amountPence: chargeAmountPence };
+    const newPayments = [...partialPayments, newPayment];
+    const newRemaining = total - newPayments.reduce((s, p) => s + p.amountPence, 0);
+
+    if (newRemaining <= 0) {
+      await completeSale(newPayments);
+    } else {
+      setPartialPayments(newPayments);
+      setNumpadValue("");
+      if (splitPeople > 1) setSplitPeople(p => Math.max(1, p - 1));
+    }
+  }
+
 
   // ── Loading ─────────────────────────────────────────────────────────────────
 
@@ -1096,216 +1056,131 @@ export default function POSPage() {
         )}
 
         {/* ── Checkout footer ── */}
-        <div className="border-t border-gray-100 p-4 space-y-3">
+        {displayBasket.length > 0 && (
+        <div className="border-t border-gray-100 shrink-0 overflow-y-auto">
 
-          {/* Total */}
-          <div className="flex items-baseline justify-between px-1">
-            <span className="text-sm text-gray-500">
-              {itemCount > 0 ? `${itemCount} item${itemCount !== 1 ? "s" : ""}` : "Total"}
-            </span>
-            <span className="text-4xl font-black text-gray-900 tracking-tight">
-              {formatCurrency(total, currency)}
-            </span>
-          </div>
-
-          {splitMode ? (
-            /* ── Split payment mode ─────────────────────────────────────── */
-            <div className="space-y-2">
-              {PAYMENT_METHODS.map(m => {
-                const Icon = m.icon;
-                const val = splitAmounts[m.id] ?? "";
+          {/* Payment history */}
+          {partialPayments.length > 0 && (
+            <div className="px-4 pt-3 pb-1 space-y-1.5">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Payment history</p>
+              {partialPayments.map((p, i) => {
+                const m = PAYMENT_METHODS.find(x => x.id === p.method);
+                const Icon = m?.icon ?? Banknote;
                 return (
-                  <div key={m.id} className="flex items-center gap-2">
-                    <Icon size={14} className="text-gray-400 shrink-0 w-4" />
-                    <span className="text-sm text-gray-600 w-20 shrink-0">{m.label}</span>
-                    <div className="relative flex-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">£</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={val}
-                        onChange={e => setSplitAmounts(prev => ({ ...prev, [m.id]: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-lg pl-7 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                      />
-                    </div>
+                  <div key={i} className="flex items-center gap-2 text-sm">
+                    <Icon size={13} className="text-blue-500 shrink-0" />
+                    <span className="text-gray-600 flex-1">{m?.label ?? p.method}</span>
+                    <span className="font-semibold text-blue-600">{formatCurrency(p.amountPence, currency)}</span>
                   </div>
                 );
               })}
-              <div className={`flex items-center justify-between text-sm px-1 font-medium ${
-                splitRemainingPence === 0 ? "text-green-600" : "text-amber-600"
-              }`}>
-                <span>Remaining</span>
-                <span>{formatCurrency(Math.abs(splitRemainingPence), currency)}{splitRemainingPence < 0 ? " over" : ""}</span>
-              </div>
-              <button
-                onClick={() => { setSplitMode(false); setSplitAmounts({}); }}
-                className="w-full py-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                Cancel split
-              </button>
             </div>
-          ) : (
-            /* ── Normal payment method picker ───────────────────────────── */
-            <>
-              <div className="grid grid-cols-2 gap-2">
-                {PAYMENT_METHODS.slice(0, 4).map(m => {
-                  const Icon = m.icon;
-                  const active = paymentMethod === m.id;
-                  return (
-                    <button
-                      key={m.id}
-                      onClick={() => {
-                        setPaymentMethod(m.id);
-                        setCashTendered("");
-                        if (m.id === "terminal" && activeTerminals.length > 0 && !selectedTerminalId) {
-                          setShowTerminalPicker(true);
-                        }
-                      }}
-                      className={`flex items-center gap-2 px-3 py-3 rounded-xl border-2 font-semibold text-sm transition-all active:scale-95 ${
-                        active
-                          ? `${m.colour} border-current`
-                          : "border-gray-200 text-gray-600 bg-white hover:border-gray-300"
-                      }`}
-                    >
-                      <Icon size={16} />
-                      {m.id === "terminal" && selectedTerminalId && active
-                        ? activeTerminals.find(t => t.terminalId === selectedTerminalId)?.name ?? m.label
-                        : m.label
-                      }
-                      {m.id === "terminal" && active && selectedTerminalId && (
-                        <button
-                          onClick={e => { e.stopPropagation(); setShowTerminalPicker(true); }}
-                          className="ml-auto text-current opacity-60 hover:opacity-100"
-                        >
-                          <Settings size={12} />
-                        </button>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPaymentMethod("complimentary")}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-sm font-medium transition-all ${
-                    paymentMethod === "complimentary"
-                      ? "border-gray-400 bg-gray-100 text-gray-700"
-                      : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
-                  }`}
-                >
-                  <Gift size={14} /> Complimentary
-                </button>
-                <button
-                  onClick={() => { setSplitMode(true); setSplitAmounts({}); }}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 text-sm font-medium transition-all"
-                >
-                  ⊕ Split
-                </button>
-              </div>
-
-              {/* Cash tendered + change */}
-              {paymentMethod === "cash" && total > 0 && (
-                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-amber-700 font-medium w-20 shrink-0">Tendered</span>
-                    <div className="relative flex-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 text-sm">£</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={cashTendered}
-                        onChange={e => setCashTendered(e.target.value)}
-                        className="w-full border border-amber-200 bg-white rounded-lg pl-7 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-1.5">
-                    {[
-                      { label: "Exact", value: (total / 100).toFixed(2) },
-                      { label: "£10",  value: "10.00" },
-                      { label: "£20",  value: "20.00" },
-                      { label: "£50",  value: "50.00" },
-                    ].map(({ label, value }) => (
-                      <button
-                        key={label}
-                        onClick={() => setCashTendered(value)}
-                        className="flex-1 py-1 text-xs font-semibold rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-800 transition-colors"
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  {cashTenderedPence >= total && cashTenderedPence > 0 && (
-                    <div className="flex items-center justify-between text-sm font-bold text-green-700 pt-0.5">
-                      <span>Change due</span>
-                      <span>{formatCurrency(changeDuePence, currency)}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
           )}
 
-          {/* Charge button */}
-          <button
-            onClick={handleCharge}
-            disabled={
-              saving ||
-              displayBasket.length === 0 ||
-              (splitMode && !splitsValid) ||
-              (!splitMode && paymentMethod === "account" && !selectedMemberId)
-            }
-            className={`w-full py-4 font-black text-lg rounded-2xl transition-all active:scale-[0.98] disabled:opacity-40 text-white shadow-lg ${
-              !splitMode && paymentMethod === "account" && selectedMember && (selectedMember.accountBalance ?? 0) < total
-                ? "bg-red-500 shadow-red-200"
-                : "bg-green-600 hover:bg-green-500 shadow-green-200"
-            }`}
-          >
-            {saving
-              ? "Processing…"
-              : splitMode
-                ? splitsValid ? `Charge ${formatCurrency(total, currency)}` : `${formatCurrency(Math.abs(splitRemainingPence), currency)} remaining`
-                : paymentMethod === "terminal" && !selectedTerminalId
-                  ? "Select terminal →"
-                  : paymentMethod === "account" && !selectedMemberId
-                    ? "Select member →"
-                    : paymentMethod === "terminal"
-                      ? "Send to terminal"
-                      : `Charge ${formatCurrency(total, currency)}`
-            }
-          </button>
+          {/* Remaining balance */}
+          <div className={`mx-4 my-2 rounded-2xl px-4 py-3 text-center ${partialPayments.length > 0 ? "bg-green-50" : "bg-gray-50"}`}>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">
+              {partialPayments.length > 0 ? "Remaining Balance" : "Order Total"}
+            </p>
+            <p className="text-3xl font-black text-gray-900 tracking-tight">
+              {formatCurrency(remainingPence, currency)}
+            </p>
+          </div>
 
-          {/* Clear / Void */}
-          {activeTabId ? (
+          {/* Split equally */}
+          <div className="px-4 pb-2 flex items-center gap-2">
+            <span className="text-xs text-gray-400">Split equally</span>
+            <button onClick={() => setSplitPeople(p => Math.max(1, p - 1))} className="w-6 h-6 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-sm font-bold hover:bg-gray-200">−</button>
+            <span className="text-sm font-semibold w-4 text-center">{splitPeople}</span>
+            <button onClick={() => setSplitPeople(p => p + 1)} className="w-6 h-6 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-sm font-bold hover:bg-gray-200">+</button>
+            {splitPeople > 1 && perPersonPence && (
+              <span className="text-xs text-green-600 font-semibold ml-1">{formatCurrency(perPersonPence, currency)} each</span>
+            )}
+          </div>
+
+          {/* Method selector */}
+          <div className="px-4 pb-2 flex gap-1.5">
+            {PAYMENT_METHODS.map(m => {
+              const Icon = m.icon;
+              const active = paymentMethod === m.id;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => {
+                    setPaymentMethod(m.id);
+                    if (m.id === "terminal" && activeTerminals.length > 0 && !selectedTerminalId) setShowTerminalPicker(true);
+                  }}
+                  className={`flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl border-2 text-[10px] font-bold transition-all active:scale-95 ${
+                    active ? `${m.colour} border-current` : "border-gray-200 text-gray-500 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <Icon size={15} />
+                  {m.id === "terminal" && selectedTerminalId && active
+                    ? activeTerminals.find(t => t.terminalId === selectedTerminalId)?.name ?? m.label
+                    : m.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Numpad display */}
+          <div className="px-4 pb-1">
+            <div className="bg-gray-50 rounded-xl px-4 py-2 text-right flex items-center justify-between">
+              <button onClick={() => setNumpadValue("")} className="text-xs text-gray-300 hover:text-gray-500">
+                {numpadValue ? "clear" : ""}
+              </button>
+              <span className={`text-2xl font-black ${numpadValue ? "text-gray-900" : "text-gray-300"}`}>
+                {numpadValue ? `£${numpadValue}` : formatCurrency(chargeAmountPence, currency)}
+              </span>
+            </div>
+          </div>
+
+          {/* Numpad grid */}
+          <div className="px-4 pb-3 grid grid-cols-3 gap-1.5">
+            {["7","8","9","4","5","6","1","2","3",".","0","⌫"].map(key => (
+              <button
+                key={key}
+                onClick={() => handleNumpad(key)}
+                className="h-11 bg-white border border-gray-200 rounded-xl text-gray-800 font-semibold text-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
+              >
+                {key}
+              </button>
+            ))}
+          </div>
+
+          {/* Charge + void/clear */}
+          <div className="px-4 pb-4 space-y-2">
             <button
-              onClick={async () => {
-                if (!confirm("Void this tab? All items will be discarded.")) return;
-                await voidTabMut({ tabId: activeTabId });
-                setActiveTabId(null);
-                setNote("");
-                setShowNote(false);
-                setSelectedMemberId(null);
-                setMemberSearch("");
-              }}
-              className="w-full py-1.5 text-xs text-red-400 hover:text-red-600 transition-colors"
+              onClick={handlePartialCharge}
+              disabled={saving || chargeAmountPence <= 0 || (paymentMethod === "account" && !selectedMemberId)}
+              className="w-full py-4 font-black text-lg rounded-2xl transition-all active:scale-[0.98] disabled:opacity-40 text-white bg-green-600 hover:bg-green-500 shadow-lg shadow-green-200"
             >
-              Void tab
+              {saving ? "Processing…"
+                : paymentMethod === "terminal" && !selectedTerminalId ? "Select terminal →"
+                : paymentMethod === "account" && !selectedMemberId ? "Select member →"
+                : `Charge ${formatCurrency(chargeAmountPence, currency)}`}
             </button>
-          ) : (
-            displayBasket.length > 0 && (
+
+            {activeTabId ? (
+              <button
+                onClick={async () => {
+                  if (!confirm("Void this tab? All items will be discarded.")) return;
+                  await voidTabMut({ tabId: activeTabId });
+                  setActiveTabId(null); setNote(""); setShowNote(false);
+                  setSelectedMemberId(null); setMemberSearch("");
+                  setPartialPayments([]); setNumpadValue(""); setSplitPeople(1);
+                }}
+                className="w-full py-1.5 text-xs text-red-400 hover:text-red-600 transition-colors"
+              >Void tab</button>
+            ) : (
               <button
                 onClick={() => { if (confirm("Clear basket?")) clearAll(); }}
                 className="w-full py-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                Clear basket
-              </button>
-            )
-          )}
+              >Clear basket</button>
+            )}
+          </div>
         </div>
+        )}
       </div>
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
