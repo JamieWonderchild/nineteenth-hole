@@ -7,7 +7,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
-import { X, ChevronLeft, Search, UserCircle, Check, Lock, ArrowLeft, Maximize, Minimize, Plus, Pencil } from "lucide-react";
+import { X, ChevronLeft, Search, UserCircle, Check, Lock, ArrowLeft, Maximize, Minimize, Plus, Pencil, Terminal, ChevronDown } from "lucide-react";
 
 import { PinPad } from "@/components/kiosk/PinLock";
 import { KioskShiftModal } from "@/components/kiosk/ShiftModal";
@@ -75,6 +75,64 @@ function NewTabModal({ onOpen, onClose }: { onOpen: (name: string) => void; onCl
             Open tab
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Terminal picker modal (dark) ──────────────────────────────────────────────
+
+function TerminalPickerModal({
+  terminals,
+  selected,
+  onSelect,
+  onClose,
+}: {
+  terminals: { _id: Id<"posTerminals">; terminalId: string; name: string; provider: string }[];
+  selected: string;
+  onSelect: (id: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-sm shadow-2xl p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-xl font-bold text-white">Select terminal</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white p-2 rounded-xl hover:bg-gray-800 transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+        {terminals.length === 0 ? (
+          <div className="text-center py-6">
+            <p className="text-gray-500 text-sm mb-3">No terminals registered.</p>
+            <Link href="/manage/pos/terminals" className="text-green-400 font-medium underline text-sm">
+              Add a terminal →
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {terminals.map(t => (
+              <button
+                key={t._id}
+                onClick={() => { onSelect(t.terminalId); onClose(); }}
+                className={`w-full flex items-center gap-4 px-5 py-4 rounded-xl border-2 transition-all text-left ${
+                  selected === t.terminalId
+                    ? "border-green-500 bg-green-900/30"
+                    : "border-gray-700 bg-gray-800 hover:border-gray-600"
+                }`}
+              >
+                <Terminal size={20} className={selected === t.terminalId ? "text-green-400" : "text-gray-400"} />
+                <div>
+                  <p className="font-semibold text-white">{t.name}</p>
+                  <p className="text-xs text-gray-500 capitalize">{t.provider}</p>
+                </div>
+                {selected === t.terminalId && (
+                  <Check size={18} className="ml-auto text-green-400" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -313,6 +371,7 @@ function KioskPOS() {
       : "skip"
   );
   const recordSale = useMutation(api.pos.recordSale);
+  const terminals  = useQuery(api.posTerminals.listByClub, clubId ? { clubId } : "skip");
 
   // ── Tab mutations ──────────────────────────────────────────────────────────
   const openTabMut    = useMutation(api.posTabs.openTab);
@@ -439,6 +498,10 @@ function KioskPOS() {
   const [splitPeople, setSplitPeople]         = useState(1);
   const [pendingAmount, setPendingAmount]     = useState(0);
 
+  // Terminal
+  const [selectedTerminalId, setSelectedTerminalId] = useState<string>("");
+  const [showTerminalPicker, setShowTerminalPicker] = useState(false);
+
   const currency  = club?.currency ?? "GBP";
   const total     = displayBasket.reduce((s, i) => s + i.subtotalPence, 0);
   const itemCount = displayBasket.reduce((s, i) => s + i.quantity, 0);
@@ -448,6 +511,7 @@ function KioskPOS() {
   const perPersonPence    = splitPeople > 1 ? Math.ceil(remainingPence / splitPeople) : null;
   const numpadPence       = numpadValue ? Math.round(parseFloat(numpadValue) * 100) : (perPersonPence ?? remainingPence);
   const chargeAmountPence = Math.min(Math.max(numpadPence, 0), remainingPence);
+  const activeTerminals   = useMemo(() => (terminals ?? []).filter(t => t.isActive), [terminals]);
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -563,6 +627,9 @@ function KioskPOS() {
     const accountPayment = payments.find(p => p.method === "account");
     try {
       if (activeTabId) {
+        // TODO: when terminal integration is complete, fire /api/payments/terminal
+        // here for card payments where selectedTerminalId is set, and wait for
+        // payment confirmation before proceeding.
         await closeTabMut({
           tabId:                 activeTabId,
           paymentMethod:         effectiveMethod,
@@ -577,6 +644,7 @@ function KioskPOS() {
         setLastTabName(activeTab?.name ?? undefined);
         setActiveTabId(null);
       } else {
+        // TODO: terminal API call stub — see tab path above
         await recordSale({
           clubId:                club._id,
           items:                 basket,
@@ -600,6 +668,7 @@ function KioskPOS() {
       setShowNumpad(false);
       setSplitPeople(1);
       setSelectedMember(null);
+      setSelectedTerminalId("");
       setStage("done");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Sale failed");
@@ -1038,16 +1107,29 @@ function KioskPOS() {
                   { id: "card",          label: "Card",    cls: "bg-blue-600  hover:bg-blue-500"  },
                   { id: "account",       label: "Account", cls: "bg-purple-600 hover:bg-purple-500" },
                   { id: "complimentary", label: "Comp",    cls: "bg-gray-700  hover:bg-gray-600"  },
-                ].map(m => (
-                  <button
-                    key={m.id}
-                    onClick={() => startCheckout(m.id)}
-                    disabled={chargeAmountPence <= 0}
-                    className={`py-3 ${m.cls} disabled:opacity-30 rounded-2xl font-bold text-white text-sm transition-colors active:scale-95`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
+                ].map(m => {
+                  const terminalName = m.id === "card" && selectedTerminalId
+                    ? activeTerminals.find(t => t.terminalId === selectedTerminalId)?.name
+                    : undefined;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => {
+                        if (m.id === "card" && activeTerminals.length > 0) {
+                          setShowTerminalPicker(true);
+                        } else {
+                          startCheckout(m.id);
+                        }
+                      }}
+                      disabled={chargeAmountPence <= 0}
+                      className={`py-3 ${m.cls} disabled:opacity-30 rounded-2xl font-bold text-white text-sm transition-colors active:scale-95`}
+                    >
+                      {terminalName
+                        ? <span className="flex items-center justify-center gap-1">{terminalName} <ChevronDown size={12} /></span>
+                        : m.label}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Numpad display */}
@@ -1060,9 +1142,12 @@ function KioskPOS() {
                   {numpadValue ? `£${numpadValue}` : formatCurrency(chargeAmountPence, currency)}
                 </span>
               </button>
-              {numpadValue && (
-                <button onClick={() => setNumpadValue("")} className="text-xs text-gray-500 hover:text-gray-300 px-1">clear entry</button>
-              )}
+              <button
+                onClick={() => setNumpadValue("")}
+                className={`text-xs px-1 transition-colors ${numpadValue ? "text-gray-500 hover:text-gray-300" : "invisible pointer-events-none"}`}
+              >
+                clear entry
+              </button>
 
               {/* Numpad grid */}
               {showNumpad && (
@@ -1127,6 +1212,15 @@ function KioskPOS() {
           member={selectedMember}
           tabName={lastTabName}
           onDismiss={() => { setStage("grid"); setSelectedMember(null); }}
+        />
+      )}
+
+      {showTerminalPicker && (
+        <TerminalPickerModal
+          terminals={activeTerminals}
+          selected={selectedTerminalId}
+          onSelect={id => { setSelectedTerminalId(id); setPaymentMethod("card"); }}
+          onClose={() => setShowTerminalPicker(false)}
         />
       )}
 
