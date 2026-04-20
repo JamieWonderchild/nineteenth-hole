@@ -9,7 +9,7 @@ import { formatCurrency } from "@/lib/format";
 import {
   Minus, Plus, X, CreditCard, Banknote, User, Terminal,
   Gift, Search, Settings, StickyNote, CheckCircle, AlertCircle,
-  PenLine, MapPin, Maximize2, ArrowLeft, Pencil,
+  PenLine, MapPin, Maximize2, ArrowLeft, Pencil, ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -50,11 +50,10 @@ type SaleDone = {
 // ── Payment methods ───────────────────────────────────────────────────────────
 
 const PAYMENT_METHODS = [
-  { id: "cash",          label: "Cash",     icon: Banknote,  colour: "bg-amber-50  border-amber-200  text-amber-800"  },
-  { id: "card",          label: "Card",     icon: CreditCard, colour: "bg-blue-50   border-blue-200   text-blue-800"   },
-  { id: "account",       label: "Account",  icon: User,      colour: "bg-purple-50 border-purple-200 text-purple-800" },
-  { id: "terminal",      label: "Terminal", icon: Terminal,  colour: "bg-green-50  border-green-200  text-green-800"  },
-  { id: "complimentary", label: "Comp",     icon: Gift,      colour: "bg-gray-50   border-gray-200   text-gray-600"   },
+  { id: "cash",          label: "Cash",    icon: Banknote,   colour: "bg-amber-50  border-amber-200  text-amber-800"  },
+  { id: "card",          label: "Card",    icon: CreditCard, colour: "bg-blue-50   border-blue-200   text-blue-800"   },
+  { id: "account",       label: "Account", icon: User,       colour: "bg-purple-50 border-purple-200 text-purple-800" },
+  { id: "complimentary", label: "Comp",    icon: Gift,       colour: "bg-gray-50   border-gray-200   text-gray-600"   },
 ] as const;
 
 // ── Custom item modal ─────────────────────────────────────────────────────────
@@ -204,13 +203,9 @@ function SaleCompleteOverlay({ sale, currency, onDismiss }: {
         <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center">
           <CheckCircle size={44} className="text-white" strokeWidth={1.5} />
         </div>
-        {sale.method !== "terminal" ? (
-          <p className="text-4xl font-black tracking-tight">
-            {formatCurrency(sale.total, currency)}
-          </p>
-        ) : (
-          <p className="text-2xl font-bold">Sent to terminal</p>
-        )}
+        <p className="text-4xl font-black tracking-tight">
+          {formatCurrency(sale.total, currency)}
+        </p>
         <p className="text-green-200 text-sm font-medium">
           {methodLabel}
           {sale.memberName ? ` · ${sale.memberName}` : ""}
@@ -535,19 +530,9 @@ export default function POSPage() {
     setError(null);
     try {
       if (activeTabId) {
-        if (effectiveMethod === "terminal") {
-          const res = await fetch("/api/payments/terminal", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              clubId: club._id, terminalId: selectedTerminalId, amount: total,
-              currency, purpose: "pos_sale",
-              description: displayBasket.map(i => `${i.quantity}× ${i.productName}`).join(", "),
-              ...(selectedMemberId ? { memberId: selectedMemberId } : {}),
-            }),
-          });
-          if (!res.ok) { const e = await res.json() as { error?: string }; throw new Error(e.error ?? "Terminal error"); }
-        }
+        // TODO: when terminal integration is complete, fire /api/payments/terminal
+        // here for card payments where selectedTerminalId is set, and wait for
+        // payment confirmation before proceeding.
         await closeTabMut({
           tabId: activeTabId,
           paymentMethod: effectiveMethod,
@@ -568,19 +553,7 @@ export default function POSPage() {
           unitPricePence: i.unitPricePence,
           subtotalPence:  i.subtotalPence,
         }));
-        if (effectiveMethod === "terminal") {
-          const res = await fetch("/api/payments/terminal", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              clubId: club._id, terminalId: selectedTerminalId, amount: total,
-              currency, purpose: "pos_sale",
-              description: basket.map(i => `${i.quantity}× ${i.productName}`).join(", "),
-              ...(selectedMemberId ? { memberId: selectedMemberId } : {}),
-            }),
-          });
-          if (!res.ok) { const e = await res.json() as { error?: string }; throw new Error(e.error ?? "Terminal error"); }
-        }
+        // TODO: terminal API call stub — see tab path above
         await recordSale({
           clubId: club._id,
           memberId:              selectedMember?.userId,
@@ -618,7 +591,6 @@ export default function POSPage() {
     if (!club || displayBasket.length === 0 || saving) return;
     if (chargeAmountPence <= 0) return;
 
-    if (paymentMethod === "terminal" && !selectedTerminalId) { setShowTerminalPicker(true); return; }
     if (paymentMethod === "account" && !selectedMemberId) { setError("Select a member to charge their account"); return; }
 
     const newPayment = { method: paymentMethod, amountPence: chargeAmountPence };
@@ -1109,20 +1081,23 @@ export default function POSPage() {
             {PAYMENT_METHODS.map(m => {
               const Icon = m.icon;
               const active = paymentMethod === m.id;
+              const terminalName = m.id === "card" && selectedTerminalId
+                ? activeTerminals.find(t => t.terminalId === selectedTerminalId)?.name
+                : undefined;
               return (
                 <button
                   key={m.id}
                   onClick={() => {
                     setPaymentMethod(m.id);
-                    if (m.id === "terminal" && activeTerminals.length > 0 && !selectedTerminalId) setShowTerminalPicker(true);
+                    if (m.id === "card" && activeTerminals.length > 0) setShowTerminalPicker(true);
                   }}
                   className={`flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl border-2 text-[10px] font-bold transition-all active:scale-95 ${
                     active ? `${m.colour} border-current` : "border-gray-200 text-gray-500 bg-white hover:border-gray-300"
                   }`}
                 >
                   <Icon size={15} />
-                  {m.id === "terminal" && selectedTerminalId && active
-                    ? activeTerminals.find(t => t.terminalId === selectedTerminalId)?.name ?? m.label
+                  {terminalName && active
+                    ? <span className="flex items-center gap-0.5">{terminalName} <ChevronDown size={9} /></span>
                     : m.label}
                 </button>
               );
@@ -1140,11 +1115,12 @@ export default function POSPage() {
                 {numpadValue ? `£${numpadValue}` : formatCurrency(chargeAmountPence, currency)}
               </span>
             </button>
-            {numpadValue && (
-              <button onClick={() => setNumpadValue("")} className="text-xs text-gray-400 hover:text-gray-600 mt-1 px-1">
-                clear entry
-              </button>
-            )}
+            <button
+              onClick={() => setNumpadValue("")}
+              className={`text-xs px-1 mt-1 transition-colors ${numpadValue ? "text-gray-400 hover:text-gray-600" : "invisible pointer-events-none"}`}
+            >
+              clear entry
+            </button>
           </div>
 
           {/* Numpad grid — only when open */}
@@ -1170,7 +1146,6 @@ export default function POSPage() {
               className="w-full py-4 font-black text-lg rounded-2xl transition-all active:scale-[0.98] disabled:opacity-40 text-white bg-green-600 hover:bg-green-500 shadow-lg shadow-green-200"
             >
               {saving ? "Processing…"
-                : paymentMethod === "terminal" && !selectedTerminalId ? "Select terminal →"
                 : paymentMethod === "account" && !selectedMemberId ? "Select member →"
                 : `Charge ${formatCurrency(chargeAmountPence, currency)}`}
             </button>
@@ -1234,7 +1209,7 @@ export default function POSPage() {
         <TerminalPickerModal
           terminals={activeTerminals}
           selected={selectedTerminalId}
-          onSelect={id => { setSelectedTerminalId(id); setPaymentMethod("terminal"); }}
+          onSelect={id => { setSelectedTerminalId(id); setPaymentMethod("card"); }}
           onClose={() => setShowTerminalPicker(false)}
         />
       )}
