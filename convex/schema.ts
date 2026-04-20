@@ -60,6 +60,9 @@ export default defineSchema({
     longitude: v.optional(v.number()),
     // Data import — scoped token for Alan's results scraper (not a global secret)
     importToken: v.optional(v.string()),
+    // Payment provider credentials — stored per-club so each club uses their own Dojo account
+    dojoApiKey:         v.optional(v.string()),
+    dojoWebhookSecret:  v.optional(v.string()),
     // Timestamps
     createdAt: v.string(),
     updatedAt: v.string(),

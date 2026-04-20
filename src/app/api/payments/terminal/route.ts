@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "convex/_generated/api";
-import { getPaymentProvider } from "@/lib/payments";
+import { DojoProvider } from "@/lib/payments/dojo";
 import type { Id } from "convex/_generated/dataModel";
 
 function convex() {
@@ -37,7 +37,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const provider = getPaymentProvider();
+  // Look up the club's Dojo credentials
+  const db = convex();
+  const club = await db.query(api.clubs.get, { clubId: clubId as Id<"clubs"> });
+  if (!club?.dojoApiKey) {
+    return NextResponse.json({ error: "Payment terminal not configured — add Dojo API credentials in Settings → Locations" }, { status: 400 });
+  }
+  const provider = new DojoProvider(club.dojoApiKey, "");
 
   // 1. Create payment intent
   let result;
@@ -70,7 +76,6 @@ export async function POST(request: NextRequest) {
   }
 
   // 3. Record pending intent in Convex
-  const db = convex();
   const intentDbId = await db.mutation(api.wallet.createPaymentIntent, {
     clubId: clubId as Id<"clubs">,
     ...(memberId ? { clubMemberId: memberId as Id<"clubMembers"> } : {}),
@@ -109,12 +114,25 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const provider = getPaymentProvider();
   const db = convex();
+
+  // Look up the club via the intent to get their Dojo credentials
+  let provider: DojoProvider | null = null;
+  try {
+    const intent = await db.query(api.wallet.getPaymentIntent, { intentId: intentId as Id<"paymentIntents"> });
+    if (intent?.clubId) {
+      const club = await db.query(api.clubs.get, { clubId: intent.clubId });
+      if (club?.dojoApiKey) {
+        provider = new DojoProvider(club.dojoApiKey, "");
+      }
+    }
+  } catch {
+    // Non-fatal — we still mark the intent cancelled in Convex
+  }
 
   // Best-effort cancel at provider — may fail if card already captured
   try {
-    await provider.cancelIntent(providerIntentId);
+    if (provider) await provider.cancelIntent(providerIntentId);
   } catch (err) {
     console.warn("[payments/terminal] cancelIntent failed (may already be captured):", err);
     // Mark failed in Convex so the UI unblocks even if Dojo cancel failed

@@ -7,7 +7,7 @@ import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import {
   MapPin, Monitor, Terminal, Wifi, Plus, Trash2, Pencil, X, Eye, EyeOff,
-  GripVertical, Copy, Check, ExternalLink,
+  GripVertical, Copy, Check, ExternalLink, KeyRound, ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -170,12 +170,18 @@ export default function LocationsPage() {
     club ? { clubId: club._id } : "skip"
   );
 
-  const saveLocation   = useMutation(api.posLocations.saveLocation);
-  const removeLocation = useMutation(api.posLocations.removeLocation);
-  const saveKiosk      = useMutation(api.posLocations.saveKiosk);
-  const removeKiosk    = useMutation(api.posLocations.removeKiosk);
-  const saveTerminal   = useMutation(api.posTerminals.save);
-  const removeTerminal = useMutation(api.posTerminals.remove);
+  const paymentSettings = useQuery(
+    api.clubs.getPaymentSettings,
+    club ? { clubId: club._id } : "skip"
+  );
+
+  const saveLocation      = useMutation(api.posLocations.saveLocation);
+  const removeLocation    = useMutation(api.posLocations.removeLocation);
+  const saveKiosk         = useMutation(api.posLocations.saveKiosk);
+  const removeKiosk       = useMutation(api.posLocations.removeKiosk);
+  const saveTerminal      = useMutation(api.posTerminals.save);
+  const removeTerminal    = useMutation(api.posTerminals.remove);
+  const savePaymentSettings = useMutation(api.clubs.savePaymentSettings);
 
   // ── Location form state ────────────────────────────────────────────────────
   const [editingLoc, setEditingLoc] = useState<LocationRow | null>(null);
@@ -196,6 +202,14 @@ export default function LocationsPage() {
   const [showPin, setShowPin] = useState(false);
   const [savingKiosk, setSavingKiosk] = useState(false);
   const [kioskError, setKioskError] = useState<string | null>(null);
+
+  // ── Payment settings state ─────────────────────────────────────────────────
+  const [paymentForm, setPaymentForm] = useState({ dojoApiKey: "", dojoWebhookSecret: "" });
+  const [showDojoKey, setShowDojoKey] = useState(false);
+  const [showDojoSecret, setShowDojoSecret] = useState(false);
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [paymentSaved, setPaymentSaved] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   // ── Terminal form state ────────────────────────────────────────────────────
   const [editingTerminal, setEditingTerminal] = useState<TerminalRow | null>(null);
@@ -385,6 +399,28 @@ export default function LocationsPage() {
   async function handleDeleteTerminal(id: Id<"posTerminals">) {
     if (!confirm("Remove this terminal?")) return;
     await removeTerminal({ terminalDbId: id });
+  }
+
+  // ── Payment settings handler ───────────────────────────────────────────────
+
+  async function handleSavePaymentSettings() {
+    if (!club) return;
+    setSavingPayment(true);
+    setPaymentError(null);
+    try {
+      await savePaymentSettings({
+        clubId:            club._id,
+        dojoApiKey:        paymentForm.dojoApiKey || undefined,
+        dojoWebhookSecret: paymentForm.dojoWebhookSecret || undefined,
+      });
+      setPaymentForm({ dojoApiKey: "", dojoWebhookSecret: "" });
+      setPaymentSaved(true);
+      setTimeout(() => setPaymentSaved(false), 3000);
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingPayment(false);
+    }
   }
 
   // ── Loading ────────────────────────────────────────────────────────────────
@@ -839,6 +875,112 @@ export default function LocationsPage() {
           <strong>How to find your terminal ID:</strong> Log into your Dojo account at{" "}
           <span className="font-mono">business.dojo.tech</span> → Devices → copy the terminal ID shown next to each device.
         </div>
+      </section>
+
+      {/* ── DOJO CREDENTIALS ────────────────────────────────────────────────── */}
+      <section>
+        <div className="mb-4">
+          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <KeyRound size={18} /> Dojo Payment Credentials
+          </h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Your club&apos;s Dojo API key and webhook secret. Each club has its own Dojo account.
+          </p>
+        </div>
+
+        {/* Status badges */}
+        <div className="flex flex-wrap gap-3 mb-6">
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium ${paymentSettings?.dojoApiKeySet ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+            <ShieldCheck size={15} />
+            API key: {paymentSettings?.dojoApiKeySet ? (paymentSettings.dojoApiKeyMasked ?? "set") : "not set"}
+          </div>
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium ${paymentSettings?.dojoWebhookSecretSet ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+            <ShieldCheck size={15} />
+            Webhook secret: {paymentSettings?.dojoWebhookSecretSet ? "set" : "not set"}
+          </div>
+        </div>
+
+        {paymentError && (
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl mb-4">
+            <span className="flex-1">{paymentError}</span>
+            <button onClick={() => setPaymentError(null)}><X size={14} /></button>
+          </div>
+        )}
+
+        <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Dojo API key{" "}
+              {paymentSettings?.dojoApiKeySet && <span className="text-gray-400">(leave blank to keep current)</span>}
+            </label>
+            <div className="relative">
+              <input
+                type={showDojoKey ? "text" : "password"}
+                value={paymentForm.dojoApiKey}
+                onChange={e => setPaymentForm(f => ({ ...f, dojoApiKey: e.target.value }))}
+                placeholder={paymentSettings?.dojoApiKeySet ? "Enter new key to rotate" : "sk_live_…"}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-10 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowDojoKey(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showDojoKey ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1">
+              Found in your Dojo dashboard under Developer → API keys.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Dojo webhook secret{" "}
+              {paymentSettings?.dojoWebhookSecretSet && <span className="text-gray-400">(leave blank to keep current)</span>}
+            </label>
+            <div className="relative">
+              <input
+                type={showDojoSecret ? "text" : "password"}
+                value={paymentForm.dojoWebhookSecret}
+                onChange={e => setPaymentForm(f => ({ ...f, dojoWebhookSecret: e.target.value }))}
+                placeholder={paymentSettings?.dojoWebhookSecretSet ? "Enter new secret to rotate" : "whsec_…"}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-10 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowDojoSecret(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showDojoSecret ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            onClick={handleSavePaymentSettings}
+            disabled={savingPayment || (!paymentForm.dojoApiKey.trim() && !paymentForm.dojoWebhookSecret.trim())}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+          >
+            {paymentSaved ? <><Check size={14} /> Saved</> : savingPayment ? "Saving…" : "Save credentials"}
+          </button>
+        </div>
+
+        {/* Webhook URL instruction */}
+        {club && (
+          <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm">
+            <p className="font-medium text-amber-800 mb-2">Register this webhook URL in your Dojo dashboard:</p>
+            <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-amber-200">
+              <code className="text-xs text-gray-700 flex-1 break-all">
+                {origin}/api/payments/webhook/dojo?club={club._id}
+              </code>
+              <CopyButton text={`${origin}/api/payments/webhook/dojo?club=${club._id}`} />
+            </div>
+            <p className="text-xs text-amber-700 mt-2">
+              In Dojo: Developer → Webhooks → Add endpoint. Select events: <span className="font-mono">payment.captured</span>, <span className="font-mono">payment.failed</span>, <span className="font-mono">payment.refunded</span>.
+            </p>
+          </div>
+        )}
       </section>
     </div>
   );

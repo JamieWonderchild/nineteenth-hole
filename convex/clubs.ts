@@ -107,6 +107,63 @@ export const create = mutation({
   },
 });
 
+// ── Payment settings ──────────────────────────────────────────────────────────
+
+/** Save Dojo API credentials for a club. Existing key preserved if blank is submitted. */
+export const savePaymentSettings = mutation({
+  args: {
+    clubId:            v.id("clubs"),
+    dojoApiKey:        v.optional(v.string()),
+    dojoWebhookSecret: v.optional(v.string()),
+  },
+  handler: async (ctx, { clubId, dojoApiKey, dojoWebhookSecret }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    if (!getSuperAdminEmails().includes(identity.email ?? "")) {
+      const member = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", clubId).eq("userId", identity.subject))
+        .unique();
+      if (!member || member.role !== "admin") throw new Error("Not authorised");
+    }
+    const patch: Record<string, string | undefined> = { updatedAt: new Date().toISOString() };
+    // Only overwrite if a non-empty value was provided
+    if (dojoApiKey?.trim())        patch.dojoApiKey        = dojoApiKey.trim();
+    if (dojoWebhookSecret?.trim()) patch.dojoWebhookSecret = dojoWebhookSecret.trim();
+    await ctx.db.patch(clubId, patch);
+  },
+});
+
+/**
+ * Return Dojo credentials for a club — admin only.
+ * The API key is masked on the way out (last 4 chars visible) so it can be
+ * shown in the UI without exposing the full secret.
+ */
+export const getPaymentSettings = query({
+  args: { clubId: v.id("clubs") },
+  handler: async (ctx, { clubId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    const isSuperAdmin = getSuperAdminEmails().includes(identity.email ?? "");
+    if (!isSuperAdmin) {
+      const member = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", clubId).eq("userId", identity.subject))
+        .unique();
+      if (!member || member.role !== "admin") return null;
+    }
+    const club = await ctx.db.get(clubId);
+    if (!club) return null;
+    const mask = (key: string | undefined) =>
+      key ? `••••••••${key.slice(-4)}` : null;
+    return {
+      dojoApiKeySet:        !!club.dojoApiKey,
+      dojoApiKeyMasked:     mask(club.dojoApiKey),
+      dojoWebhookSecretSet: !!club.dojoWebhookSecret,
+    };
+  },
+});
+
 // Generate (or rotate) the club's import token — club admin only
 export const generateImportToken = mutation({
   args: { clubId: v.id("clubs") },
