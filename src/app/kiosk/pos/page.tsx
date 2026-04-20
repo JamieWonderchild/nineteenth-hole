@@ -1141,7 +1141,7 @@ function KioskPOS() {
         <TerminalPickerModal
           terminals={activeTerminals}
           selected={selectedTerminalId}
-          onSelect={id => { setSelectedTerminalId(id); setPaymentMethod("card"); }}
+          onSelect={id => { setSelectedTerminalId(id); startCheckout("card"); }}
           onClose={() => setShowTerminalPicker(false)}
           theme="dark"
         />
