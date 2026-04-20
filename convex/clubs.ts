@@ -113,10 +113,11 @@ export const create = mutation({
 export const savePaymentSettings = mutation({
   args: {
     clubId:            v.id("clubs"),
+    paymentProvider:   v.optional(v.union(v.literal("dojo"), v.literal("square"))),
     dojoApiKey:        v.optional(v.string()),
     dojoWebhookSecret: v.optional(v.string()),
   },
-  handler: async (ctx, { clubId, dojoApiKey, dojoWebhookSecret }) => {
+  handler: async (ctx, { clubId, paymentProvider, dojoApiKey, dojoWebhookSecret }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthenticated");
     if (!getSuperAdminEmails().includes(identity.email ?? "")) {
@@ -127,7 +128,7 @@ export const savePaymentSettings = mutation({
       if (!member || member.role !== "admin") throw new Error("Not authorised");
     }
     const patch: Record<string, string | undefined> = { updatedAt: new Date().toISOString() };
-    // Only overwrite if a non-empty value was provided
+    if (paymentProvider)           patch.paymentProvider   = paymentProvider;
     if (dojoApiKey?.trim())        patch.dojoApiKey        = dojoApiKey.trim();
     if (dojoWebhookSecret?.trim()) patch.dojoWebhookSecret = dojoWebhookSecret.trim();
     await ctx.db.patch(clubId, patch);
@@ -157,6 +158,7 @@ export const getPaymentSettings = query({
     const mask = (key: string | undefined) =>
       key ? `••••••••${key.slice(-4)}` : null;
     return {
+      paymentProvider:      club.paymentProvider ?? null,
       dojoApiKeySet:        !!club.dojoApiKey,
       dojoApiKeyMasked:     mask(club.dojoApiKey),
       dojoWebhookSecretSet: !!club.dojoWebhookSecret,

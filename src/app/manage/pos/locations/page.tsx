@@ -204,7 +204,7 @@ export default function LocationsPage() {
   const [kioskError, setKioskError] = useState<string | null>(null);
 
   // ── Payment settings state ─────────────────────────────────────────────────
-  const [paymentForm, setPaymentForm] = useState({ dojoApiKey: "", dojoWebhookSecret: "" });
+  const [paymentForm, setPaymentForm] = useState({ provider: "" as "" | "dojo" | "square", dojoApiKey: "", dojoWebhookSecret: "" });
   const [showDojoKey, setShowDojoKey] = useState(false);
   const [showDojoSecret, setShowDojoSecret] = useState(false);
   const [savingPayment, setSavingPayment] = useState(false);
@@ -410,10 +410,11 @@ export default function LocationsPage() {
     try {
       await savePaymentSettings({
         clubId:            club._id,
+        paymentProvider:   paymentForm.provider || undefined,
         dojoApiKey:        paymentForm.dojoApiKey || undefined,
         dojoWebhookSecret: paymentForm.dojoWebhookSecret || undefined,
       });
-      setPaymentForm({ dojoApiKey: "", dojoWebhookSecret: "" });
+      setPaymentForm({ provider: "", dojoApiKey: "", dojoWebhookSecret: "" });
       setPaymentSaved(true);
       setTimeout(() => setPaymentSaved(false), 3000);
     } catch (err) {
@@ -890,14 +891,22 @@ export default function LocationsPage() {
 
         {/* Status badges */}
         <div className="flex flex-wrap gap-3 mb-6">
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium ${paymentSettings?.dojoApiKeySet ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium ${paymentSettings?.paymentProvider ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
             <ShieldCheck size={15} />
-            API key: {paymentSettings?.dojoApiKeySet ? (paymentSettings.dojoApiKeyMasked ?? "set") : "not set"}
+            Provider: {paymentSettings?.paymentProvider ? paymentSettings.paymentProvider.charAt(0).toUpperCase() + paymentSettings.paymentProvider.slice(1) : "not set"}
           </div>
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium ${paymentSettings?.dojoWebhookSecretSet ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-            <ShieldCheck size={15} />
-            Webhook secret: {paymentSettings?.dojoWebhookSecretSet ? "set" : "not set"}
-          </div>
+          {paymentSettings?.paymentProvider === "dojo" || !paymentSettings?.paymentProvider ? (
+            <>
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium ${paymentSettings?.dojoApiKeySet ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                <ShieldCheck size={15} />
+                API key: {paymentSettings?.dojoApiKeySet ? (paymentSettings.dojoApiKeyMasked ?? "set") : "not set"}
+              </div>
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium ${paymentSettings?.dojoWebhookSecretSet ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                <ShieldCheck size={15} />
+                Webhook secret: {paymentSettings?.dojoWebhookSecretSet ? "set" : "not set"}
+              </div>
+            </>
+          ) : null}
         </div>
 
         {paymentError && (
@@ -908,66 +917,90 @@ export default function LocationsPage() {
         )}
 
         <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+          {/* Provider selector */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Dojo API key{" "}
-              {paymentSettings?.dojoApiKeySet && <span className="text-gray-400">(leave blank to keep current)</span>}
-            </label>
-            <div className="relative">
-              <input
-                type={showDojoKey ? "text" : "password"}
-                value={paymentForm.dojoApiKey}
-                onChange={e => setPaymentForm(f => ({ ...f, dojoApiKey: e.target.value }))}
-                placeholder={paymentSettings?.dojoApiKeySet ? "Enter new key to rotate" : "sk_live_…"}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-10 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-              <button
-                type="button"
-                onClick={() => setShowDojoKey(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                {showDojoKey ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-            <p className="text-[11px] text-gray-400 mt-1">
-              Found in your Dojo dashboard under Developer → API keys.
-            </p>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Payment provider</label>
+            <select
+              value={paymentForm.provider || paymentSettings?.paymentProvider || "dojo"}
+              onChange={e => setPaymentForm(f => ({ ...f, provider: e.target.value as "dojo" | "square" }))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="dojo">Dojo</option>
+              <option value="square">Square</option>
+            </select>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Dojo webhook secret{" "}
-              {paymentSettings?.dojoWebhookSecretSet && <span className="text-gray-400">(leave blank to keep current)</span>}
-            </label>
-            <div className="relative">
-              <input
-                type={showDojoSecret ? "text" : "password"}
-                value={paymentForm.dojoWebhookSecret}
-                onChange={e => setPaymentForm(f => ({ ...f, dojoWebhookSecret: e.target.value }))}
-                placeholder={paymentSettings?.dojoWebhookSecretSet ? "Enter new secret to rotate" : "whsec_…"}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-10 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-              <button
-                type="button"
-                onClick={() => setShowDojoSecret(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                {showDojoSecret ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
+          {/* Dojo-specific credentials */}
+          {(paymentForm.provider || paymentSettings?.paymentProvider || "dojo") === "dojo" && (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Dojo API key{" "}
+                  {paymentSettings?.dojoApiKeySet && <span className="text-gray-400">(leave blank to keep current)</span>}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showDojoKey ? "text" : "password"}
+                    value={paymentForm.dojoApiKey}
+                    onChange={e => setPaymentForm(f => ({ ...f, dojoApiKey: e.target.value }))}
+                    placeholder={paymentSettings?.dojoApiKeySet ? "Enter new key to rotate" : "sk_live_…"}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-10 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDojoKey(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showDojoKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Found in your Dojo dashboard under Developer → API keys.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Dojo webhook secret{" "}
+                  {paymentSettings?.dojoWebhookSecretSet && <span className="text-gray-400">(leave blank to keep current)</span>}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showDojoSecret ? "text" : "password"}
+                    value={paymentForm.dojoWebhookSecret}
+                    onChange={e => setPaymentForm(f => ({ ...f, dojoWebhookSecret: e.target.value }))}
+                    placeholder={paymentSettings?.dojoWebhookSecretSet ? "Enter new secret to rotate" : "whsec_…"}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-10 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDojoSecret(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showDojoSecret ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {(paymentForm.provider || paymentSettings?.paymentProvider || "dojo") === "square" && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+              Square integration is not yet configured. Select Dojo to process payments.
             </div>
-          </div>
+          )}
 
           <button
             onClick={handleSavePaymentSettings}
-            disabled={savingPayment || (!paymentForm.dojoApiKey.trim() && !paymentForm.dojoWebhookSecret.trim())}
+            disabled={savingPayment || (!paymentForm.provider && !paymentForm.dojoApiKey.trim() && !paymentForm.dojoWebhookSecret.trim())}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
           >
-            {paymentSaved ? <><Check size={14} /> Saved</> : savingPayment ? "Saving…" : "Save credentials"}
+            {paymentSaved ? <><Check size={14} /> Saved</> : savingPayment ? "Saving…" : "Save settings"}
           </button>
         </div>
 
-        {/* Webhook URL instruction */}
-        {club && (
+        {/* Webhook URL instruction — only relevant for Dojo */}
+        {club && (paymentSettings?.paymentProvider ?? "dojo") === "dojo" && (
           <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm">
             <p className="font-medium text-amber-800 mb-2">Register this webhook URL in your Dojo dashboard:</p>
             <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-amber-200">

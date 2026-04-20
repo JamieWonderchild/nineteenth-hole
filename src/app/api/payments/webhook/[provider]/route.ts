@@ -33,6 +33,11 @@ export async function POST(
         const club = await db.query(api.clubs.get, { clubId: clubId as Id<"clubs"> });
         if (club?.dojoWebhookSecret) webhookSecret = club.dojoWebhookSecret;
         if (club?.dojoApiKey) apiKey = club.dojoApiKey;
+        // Sanity check: reject if this club's configured provider isn't Dojo
+        if (club?.paymentProvider && club.paymentProvider !== "dojo") {
+          console.warn(`[webhook/dojo] Club ${clubId} uses provider "${club.paymentProvider}", not dojo`);
+          return NextResponse.json({ error: "Provider mismatch" }, { status: 400 });
+        }
       } catch (err) {
         console.error("[webhook/dojo] Failed to fetch club credentials:", err);
       }

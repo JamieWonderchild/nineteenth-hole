@@ -3,6 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "convex/_generated/api";
 import { DojoProvider } from "@/lib/payments/dojo";
+import { SquareProvider } from "@/lib/payments/square";
+import type { PaymentProvider } from "@/lib/payments/types";
 import type { Id } from "convex/_generated/dataModel";
 
 function convex() {
@@ -37,13 +39,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  // Look up the club's Dojo credentials
+  // Look up the club and build the correct per-club provider
   const db = convex();
   const club = await db.query(api.clubs.get, { clubId: clubId as Id<"clubs"> });
-  if (!club?.dojoApiKey) {
-    return NextResponse.json({ error: "Payment terminal not configured — add Dojo API credentials in Settings → Locations" }, { status: 400 });
+  if (!club) return NextResponse.json({ error: "Club not found" }, { status: 404 });
+
+  let provider: PaymentProvider;
+  const providerName = club.paymentProvider ?? "dojo";
+
+  if (providerName === "square") {
+    provider = new SquareProvider();
+  } else {
+    if (!club.dojoApiKey) {
+      return NextResponse.json({ error: "Payment terminal not configured — add Dojo API credentials in Settings → Locations" }, { status: 400 });
+    }
+    provider = new DojoProvider(club.dojoApiKey, "");
   }
-  const provider = new DojoProvider(club.dojoApiKey, "");
 
   // 1. Create payment intent
   let result;
@@ -116,14 +127,19 @@ export async function DELETE(request: NextRequest) {
 
   const db = convex();
 
-  // Look up the club via the intent to get their Dojo credentials
-  let provider: DojoProvider | null = null;
+  // Look up the club via the intent to get their provider credentials
+  let provider: PaymentProvider | null = null;
   try {
     const intent = await db.query(api.wallet.getPaymentIntent, { intentId: intentId as Id<"paymentIntents"> });
     if (intent?.clubId) {
       const club = await db.query(api.clubs.get, { clubId: intent.clubId });
-      if (club?.dojoApiKey) {
-        provider = new DojoProvider(club.dojoApiKey, "");
+      if (club) {
+        const providerName = club.paymentProvider ?? "dojo";
+        if (providerName === "square") {
+          provider = new SquareProvider();
+        } else if (club.dojoApiKey) {
+          provider = new DojoProvider(club.dojoApiKey, "");
+        }
       }
     }
   } catch {
