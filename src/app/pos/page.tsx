@@ -7,32 +7,19 @@ import { useActiveClub } from "@/lib/club-context";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
 import {
-  Minus, Plus, X, CreditCard, Banknote, User, Terminal,
+  Minus, Plus, X, CreditCard, Banknote, User,
   Gift, Search, Settings, StickyNote, CheckCircle, AlertCircle,
   PenLine, MapPin, Maximize2, ArrowLeft, Pencil, ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
+import type { PosProduct, BasketItem } from "@/lib/pos/types";
+import { applyNumpadKey } from "@/lib/pos/numpad";
+import { TerminalPickerModal } from "@/components/pos/TerminalPickerModal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Product = {
-  _id: Id<"posProducts">;
-  name: string;
-  pricePence: number;
-  currency: string;
-  categoryId?: Id<"posCategories">;
-  stockCount?: number;
-  trackStock?: boolean;
-  isActive: boolean;
-};
-
-type BasketItem = {
-  productId: Id<"posProducts"> | "custom";
-  productName: string;
-  quantity: number;
-  unitPricePence: number;
-  subtotalPence: number;
-};
+// PosProduct and BasketItem imported from @/lib/pos/types
+type Product = PosProduct;
 
 type MemberRow = {
   _id: Id<"clubMembers">;
@@ -119,62 +106,6 @@ function CustomItemModal({
             Add to basket
           </button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Terminal picker modal ─────────────────────────────────────────────────────
-
-function TerminalPickerModal({
-  terminals,
-  selected,
-  onSelect,
-  onClose,
-}: {
-  terminals: { _id: Id<"posTerminals">; terminalId: string; name: string; provider: string }[];
-  selected: string;
-  onSelect: (id: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
-      <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-bold text-gray-900 text-lg">Select terminal</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
-        </div>
-        {terminals.length === 0 ? (
-          <div className="text-center py-6">
-            <p className="text-gray-500 text-sm mb-3">No terminals registered.</p>
-            <Link href="/manage/pos/terminals" className="text-green-600 font-medium underline text-sm">
-              Add a terminal →
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {terminals.map(t => (
-              <button
-                key={t._id}
-                onClick={() => { onSelect(t.terminalId); onClose(); }}
-                className={`w-full flex items-center gap-4 px-5 py-4 rounded-xl border-2 transition-all text-left ${
-                  selected === t.terminalId
-                    ? "border-green-500 bg-green-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <Terminal size={20} className={selected === t.terminalId ? "text-green-600" : "text-gray-400"} />
-                <div>
-                  <p className="font-semibold text-gray-900">{t.name}</p>
-                  <p className="text-xs text-gray-400 capitalize">{t.provider}</p>
-                </div>
-                {selected === t.terminalId && (
-                  <CheckCircle size={18} className="ml-auto text-green-500" />
-                )}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -502,19 +433,7 @@ export default function POSPage() {
   // ── Numpad ─────────────────────────────────────────────────────────────────
 
   function handleNumpad(key: string) {
-    setNumpadValue(prev => {
-      if (key === "⌫") return prev.slice(0, -1);
-      if (key === ".") {
-        if (prev.includes(".")) return prev;
-        return (prev || "0") + ".";
-      }
-      // Max 2 decimal places
-      const dot = prev.indexOf(".");
-      if (dot !== -1 && prev.length - dot > 2) return prev;
-      // No leading zeros before decimal
-      if (prev === "0") return key;
-      return prev + key;
-    });
+    setNumpadValue(prev => applyNumpadKey(prev, key));
   }
 
   // ── Complete sale (all payments collected) ─────────────────────────────────
@@ -1211,6 +1130,7 @@ export default function POSPage() {
           selected={selectedTerminalId}
           onSelect={id => { setSelectedTerminalId(id); setPaymentMethod("card"); }}
           onClose={() => setShowTerminalPicker(false)}
+          theme="light"
         />
       )}
     </div>

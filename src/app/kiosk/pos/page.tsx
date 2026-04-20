@@ -7,32 +7,19 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
-import { X, ChevronLeft, Search, UserCircle, Check, Lock, ArrowLeft, Maximize, Minimize, Plus, Pencil, Terminal, ChevronDown } from "lucide-react";
+import { X, ChevronLeft, Search, UserCircle, Check, Lock, ArrowLeft, Maximize, Minimize, Plus, Pencil, ChevronDown } from "lucide-react";
 
 import { PinPad } from "@/components/kiosk/PinLock";
 import { KioskShiftModal } from "@/components/kiosk/ShiftModal";
+import { TerminalPickerModal } from "@/components/pos/TerminalPickerModal";
 import Link from "next/link";
+import type { PosProduct, BasketItem } from "@/lib/pos/types";
+import { applyNumpadKey } from "@/lib/pos/numpad";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Product = {
-  _id: Id<"posProducts">;
-  name: string;
-  pricePence: number;
-  currency: string;
-  categoryId?: Id<"posCategories">;
-  stockCount?: number;
-  trackStock?: boolean;
-  isActive: boolean;
-};
-
-type BasketItem = {
-  productId: Id<"posProducts">;
-  productName: string;
-  quantity: number;
-  unitPricePence: number;
-  subtotalPence: number;
-};
+// PosProduct and BasketItem imported from @/lib/pos/types
+type Product = PosProduct;
 
 type MemberResult = {
   _id: Id<"clubMembers">;
@@ -75,64 +62,6 @@ function NewTabModal({ onOpen, onClose }: { onOpen: (name: string) => void; onCl
             Open tab
           </button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Terminal picker modal (dark) ──────────────────────────────────────────────
-
-function TerminalPickerModal({
-  terminals,
-  selected,
-  onSelect,
-  onClose,
-}: {
-  terminals: { _id: Id<"posTerminals">; terminalId: string; name: string; provider: string }[];
-  selected: string;
-  onSelect: (id: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-sm shadow-2xl p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-xl font-bold text-white">Select terminal</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white p-2 rounded-xl hover:bg-gray-800 transition-colors">
-            <X size={20} />
-          </button>
-        </div>
-        {terminals.length === 0 ? (
-          <div className="text-center py-6">
-            <p className="text-gray-500 text-sm mb-3">No terminals registered.</p>
-            <Link href="/manage/pos/terminals" className="text-green-400 font-medium underline text-sm">
-              Add a terminal →
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {terminals.map(t => (
-              <button
-                key={t._id}
-                onClick={() => { onSelect(t.terminalId); onClose(); }}
-                className={`w-full flex items-center gap-4 px-5 py-4 rounded-xl border-2 transition-all text-left ${
-                  selected === t.terminalId
-                    ? "border-green-500 bg-green-900/30"
-                    : "border-gray-700 bg-gray-800 hover:border-gray-600"
-                }`}
-              >
-                <Terminal size={20} className={selected === t.terminalId ? "text-green-400" : "text-gray-400"} />
-                <div>
-                  <p className="font-semibold text-white">{t.name}</p>
-                  <p className="text-xs text-gray-500 capitalize">{t.provider}</p>
-                </div>
-                {selected === t.terminalId && (
-                  <Check size={18} className="ml-auto text-green-400" />
-                )}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -591,17 +520,7 @@ function KioskPOS() {
   // ── Numpad ─────────────────────────────────────────────────────────────────
 
   function handleNumpad(key: string) {
-    setNumpadValue(prev => {
-      if (key === "⌫") return prev.slice(0, -1);
-      if (key === ".") {
-        if (prev.includes(".")) return prev;
-        return (prev || "0") + ".";
-      }
-      const dot = prev.indexOf(".");
-      if (dot !== -1 && prev.length - dot > 2) return prev;
-      if (prev === "0") return key;
-      return prev + key;
-    });
+    setNumpadValue(prev => applyNumpadKey(prev, key));
   }
 
   // ── Checkout ───────────────────────────────────────────────────────────────
@@ -647,7 +566,10 @@ function KioskPOS() {
         // TODO: terminal API call stub — see tab path above
         await recordSale({
           clubId:                club._id,
-          items:                 basket,
+          items:                 basket.map(i => ({
+            ...i,
+            productId: i.productId !== "custom" ? i.productId as Id<"posProducts"> : undefined,
+          })),
           currency,
           paymentMethod:         effectiveMethod,
           chargeAccountMemberId: accountPayment && selectedMember ? selectedMember._id : undefined,
@@ -1052,9 +974,9 @@ function KioskPOS() {
                   <div className="flex items-center gap-2">
                     <p className="text-xs text-gray-500 flex-1">{formatCurrency(item.unitPricePence, currency)} each</p>
                     <div className="flex items-center gap-2 shrink-0">
-                      <button onClick={() => changeQty(item.productId, -1)} className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 flex items-center justify-center text-white font-bold transition-colors text-lg">−</button>
+                      <button onClick={() => item.productId !== "custom" && changeQty(item.productId, -1)} className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 flex items-center justify-center text-white font-bold transition-colors text-lg">−</button>
                       <span className="text-white font-bold w-5 text-center">{item.quantity}</span>
-                      <button onClick={() => changeQty(item.productId, 1)} className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 flex items-center justify-center text-white font-bold transition-colors text-lg">+</button>
+                      <button onClick={() => item.productId !== "custom" && changeQty(item.productId, 1)} className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 flex items-center justify-center text-white font-bold transition-colors text-lg">+</button>
                     </div>
                     <span className="text-white font-bold text-sm w-14 text-right shrink-0">{formatCurrency(item.subtotalPence, currency)}</span>
                     <button onClick={() => removeBasketItem(idx)} className="text-gray-600 hover:text-red-400 transition-colors ml-1"><X size={14} /></button>
@@ -1221,6 +1143,7 @@ function KioskPOS() {
           selected={selectedTerminalId}
           onSelect={id => { setSelectedTerminalId(id); setPaymentMethod("card"); }}
           onClose={() => setShowTerminalPicker(false)}
+          theme="dark"
         />
       )}
 
