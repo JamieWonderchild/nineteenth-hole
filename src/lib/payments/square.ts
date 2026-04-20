@@ -24,6 +24,11 @@ export class SquareProvider implements PaymentProvider {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async cancelIntent(_providerIntentId: string): Promise<void> {
+    throw new Error("Square integration not yet configured.");
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async refund(_providerIntentId: string, _amountPence?: number): Promise<void> {
     throw new Error("Square integration not yet configured.");
   }

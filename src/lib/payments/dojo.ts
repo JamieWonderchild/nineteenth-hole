@@ -89,6 +89,11 @@ export class DojoProvider implements PaymentProvider {
     );
   }
 
+  async cancelIntent(providerIntentId: string): Promise<void> {
+    // Dojo: DELETE /payment-intents/{id}
+    await this.request("DELETE", `/payment-intents/${providerIntentId}`);
+  }
+
   async refund(providerIntentId: string, amountPence?: number): Promise<void> {
     const body = amountPence ? { amount: { value: amountPence } } : {};
     await this.request("POST", `/payment-intents/${providerIntentId}/refunds`, body);

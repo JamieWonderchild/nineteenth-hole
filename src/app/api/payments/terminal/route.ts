@@ -10,31 +10,28 @@ function convex() {
 }
 
 // POST /api/payments/terminal
-// Body: { clubId, terminalId, amount, currency?, purpose, description, memberId? }
+// Body: { clubId, terminalId, amount, currency?, purpose, description, memberId?, kioskId? }
 // Returns: { intentId, providerIntentId }
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
-
   const body = await request.json() as {
     clubId: string;
     terminalId: string;       // provider's terminal ID
     amount: number;           // pence
     currency?: string;
-    purpose: string;          // 'pos_sale' | 'topup' | 'green_fee' | 'tee_time'
+    purpose: string;
     description: string;
-    memberId?: string;        // clubMembers ID if charging to a member
+    memberId?: string;
+    kioskId?: string;         // kiosk device ID (alternative to Clerk session)
   };
 
-  const {
-    clubId,
-    terminalId,
-    amount,
-    currency = "GBP",
-    purpose,
-    description,
-    memberId,
-  } = body;
+  // Auth: logged-in staff (Clerk) OR kiosk device
+  const { userId } = await auth();
+  if (!userId && !body.kioskId) {
+    return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  }
+  const servedBy = userId ?? `kiosk:${body.kioskId}`;
+
+  const { clubId, terminalId, amount, currency = "GBP", purpose, description, memberId } = body;
 
   if (!clubId || !terminalId || !amount || amount <= 0) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
@@ -52,7 +49,7 @@ export async function POST(request: NextRequest) {
       metadata: {
         clubId,
         purpose,
-        userId,
+        servedBy,
         ...(memberId ? { memberId } : {}),
       },
     });
@@ -72,7 +69,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to reach terminal" }, { status: 502 });
   }
 
-  // 3. Record in Convex
+  // 3. Record pending intent in Convex
   const db = convex();
   const intentDbId = await db.mutation(api.wallet.createPaymentIntent, {
     clubId: clubId as Id<"clubs">,
@@ -90,4 +87,48 @@ export async function POST(request: NextRequest) {
     intentId: intentDbId,
     providerIntentId: result.providerIntentId,
   });
+}
+
+// DELETE /api/payments/terminal
+// Body: { intentId, providerIntentId }
+// Cancels the Dojo intent and marks it cancelled in Convex
+export async function DELETE(request: NextRequest) {
+  const { userId } = await auth();
+  const body = await request.json() as {
+    intentId: string;
+    providerIntentId: string;
+    kioskId?: string;
+  };
+
+  if (!userId && !body.kioskId) {
+    return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  }
+
+  const { intentId, providerIntentId } = body;
+  if (!intentId || !providerIntentId) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  const provider = getPaymentProvider();
+  const db = convex();
+
+  // Best-effort cancel at provider — may fail if card already captured
+  try {
+    await provider.cancelIntent(providerIntentId);
+  } catch (err) {
+    console.warn("[payments/terminal] cancelIntent failed (may already be captured):", err);
+    // Mark failed in Convex so the UI unblocks even if Dojo cancel failed
+  }
+
+  // Mark cancelled in Convex
+  try {
+    await db.mutation(api.wallet.cancelPaymentIntent, {
+      intentId: intentId as Id<"paymentIntents">,
+    });
+  } catch (err) {
+    console.error("[payments/terminal] Failed to cancel intent in Convex:", err);
+    return NextResponse.json({ error: "Failed to cancel intent" }, { status: 500 });
+  }
+
+  return NextResponse.json({ cancelled: true });
 }

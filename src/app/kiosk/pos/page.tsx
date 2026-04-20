@@ -12,6 +12,7 @@ import { X, ChevronLeft, Search, UserCircle, Check, Lock, ArrowLeft, Maximize, M
 import { PinPad } from "@/components/kiosk/PinLock";
 import { KioskShiftModal } from "@/components/kiosk/ShiftModal";
 import { TerminalPickerModal } from "@/components/pos/TerminalPickerModal";
+import { TerminalWaitingOverlay } from "@/components/pos/TerminalWaitingOverlay";
 import Link from "next/link";
 import type { PosProduct, BasketItem } from "@/lib/pos/types";
 import { applyNumpadKey } from "@/lib/pos/numpad";
@@ -299,8 +300,9 @@ function KioskPOS() {
       ? { clubId, ...(kioskData?.locationId ? { locationId: kioskData.locationId } : {}) }
       : "skip"
   );
-  const recordSale = useMutation(api.pos.recordSale);
-  const terminals  = useQuery(api.posTerminals.listByClub, clubId ? { clubId } : "skip");
+  const recordSale       = useMutation(api.pos.recordSale);
+  const linkSaleToIntent = useMutation(api.wallet.linkSaleToIntent);
+  const terminals        = useQuery(api.posTerminals.listByClub, clubId ? { clubId } : "skip");
 
   // ── Tab mutations ──────────────────────────────────────────────────────────
   const openTabMut    = useMutation(api.posTabs.openTab);
@@ -413,7 +415,7 @@ function KioskPOS() {
       }))
     : basket;
 
-  const [stage, setStage]                   = useState<"grid" | "memberSearch" | "confirm" | "done">("grid");
+  const [stage, setStage]                   = useState<"grid" | "memberSearch" | "confirm" | "terminalWaiting" | "done">("grid");
   const [paymentMethod, setPaymentMethod]   = useState<string>("cash");
   const [selectedMember, setSelectedMember] = useState<MemberResult | null>(null);
   const [saving, setSaving]                 = useState(false);
@@ -430,6 +432,10 @@ function KioskPOS() {
   // Terminal
   const [selectedTerminalId, setSelectedTerminalId] = useState<string>("");
   const [showTerminalPicker, setShowTerminalPicker] = useState(false);
+  const [pendingIntentId, setPendingIntentId] = useState<Id<"paymentIntents"> | null>(null);
+  const [pendingIntentProvId, setPendingIntentProvId] = useState<string>("");
+  const [pendingTerminalPayments, setPendingTerminalPayments] = useState<Array<{ method: string; amountPence: number }>>([]);
+  const [pendingTerminalAmount, setPendingTerminalAmount] = useState(0);
 
   const currency  = club?.currency ?? "GBP";
   const total     = displayBasket.reduce((s, i) => s + i.subtotalPence, 0);
@@ -441,6 +447,39 @@ function KioskPOS() {
   const numpadPence       = numpadValue ? Math.round(parseFloat(numpadValue) * 100) : (perPersonPence ?? remainingPence);
   const chargeAmountPence = Math.min(Math.max(numpadPence, 0), remainingPence);
   const activeTerminals   = useMemo(() => (terminals ?? []).filter(t => t.isActive), [terminals]);
+
+  const pendingIntent = useQuery(
+    api.wallet.getPaymentIntent,
+    pendingIntentId ? { intentId: pendingIntentId } : "skip"
+  );
+
+  // React to terminal payment capture / failure
+  useEffect(() => {
+    if (!pendingIntent || !pendingIntentId) return;
+    if (pendingIntent.status === "captured") {
+      const payments = pendingTerminalPayments;
+      const intentId = pendingIntentId;
+      setPendingIntentId(null);
+      setPendingIntentProvId("");
+      const remaining = total - payments.reduce((s, p) => s + p.amountPence, 0);
+      if (remaining <= 0) {
+        void completeSale(payments, intentId);
+      } else {
+        setPartialPayments(payments);
+        if (splitPeople > 1) setSplitPeople(p => Math.max(1, p - 1));
+        setNumpadValue("");
+        setShowNumpad(false);
+        setStage("grid");
+      }
+    } else if (pendingIntent.status === "failed" || pendingIntent.status === "cancelled") {
+      setPendingIntentId(null);
+      setPendingIntentProvId("");
+      setPendingTerminalPayments([]);
+      setStage("grid");
+      alert("Terminal payment failed or was cancelled. Please try again.");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingIntent?.status]);
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -537,7 +576,10 @@ function KioskPOS() {
     }
   }
 
-  async function completeSale(payments: Array<{ method: string; amountPence: number }>) {
+  async function completeSale(
+    payments: Array<{ method: string; amountPence: number }>,
+    terminalIntentId?: Id<"paymentIntents">,
+  ) {
     if (!club) return;
     setSaving(true);
     const uniqueMethods = [...new Set(payments.map(p => p.method))];
@@ -545,11 +587,9 @@ function KioskPOS() {
     const splits = uniqueMethods.length > 1 ? payments : undefined;
     const accountPayment = payments.find(p => p.method === "account");
     try {
+      let saleId: Id<"posSales">;
       if (activeTabId) {
-        // TODO: when terminal integration is complete, fire /api/payments/terminal
-        // here for card payments where selectedTerminalId is set, and wait for
-        // payment confirmation before proceeding.
-        await closeTabMut({
+        saleId = await closeTabMut({
           tabId:                 activeTabId,
           paymentMethod:         effectiveMethod,
           currency,
@@ -563,8 +603,7 @@ function KioskPOS() {
         setLastTabName(activeTab?.name ?? undefined);
         setActiveTabId(null);
       } else {
-        // TODO: terminal API call stub — see tab path above
-        await recordSale({
+        saleId = await recordSale({
           clubId:                club._id,
           items:                 basket.map(i => ({
             ...i,
@@ -585,6 +624,9 @@ function KioskPOS() {
         setLastTabName(undefined);
         setBasket([]);
       }
+      if (terminalIntentId && saleId) {
+        await linkSaleToIntent({ intentId: terminalIntentId, saleId });
+      }
       setPartialPayments([]);
       setNumpadValue("");
       setShowNumpad(false);
@@ -602,6 +644,44 @@ function KioskPOS() {
 
   async function confirmPartialCharge() {
     const newPayments = [...partialPayments, { method: paymentMethod, amountPence: pendingAmount }];
+
+    // Card + terminal: fire terminal payment and wait for webhook
+    if (paymentMethod === "card" && selectedTerminalId && club) {
+      setSaving(true);
+      try {
+        const res = await fetch("/api/payments/terminal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clubId:      club._id,
+            terminalId:  selectedTerminalId,
+            amount:      pendingAmount,
+            currency,
+            purpose:     "pos_sale",
+            description: displayBasket.map(i => `${i.quantity}× ${i.productName}`).join(", "),
+            kioskId:     kioskId ?? undefined,
+          }),
+        });
+        if (!res.ok) {
+          const e = await res.json() as { error?: string };
+          throw new Error(e.error ?? "Terminal error");
+        }
+        const { intentId, providerIntentId } = await res.json() as { intentId: string; providerIntentId: string };
+        setPendingIntentId(intentId as Id<"paymentIntents">);
+        setPendingIntentProvId(providerIntentId);
+        setPendingTerminalAmount(pendingAmount);
+        setPendingTerminalPayments(newPayments);
+        setStage("terminalWaiting");
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Terminal error");
+        setStage("grid");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Non-terminal: proceed immediately
     const newRemaining = total - newPayments.reduce((s, p) => s + p.amountPence, 0);
     if (newRemaining <= 0) {
       await completeSale(newPayments);
@@ -612,6 +692,22 @@ function KioskPOS() {
       if (splitPeople > 1) setSplitPeople(p => Math.max(1, p - 1));
       setStage("grid");
     }
+  }
+
+  async function cancelTerminalPayment() {
+    if (!pendingIntentId) return;
+    try {
+      await fetch("/api/payments/terminal", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intentId: pendingIntentId, providerIntentId: pendingIntentProvId, kioskId: kioskId ?? undefined }),
+      });
+    } catch { /* best effort */ }
+    setPendingIntentId(null);
+    setPendingIntentProvId("");
+    setPendingTerminalPayments([]);
+    setPendingTerminalAmount(0);
+    setStage("grid");
   }
 
   if (!club || !products || !categories) {
@@ -1144,6 +1240,17 @@ function KioskPOS() {
           onSelect={id => { setSelectedTerminalId(id); startCheckout("card"); }}
           onClose={() => setShowTerminalPicker(false)}
           theme="dark"
+        />
+      )}
+
+      {stage === "terminalWaiting" && (
+        <TerminalWaitingOverlay
+          amount={pendingTerminalAmount}
+          currency={currency}
+          terminalName={activeTerminals.find(t => t.terminalId === selectedTerminalId)?.name}
+          theme="dark"
+          onCancel={cancelTerminalPayment}
+          onTimeout={cancelTerminalPayment}
         />
       )}
 

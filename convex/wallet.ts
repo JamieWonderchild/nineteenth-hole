@@ -167,6 +167,28 @@ export const refundToWallet = mutation({
   },
 });
 
+// Get a single payment intent by ID — used by POS to poll terminal status
+export const getPaymentIntent = query({
+  args: { intentId: v.id("paymentIntents") },
+  handler: async (ctx, { intentId }) => {
+    return ctx.db.get(intentId);
+  },
+});
+
+// Cancel a pending payment intent (called by POS when user hits cancel)
+export const cancelPaymentIntent = mutation({
+  args: { intentId: v.id("paymentIntents") },
+  handler: async (ctx, { intentId }) => {
+    const intent = await ctx.db.get(intentId);
+    if (!intent) throw new Error("Intent not found");
+    if (intent.status !== "pending") return; // already resolved
+    await ctx.db.patch(intentId, {
+      status: "cancelled",
+      completedAt: new Date().toISOString(),
+    });
+  },
+});
+
 // Called by webhook handler after Dojo/Square confirms capture
 export const resolvePaymentIntent = mutation({
   args: {

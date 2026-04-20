@@ -15,6 +15,7 @@ import Link from "next/link";
 import type { PosProduct, BasketItem } from "@/lib/pos/types";
 import { applyNumpadKey } from "@/lib/pos/numpad";
 import { TerminalPickerModal } from "@/components/pos/TerminalPickerModal";
+import { TerminalWaitingOverlay } from "@/components/pos/TerminalWaitingOverlay";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -222,7 +223,8 @@ export default function POSPage() {
   const terminals   = useQuery(api.posTerminals.listByClub, club ? { clubId: club._id } : "skip");
   const members     = useQuery(api.clubMembers.listByClub, club ? { clubId: club._id } : "skip") as MemberRow[] | undefined;
   const locations   = useQuery(api.posLocations.listLocations, club ? { clubId: club._id } : "skip");
-  const recordSale  = useMutation(api.pos.recordSale);
+  const recordSale        = useMutation(api.pos.recordSale);
+  const linkSaleToIntent  = useMutation(api.wallet.linkSaleToIntent);
   const openShift = useQuery(
     api.posShifts.getOpenShift,
     club && selectedLocationId ? { clubId: club._id, locationId: selectedLocationId } : "skip"
@@ -274,6 +276,15 @@ export default function POSPage() {
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [selectedTerminalId, setSelectedTerminalId] = useState<string>("");
   const [showTerminalPicker, setShowTerminalPicker] = useState(false);
+  // Terminal payment waiting state
+  const [pendingIntentId, setPendingIntentId] = useState<Id<"paymentIntents"> | null>(null);
+  const [pendingIntentProvId, setPendingIntentProvId] = useState<string>("");
+  const [pendingTerminalPayments, setPendingTerminalPayments] = useState<Array<{ method: string; amountPence: number }>>([]);
+  const [pendingTerminalAmount, setPendingTerminalAmount] = useState(0);
+  const pendingIntent = useQuery(
+    api.wallet.getPaymentIntent,
+    pendingIntentId ? { intentId: pendingIntentId } : "skip"
+  );
 
   // Partial payments (cash/card/etc collected so far for this sale)
   const [partialPayments, setPartialPayments] = useState<Array<{ method: string; amountPence: number }>>([]);
@@ -302,6 +313,32 @@ export default function POSPage() {
     const t = setTimeout(() => setError(null), 4000);
     return () => clearTimeout(t);
   }, [error]);
+
+  // ── React to terminal payment intent status ────────────────────────────────
+  useEffect(() => {
+    if (!pendingIntent || !pendingIntentId) return;
+    if (pendingIntent.status === "captured") {
+      const payments = pendingTerminalPayments;
+      const intentId = pendingIntentId;
+      setPendingIntentId(null);
+      setPendingIntentProvId("");
+      const remaining = total - payments.reduce((s, p) => s + p.amountPence, 0);
+      if (remaining <= 0) {
+        void completeSale(payments, intentId);
+      } else {
+        setPartialPayments(payments);
+        if (splitPeople > 1) setSplitPeople(p => Math.max(1, p - 1));
+        setNumpadValue("");
+        setShowNumpad(false);
+      }
+    } else if (pendingIntent.status === "failed" || pendingIntent.status === "cancelled") {
+      setPendingIntentId(null);
+      setPendingIntentProvId("");
+      setPendingTerminalPayments([]);
+      setError("Terminal payment failed or was cancelled. Please try again.");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingIntent?.status]);
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
@@ -438,7 +475,10 @@ export default function POSPage() {
 
   // ── Complete sale (all payments collected) ─────────────────────────────────
 
-  async function completeSale(payments: Array<{ method: string; amountPence: number }>) {
+  async function completeSale(
+    payments: Array<{ method: string; amountPence: number }>,
+    terminalIntentId?: Id<"paymentIntents">,
+  ) {
     if (!club) return;
     const uniqueMethods = [...new Set(payments.map(p => p.method))];
     const effectiveMethod = uniqueMethods.length === 1 ? uniqueMethods[0] : "split";
@@ -448,11 +488,9 @@ export default function POSPage() {
     setSaving(true);
     setError(null);
     try {
+      let saleId: Id<"posSales">;
       if (activeTabId) {
-        // TODO: when terminal integration is complete, fire /api/payments/terminal
-        // here for card payments where selectedTerminalId is set, and wait for
-        // payment confirmation before proceeding.
-        await closeTabMut({
+        saleId = await closeTabMut({
           tabId: activeTabId,
           paymentMethod: effectiveMethod,
           currency,
@@ -472,8 +510,7 @@ export default function POSPage() {
           unitPricePence: i.unitPricePence,
           subtotalPence:  i.subtotalPence,
         }));
-        // TODO: terminal API call stub — see tab path above
-        await recordSale({
+        saleId = await recordSale({
           clubId: club._id,
           memberId:              selectedMember?.userId,
           memberName:            selectedMember?.displayName,
@@ -488,6 +525,10 @@ export default function POSPage() {
           isGuest:    !selectedMember,
         });
       }
+      // Link terminal payment intent to sale if present
+      if (terminalIntentId && saleId) {
+        await linkSaleToIntent({ intentId: terminalIntentId, saleId });
+      }
       setSaleDone({ total, method: effectiveMethod, memberName: selectedMember?.displayName });
       setBasket([]);
       setNote("");
@@ -497,11 +538,64 @@ export default function POSPage() {
       setPartialPayments([]);
       setNumpadValue("");
       setSplitPeople(1);
+      setSelectedTerminalId("");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSaving(false);
     }
+  }
+
+  // ── Initiate terminal payment and wait for webhook ──────────────────────────
+
+  async function startTerminalPayment(amountPence: number, futurePayments: Array<{ method: string; amountPence: number }>) {
+    if (!club) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/payments/terminal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clubId: club._id,
+          terminalId: selectedTerminalId,
+          amount: amountPence,
+          currency,
+          purpose: "pos_sale",
+          description: displayBasket.map(i => `${i.quantity}× ${i.productName}`).join(", "),
+        }),
+      });
+      if (!res.ok) {
+        const e = await res.json() as { error?: string };
+        throw new Error(e.error ?? "Terminal error");
+      }
+      const { intentId, providerIntentId } = await res.json() as { intentId: string; providerIntentId: string };
+      setPendingIntentId(intentId as Id<"paymentIntents">);
+      setPendingIntentProvId(providerIntentId);
+      setPendingTerminalAmount(amountPence);
+      setPendingTerminalPayments(futurePayments);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Terminal error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function cancelTerminalPayment() {
+    if (!pendingIntentId) return;
+    try {
+      await fetch("/api/payments/terminal", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intentId: pendingIntentId, providerIntentId: pendingIntentProvId }),
+      });
+    } catch {
+      // best effort
+    }
+    setPendingIntentId(null);
+    setPendingIntentProvId("");
+    setPendingTerminalPayments([]);
+    setPendingTerminalAmount(0);
   }
 
   // ── Partial charge ──────────────────────────────────────────────────────────
@@ -512,10 +606,15 @@ export default function POSPage() {
 
     if (paymentMethod === "account" && !selectedMemberId) { setError("Select a member to charge their account"); return; }
 
-    const newPayment = { method: paymentMethod, amountPence: chargeAmountPence };
-    const newPayments = [...partialPayments, newPayment];
-    const newRemaining = total - newPayments.reduce((s, p) => s + p.amountPence, 0);
+    const newPayments = [...partialPayments, { method: paymentMethod, amountPence: chargeAmountPence }];
 
+    // Card + terminal selected: fire payment and wait for webhook
+    if (paymentMethod === "card" && selectedTerminalId) {
+      await startTerminalPayment(chargeAmountPence, newPayments);
+      return;
+    }
+
+    const newRemaining = total - newPayments.reduce((s, p) => s + p.amountPence, 0);
     if (newRemaining <= 0) {
       await completeSale(newPayments);
     } else {
@@ -1131,6 +1230,17 @@ export default function POSPage() {
           onSelect={id => { setSelectedTerminalId(id); setPaymentMethod("card"); }}
           onClose={() => setShowTerminalPicker(false)}
           theme="light"
+        />
+      )}
+
+      {pendingIntentId && (
+        <TerminalWaitingOverlay
+          amount={pendingTerminalAmount}
+          currency={currency}
+          terminalName={activeTerminals.find(t => t.terminalId === selectedTerminalId)?.name}
+          theme="light"
+          onCancel={cancelTerminalPayment}
+          onTimeout={cancelTerminalPayment}
         />
       )}
     </div>

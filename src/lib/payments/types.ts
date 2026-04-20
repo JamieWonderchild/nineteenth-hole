@@ -38,6 +38,9 @@ export interface PaymentProvider {
   /** Initiate a session on a physical terminal */
   sendToTerminal(opts: SendToTerminalOpts): Promise<void>;
 
+  /** Cancel a pending intent (before capture) */
+  cancelIntent(providerIntentId: string): Promise<void>;
+
   /** Full or partial refund */
   refund(providerIntentId: string, amountPence?: number): Promise<void>;
 
