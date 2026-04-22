@@ -270,7 +270,7 @@ export function CoursePickerSheet({ visible, onClose, onSelect, country }: Props
                       <Text className="text-sm font-medium text-gray-900">{item.name}</Text>
                       <Text className="text-xs text-gray-400 mt-0.5">
                         {[item.venueName, item.city, item.county]
-                          .filter(Boolean)
+                          .filter(v => v && v !== "0")
                           .join(" · ")}
                       </Text>
                     </View>
