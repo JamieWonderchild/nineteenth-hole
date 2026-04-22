@@ -338,7 +338,7 @@ export default function IndividualHomePage() {
             </h3>
             {myClubs === undefined ? (
               <div className="h-10 bg-gray-100 rounded animate-pulse" />
-            ) : myClubs.length === 0 ? (
+            ) : !myClubs || myClubs.length === 0 ? (
               <div>
                 <p className="text-sm text-gray-500 mb-3">
                   Not a member of any clubs on The 19th Hole yet.

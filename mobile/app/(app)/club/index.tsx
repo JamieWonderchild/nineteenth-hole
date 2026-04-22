@@ -167,7 +167,7 @@ export default function ClubScreen() {
     );
   }
 
-  if (clubs.length === 0) {
+  if (!clubs || clubs.length === 0) {
     return (
       <>
         <Stack.Screen options={{ title: "Club", headerShown: false }} />

@@ -143,7 +143,7 @@ export default function ClubCompetitionsScreen() {
     );
   }
 
-  if (!clubId || clubs.length === 0) {
+  if (!clubId || !clubs || clubs.length === 0) {
     return (
       <>
         <Stack.Screen options={{ title: "Competitions" }} />

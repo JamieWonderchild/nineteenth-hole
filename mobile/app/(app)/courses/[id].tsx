@@ -362,12 +362,12 @@ export default function CourseDetailScreen() {
                 </Text>
               </View>
             )}
-            {(defaultPar || course.holes) && (
+            {(defaultPar || course.numberOfHoles) && (
               <View className="bg-white/10 rounded-full px-3 py-1">
                 <Text className="text-green-200 text-xs">
                   {[
                     defaultPar ? `Par ${defaultPar}` : null,
-                    course.holes ? `${course.holes} holes` : null,
+                    course.numberOfHoles ? `${course.numberOfHoles} holes` : null,
                   ]
                     .filter(Boolean)
                     .join(" · ")}
@@ -431,7 +431,7 @@ export default function CourseDetailScreen() {
             <View className="bg-white mx-4 rounded-xl border border-gray-100 overflow-hidden">
               {course.website && (
                 <TouchableOpacity
-                  onPress={() => Linking.openURL(course.website)}
+                  onPress={() => Linking.openURL(course.website!)}
                   className="flex-row items-center px-4 py-3.5 border-b border-gray-50"
                 >
                   <Ionicons name="globe-outline" size={18} color="#16a34a" />

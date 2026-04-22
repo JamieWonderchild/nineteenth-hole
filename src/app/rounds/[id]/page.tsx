@@ -323,10 +323,10 @@ export default function RoundDetailPage() {
       {(round.playedWith?.length || round.conditions || round.notes) && (
         <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
           <h2 className="font-semibold text-gray-900">Details</h2>
-          {round.playedWith?.length > 0 && (
+          {(round.playedWith?.length ?? 0) > 0 && (
             <div className="flex items-start gap-2 text-sm text-gray-700">
               <Users size={15} className="text-gray-400 mt-0.5 shrink-0" />
-              <span>Played with {round.playedWith.join(", ")}</span>
+              <span>Played with {round.playedWith!.join(", ")}</span>
             </div>
           )}
           {round.conditions && (

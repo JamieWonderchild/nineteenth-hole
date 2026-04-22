@@ -46,7 +46,7 @@ export const search = query({
 
     // Merge, deduplicate, return up to cap
     const seen = new Set<string>();
-    const merged = [];
+    const merged: typeof byName = [];
     for (const c of [...byName, ...byVenue]) {
       if (!seen.has(c._id)) {
         seen.add(c._id);
