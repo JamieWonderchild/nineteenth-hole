@@ -27,11 +27,17 @@ const UK_COUNTIES = [
   "Somerset",
 ];
 
+// SA golf association regions (as stored by the HNA data source)
 const SA_PROVINCES = [
-  "Gauteng",
-  "Western Cape",
-  "KwaZulu-Natal",
-  "Eastern Cape",
+  "Central Gauteng",
+  "Gauteng North",
+  "Ekurhuleni",
+  "Western Province",
+  "Boland",
+  "Southern Cape",
+  "Kwazulu-Natal",
+  "Eastern Province",
+  "Border",
   "Free State",
   "Limpopo",
   "Mpumalanga",
