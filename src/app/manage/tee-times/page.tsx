@@ -5,7 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
-import { ChevronLeft, ChevronRight, Settings, Sunset, AlertTriangle, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Settings, Sunset, AlertTriangle, Plus, X, Sparkles, Send, Loader2 } from "lucide-react";
 import { getSunsetTime, minutesBeforeSunset } from "@/lib/sunset";
 
 function toDateStr(d: Date) {
@@ -201,14 +201,23 @@ export default function ManageTeeTimes() {
   const [visitorStart, setVisitorStart] = useState<string | null>(null);
   const [savingPolicy, setSavingPolicy] = useState(false);
 
+  // Agent command bar
+  const [showAgent, setShowAgent] = useState(false);
+  const [agentCommand, setAgentCommand] = useState("");
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentMsg, setAgentMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
   const slots = useQuery(api.teeTimes.listSlotsForDate, club ? { clubId: club._id, date: selectedDate } : "skip");
   const availableDates = useQuery(api.teeTimes.listAvailableDates, club ? { clubId: club._id } : "skip");
+  const rangeSlots = useQuery(api.teeTimes.listSlotsForRange, club ? { clubId: club._id, startDate: today, days: 14 } : "skip");
+  const allMembers = useQuery(api.clubMembers.listByClub, club ? { clubId: club._id } : "skip");
 
   const generateSlots = useMutation(api.teeTimes.generateSlots);
   const cancelBooking = useMutation(api.teeTimes.cancelBooking);
   const setSlotBlocked = useMutation(api.teeTimes.setSlotBlocked);
   const deleteSlotsForDate = useMutation(api.teeTimes.deleteSlotsForDate);
   const updatePolicy = useMutation(api.teeTimes.updatePolicy);
+  const bookForMember = useMutation(api.teeTimes.bookForMember);
 
   if (!club) return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-green-600 border-t-transparent rounded-full" /></div>;
 
@@ -243,6 +252,57 @@ export default function ManageTeeTimes() {
     await deleteSlotsForDate({ clubId: club._id, date: selectedDate });
   }
 
+  async function handleAgentCommand(e: React.FormEvent) {
+    e.preventDefault();
+    if (!agentCommand.trim() || !club) return;
+    setAgentLoading(true);
+    setAgentMsg(null);
+    try {
+      const context = {
+        today,
+        selectedDate,
+        slots: rangeSlots ?? [],
+        members: (allMembers ?? []).map(m => ({ id: m._id, displayName: m.displayName })),
+      };
+      const res = await fetch("/api/tee-times/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: agentCommand, context }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Agent failed");
+
+      // Execute each intent
+      for (const intent of data.intents as Array<{ tool: string; args: Record<string, unknown> }>) {
+        if (intent.tool === "block_slot") {
+          await setSlotBlocked({ slotId: intent.args.slotId as Id<"teeTimeSlots">, blocked: intent.args.blocked as boolean });
+        } else if (intent.tool === "book_slot") {
+          await bookForMember({
+            slotId: intent.args.slotId as Id<"teeTimeSlots">,
+            clubId: club._id,
+            displayName: intent.args.displayName as string,
+            playerCount: (intent.args.playerCount as number) ?? 1,
+            notes: (intent.args.notes as string | undefined) || undefined,
+          });
+        } else if (intent.tool === "cancel_booking") {
+          await cancelBooking({ bookingId: intent.args.bookingId as Id<"teeTimeBookings"> });
+        } else if (intent.tool === "navigate_to_date") {
+          setSelectedDate(intent.args.date as string);
+        } else if (intent.tool === "clarify") {
+          setAgentMsg({ text: intent.args.message as string, ok: false });
+          setAgentLoading(false);
+          return;
+        }
+      }
+
+      setAgentMsg({ text: data.summary || "Done.", ok: true });
+      setAgentCommand("");
+    } catch (err) {
+      setAgentMsg({ text: err instanceof Error ? err.message : "Something went wrong", ok: false });
+    }
+    setAgentLoading(false);
+  }
+
   async function handleSavePolicy() {
     if (!club) return;
     setSavingPolicy(true);
@@ -263,6 +323,13 @@ export default function ManageTeeTimes() {
           <p className="text-gray-500 text-sm mt-0.5">{club.name}</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setShowAgent(v => !v); setAgentMsg(null); }}
+            className={`flex items-center gap-1.5 px-3 py-2 border text-sm font-medium rounded-lg transition-colors ${showAgent ? "border-purple-400 bg-purple-50 text-purple-700" : "border-gray-300 hover:bg-gray-50 text-gray-700"}`}
+            title="AI assistant"
+          >
+            <Sparkles size={14} /> Ask AI
+          </button>
           <button onClick={() => setShowSettings(v => !v)}
             className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50">
             <Settings size={14} /> Policy
@@ -273,6 +340,43 @@ export default function ManageTeeTimes() {
           </button>
         </div>
       </div>
+
+      {/* AI command bar */}
+      {showAgent && (
+        <div className="bg-white border border-purple-200 rounded-xl px-5 py-4 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-purple-800">
+            <Sparkles size={15} />
+            Tee Time Assistant
+          </div>
+          <p className="text-xs text-gray-500">
+            Use natural language to manage the tee sheet. E.g. "Block Friday between 9 and 2 for the Masters shootout" or "Add Jon and Sarah to the 10:00 tee time on Saturday."
+          </p>
+          <form onSubmit={handleAgentCommand} className="flex gap-2">
+            <input
+              type="text"
+              value={agentCommand}
+              onChange={e => { setAgentCommand(e.target.value); setAgentMsg(null); }}
+              placeholder="What would you like to do?"
+              autoFocus
+              disabled={agentLoading}
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={agentLoading || !agentCommand.trim()}
+              className="flex items-center gap-1.5 px-4 py-2 bg-purple-700 text-white text-sm font-medium rounded-lg hover:bg-purple-600 disabled:opacity-50 shrink-0"
+            >
+              {agentLoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              {agentLoading ? "Working…" : "Send"}
+            </button>
+          </form>
+          {agentMsg && (
+            <p className={`text-sm rounded-lg px-3 py-2 ${agentMsg.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
+              {agentMsg.ok ? "✓ " : "⚠ "}{agentMsg.text}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Policy settings */}
       {showSettings && (

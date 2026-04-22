@@ -124,6 +124,37 @@ export const listAvailableDates = query({
   },
 });
 
+// Lightweight slot list for agent context — returns all slots + bookings for a date range
+export const listSlotsForRange = query({
+  args: { clubId: v.id("clubs"), startDate: v.string(), days: v.number() },
+  handler: async (ctx, { clubId, startDate, days }) => {
+    const endDate = addDays(startDate, days - 1);
+    const slots = await ctx.db
+      .query("teeTimeSlots")
+      .withIndex("by_club_and_date", q => q.eq("clubId", clubId).gte("date", startDate))
+      .filter(q => q.lte(q.field("date"), endDate))
+      .collect();
+
+    return Promise.all(slots.map(async slot => {
+      const bookings = await ctx.db
+        .query("teeTimeBookings")
+        .withIndex("by_slot", q => q.eq("slotId", slot._id))
+        .filter(q => q.eq(q.field("status"), "confirmed"))
+        .collect();
+      const takenPlayers = bookings.reduce((sum, b) => sum + b.playerCount, 0);
+      return {
+        id: slot._id,
+        date: slot.date,
+        time: slot.time,
+        isBlocked: slot.isBlocked ?? false,
+        available: Math.max(0, slot.maxPlayers - takenPlayers),
+        maxPlayers: slot.maxPlayers,
+        bookings: bookings.map(b => ({ id: b._id, displayName: b.displayName, playerCount: b.playerCount })),
+      };
+    }));
+  },
+});
+
 // ── Mutations ────────────────────────────────────────────────────────────────
 
 // Admin: generate slots for a date range

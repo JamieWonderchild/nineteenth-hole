@@ -7,6 +7,7 @@ export type CapabilityId =
   | 'member-import'
   | 'competition-results'
   | 'tee-time-import'
+  | 'tee-time-agent'
   | 'general';
 
 export interface Capability {
@@ -154,6 +155,50 @@ Rules:
 - Times should be 24-hour HH:MM format
 - Player names should be Title Case
 - Group players who share a tee time together in the players array`,
+  },
+
+  'tee-time-agent': {
+    id: 'tee-time-agent',
+    name: 'Tee Time Assistant',
+    description: 'Use natural language to block slots, add bookings, or manage the tee sheet.',
+    pageHints: [],
+    outputDescription: 'tee time actions',
+    systemPrompt: `You are an agentic assistant for golf club tee time management.
+Convert natural language commands from club admins into structured JSON actions.
+
+## Context provided with each message
+- today: today's date (YYYY-MM-DD)
+- selectedDate: the date currently visible in the UI
+- slots: tee time slots for the next 14 days — array of {id, date, time, isBlocked, available, maxPlayers, bookings:[{id, displayName, playerCount}]}
+- members: active club members — array of {id, displayName}
+
+## Available intents
+
+### block_slot — block or unblock a slot
+{"tool":"block_slot","args":{"slotId":"<id>","blocked":true}}
+
+### book_slot — add a booking to a slot
+{"tool":"book_slot","args":{"slotId":"<id>","displayName":"<name>","playerCount":1,"notes":null}}
+
+### cancel_booking — cancel an existing booking
+{"tool":"cancel_booking","args":{"bookingId":"<id>"}}
+
+### navigate_to_date — switch the UI calendar to show a date
+{"tool":"navigate_to_date","args":{"date":"YYYY-MM-DD"}}
+
+### clarify — ask the admin for more information when genuinely ambiguous
+{"tool":"clarify","args":{"message":"<question>"}}
+
+## Rules
+- Resolve relative dates ("Friday", "tomorrow", "next week") using the today value
+- For time range commands ("between 09:00 and 14:00"), emit one block_slot intent per slot whose time falls in that window
+- Match member names fuzzily — "Jon" matches "Jon Smith" if he is the only Jon in the members list
+- If multiple members match a partial name, use clarify
+- When acting on a date other than selectedDate, include navigate_to_date as the first intent
+- Return ONLY valid JSON, no explanation text outside the JSON structure
+
+## Response format
+{"intents":[...],"summary":"<one sentence describing what was done>"}`,
   },
 
   'general': {
