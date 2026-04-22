@@ -587,7 +587,7 @@ function IndividualHome({
           <TouchableOpacity
             onPress={() => router.push("/(app)/rounds/new" as any)}
             activeOpacity={0.88}
-            className="rounded-2xl p-5"
+            className="rounded-2xl p-5 items-center"
             style={{
               backgroundColor: "#16a34a",
               shadowColor: "#16a34a",
@@ -597,7 +597,7 @@ function IndividualHome({
               elevation: 6,
             }}
           >
-            <Text className="text-green-200 text-xs font-medium mb-2 uppercase tracking-wide">
+            <Text className="text-green-200 text-xs font-medium mb-3 uppercase tracking-wide">
               WHS Handicap Index
             </Text>
             {/* Progress dots */}
@@ -612,15 +612,15 @@ function IndividualHome({
                 />
               ))}
             </View>
-            <Text className="text-white text-xl font-bold">
+            <Text className="text-white text-xl font-bold text-center">
               {roundsNeeded === 0
                 ? "Calculating your handicap…"
                 : `${roundsNeeded} more round${roundsNeeded !== 1 ? "s" : ""} to go`}
             </Text>
-            <Text className="text-green-300 text-xs mt-1">
+            <Text className="text-green-300 text-xs mt-1 text-center">
               Log {roundsNeeded > 0 ? `${roundsNeeded} more` : "rounds"} with course & slope data for your official WHS index
             </Text>
-            <View className="mt-4 bg-white/20 rounded-xl py-2.5 flex-row items-center justify-center gap-2">
+            <View className="mt-4 bg-white/20 rounded-xl py-2.5 px-6 flex-row items-center gap-2">
               <Ionicons name="add" size={16} color="#fff" />
               <Text className="text-white font-semibold text-sm">Log a Round</Text>
             </View>
@@ -777,7 +777,7 @@ export default function HomeScreen() {
   const greeting =
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  if (rounds === undefined || myClubs === undefined) {
+  if (rounds === undefined) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
         <LoadingSpinner fullScreen />
@@ -785,7 +785,7 @@ export default function HomeScreen() {
     );
   }
 
-  const firstClub = myClubs.length > 0 ? myClubs[0] : null;
+  const firstClub = myClubs && myClubs.length > 0 ? myClubs[0] : null;
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>

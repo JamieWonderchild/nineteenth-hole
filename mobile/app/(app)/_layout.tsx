@@ -88,7 +88,9 @@ export default function AppLayout() {
     return <Redirect href="/(app)/onboarding" />;
   }
 
-  const isClubMember = !!myClubs && myClubs.length > 0;
+  // Keep club tab visible while myClubs is still loading (undefined) to prevent
+  // it from disappearing and causing navigation resets on lock/unlock resume.
+  const isClubMember = myClubs === undefined || myClubs.length > 0;
 
   return (
     <Tabs
