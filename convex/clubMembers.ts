@@ -21,7 +21,7 @@ export const myActiveClubs = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
+    if (!identity) return null;
     const memberships = await ctx.db
       .query("clubMembers")
       .withIndex("by_user", q => q.eq("userId", identity.subject))

@@ -1,6 +1,6 @@
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Redirect, Tabs, useSegments, useRouter } from "expo-router";
-import { View, ActivityIndicator, Platform, TouchableOpacity, Modal, Text, Pressable, AppState } from "react-native";
+import { View, ActivityIndicator, Platform, TouchableOpacity, Modal, Text, Pressable, AppState, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "convex/react";
 import { useEffect, useState, useRef } from "react";
@@ -41,89 +41,111 @@ async function registerForPushNotifications(): Promise<string | null> {
   }
 }
 
-function ActionSheet({
+function FABMenu({
   visible,
+  btn1Anim,
+  btn2Anim,
   onClose,
   onLogRound,
   onQuickGame,
 }: {
   visible: boolean;
+  btn1Anim: Animated.Value;
+  btn2Anim: Animated.Value;
   onClose: () => void;
   onLogRound: () => void;
   onQuickGame: () => void;
 }) {
+  const btn1TranslateY = btn1Anim.interpolate({ inputRange: [0, 1], outputRange: [60, 0] });
+  const btn1Scale = btn1Anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] });
+  const btn2TranslateY = btn2Anim.interpolate({ inputRange: [0, 1], outputRange: [120, 0] });
+  const btn2Scale = btn2Anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] });
+
+  const tabBarBottom = Platform.OS === "ios" ? 88 : 64;
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      {/* Backdrop — tap to close */}
       <Pressable
-        style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+        style={{
+          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: "rgba(0,0,0,0.45)",
+        }}
         onPress={onClose}
+      />
+
+      {/* Action buttons — inner Pressable stops touch propagation to backdrop */}
+      <Pressable
+        onPress={() => {}}
+        style={{
+          position: "absolute",
+          bottom: tabBarBottom + 16,
+          right: 20,
+        }}
       >
-        <Pressable onPress={() => {}}>
-          <View style={{
-            backgroundColor: "#fff",
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            paddingTop: 8,
-            paddingBottom: Platform.OS === "ios" ? 36 : 20,
-            paddingHorizontal: 16,
+        <View style={{ alignItems: "flex-end", gap: 16 }}>
+          {/* Quick Game (further from +, animates second) */}
+          <Animated.View style={{
+            transform: [{ translateY: btn2TranslateY }, { scale: btn2Scale }],
+            opacity: btn2Anim,
           }}>
-            {/* Drag handle */}
-            <View style={{ width: 36, height: 4, backgroundColor: "#e5e7eb", borderRadius: 2, alignSelf: "center", marginBottom: 20 }} />
-
-            {/* Log a Round */}
-            <TouchableOpacity
-              onPress={onLogRound}
-              activeOpacity={0.85}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: "#16a34a",
-                borderRadius: 16,
-                padding: 18,
-                marginBottom: 10,
-                gap: 14,
-              }}
-            >
-              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
-                <Ionicons name="golf" size={22} color="#fff" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>Log a Round</Text>
-                <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 13, marginTop: 2 }}>
-                  Track your score · counts toward handicap
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.6)" />
-            </TouchableOpacity>
-
-            {/* Quick Game */}
             <TouchableOpacity
               onPress={onQuickGame}
-              activeOpacity={0.85}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: "#f9fafb",
-                borderWidth: 1,
-                borderColor: "#e5e7eb",
-                borderRadius: 16,
-                padding: 18,
-                gap: 14,
-              }}
+              activeOpacity={0.8}
+              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
             >
-              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "#fef3c7", alignItems: "center", justifyContent: "center" }}>
+              <View style={{
+                backgroundColor: "rgba(255,255,255,0.95)",
+                paddingHorizontal: 14, paddingVertical: 7,
+                borderRadius: 20,
+                shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.15, shadowRadius: 3, elevation: 3,
+              }}>
+                <Text style={{ color: "#111827", fontWeight: "600", fontSize: 14 }}>Quick Game</Text>
+              </View>
+              <View style={{
+                width: 52, height: 52, borderRadius: 26,
+                backgroundColor: "#fef3c7",
+                alignItems: "center", justifyContent: "center",
+                shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.18, shadowRadius: 5, elevation: 4,
+              }}>
                 <Ionicons name="flash" size={22} color="#d97706" />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: "#111827", fontWeight: "700", fontSize: 16 }}>Quick Game</Text>
-                <Text style={{ color: "#6b7280", fontSize: 13, marginTop: 2 }}>
-                  Skins · Nassau · Stableford with friends
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
             </TouchableOpacity>
-          </View>
-        </Pressable>
+          </Animated.View>
+
+          {/* Log a Round (closer to +, animates first) */}
+          <Animated.View style={{
+            transform: [{ translateY: btn1TranslateY }, { scale: btn1Scale }],
+            opacity: btn1Anim,
+          }}>
+            <TouchableOpacity
+              onPress={onLogRound}
+              activeOpacity={0.8}
+              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+            >
+              <View style={{
+                backgroundColor: "rgba(255,255,255,0.95)",
+                paddingHorizontal: 14, paddingVertical: 7,
+                borderRadius: 20,
+                shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.15, shadowRadius: 3, elevation: 3,
+              }}>
+                <Text style={{ color: "#111827", fontWeight: "600", fontSize: 14 }}>Log a Round</Text>
+              </View>
+              <View style={{
+                width: 52, height: 52, borderRadius: 26,
+                backgroundColor: "#16a34a",
+                alignItems: "center", justifyContent: "center",
+                shadowColor: "#16a34a", shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.4, shadowRadius: 10, elevation: 6,
+              }}>
+                <Ionicons name="golf" size={22} color="#fff" />
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
       </Pressable>
     </Modal>
   );
@@ -134,7 +156,42 @@ export default function AppLayout() {
   const { user } = useUser();
   const segments = useSegments();
   const router = useRouter();
-  const [showActionSheet, setShowActionSheet] = useState(false);
+
+  // Speed dial FAB animation
+  const fabAnim = useRef(new Animated.Value(0)).current;
+  const btn1Anim = useRef(new Animated.Value(0)).current;
+  const btn2Anim = useRef(new Animated.Value(0)).current;
+  const [fabOpen, setFabOpen] = useState(false);
+
+  const openFab = () => {
+    btn1Anim.setValue(0);
+    btn2Anim.setValue(0);
+    fabAnim.setValue(0);
+    setFabOpen(true);
+    Animated.parallel([
+      Animated.timing(fabAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.stagger(60, [
+        Animated.spring(btn1Anim, { toValue: 1, useNativeDriver: true, friction: 6, tension: 80 }),
+        Animated.spring(btn2Anim, { toValue: 1, useNativeDriver: true, friction: 6, tension: 80 }),
+      ]),
+    ]).start();
+  };
+
+  const closeFab = (callback?: () => void) => {
+    Animated.parallel([
+      Animated.timing(fabAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.spring(btn1Anim, { toValue: 0, useNativeDriver: true, friction: 10 }),
+      Animated.spring(btn2Anim, { toValue: 0, useNativeDriver: true, friction: 10 }),
+    ]).start(() => {
+      setFabOpen(false);
+      callback?.();
+    });
+  };
+
+  const fabRotate = fabAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "45deg"],
+  });
 
   const profile = useQuery(
     api.golferProfiles.get,
@@ -271,11 +328,11 @@ export default function AppLayout() {
                 if (inProgressRound) {
                   router.push(`/(app)/rounds/score?roundId=${inProgressRound._id}` as any);
                 } else {
-                  setShowActionSheet(true);
+                  fabOpen ? closeFab() : openFab();
                 }
               }}
             >
-              <View
+              <Animated.View
                 style={{
                   width: 56,
                   height: 56,
@@ -289,10 +346,11 @@ export default function AppLayout() {
                   shadowOpacity: 0.4,
                   shadowRadius: 10,
                   elevation: 6,
+                  transform: [{ rotate: fabRotate }],
                 }}
               >
                 <Ionicons name="add" size={30} color="#fff" />
-              </View>
+              </Animated.View>
             </TouchableOpacity>
           ),
         }}
@@ -347,11 +405,13 @@ export default function AppLayout() {
         }}
       />
     </Tabs>
-    <ActionSheet
-      visible={showActionSheet}
-      onClose={() => setShowActionSheet(false)}
-      onLogRound={() => { setShowActionSheet(false); router.push("/(app)/rounds/new" as any); }}
-      onQuickGame={() => { setShowActionSheet(false); router.push("/(app)/play/games/new" as any); }}
+    <FABMenu
+      visible={fabOpen}
+      btn1Anim={btn1Anim}
+      btn2Anim={btn2Anim}
+      onClose={() => closeFab()}
+      onLogRound={() => closeFab(() => router.push("/(app)/rounds/new" as any))}
+      onQuickGame={() => closeFab(() => router.push("/(app)/play/games/new" as any))}
     />
     </>
   );

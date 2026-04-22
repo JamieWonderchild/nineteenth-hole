@@ -283,6 +283,7 @@ export default defineSchema({
     golfCourseApiId: v.optional(v.string()),      // GolfCourseAPI.com
     osmRelationId: v.optional(v.string()),        // OpenStreetMap relation/way ID
     englandGolfCourseId: v.optional(v.string()),  // England Golf / CDH course ID
+    hnaClubId: v.optional(v.string()),            // Handicap Network Africa clubId
 
     // Data provenance
     dataSource: v.string(),                       // 'manual'|'golf_api_uk'|'golf_course_api'|'osm'|'import'
@@ -299,6 +300,8 @@ export default defineSchema({
     .index("by_platform_club", ["platformClubId"])
     .index("by_golf_club", ["golfClubId"])
     .index("by_golf_api_uk_id", ["golfApiUkId"])
+    .index("by_golf_course_api_id", ["golfCourseApiId"])
+    .index("by_hna_club_id", ["hnaClubId"])
     .searchIndex("search_name", {
       searchField: "name",
       filterFields: ["country", "county"],

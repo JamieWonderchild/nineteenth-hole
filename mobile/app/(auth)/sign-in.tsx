@@ -1,15 +1,18 @@
 import { useSSO } from "@clerk/clerk-expo";
 import * as WebBrowser from "expo-web-browser";
+import { useEffect } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { Button } from "../../components/ui/button";
 import { Ionicons } from "@expo/vector-icons";
 
-WebBrowser.maybeCompleteAuthSession();
-
 export default function SignInScreen() {
   const { startSSOFlow } = useSSO();
   const router = useRouter();
+
+  useEffect(() => {
+    WebBrowser.maybeCompleteAuthSession();
+  }, []);
 
   const handleApple = async () => {
     try {

@@ -14,6 +14,7 @@ import { useQuery, useAction } from "convex/react";
 import { useUser } from "@clerk/clerk-expo";
 import { api } from "../../../lib/convex";
 import { LoadingSpinner, Badge, SectionHeader } from "../../../components/ui";
+import { useDistanceUnit } from "../../../hooks/useDistanceUnit";
 
 // ── Tee colour helpers ────────────────────────────────────────────────────────
 
@@ -52,8 +53,8 @@ function sortTees(tees: any[]): any[] {
   const female = tees.filter((t) => t.gender === "female");
 
   function byYards(a: any, b: any) {
-    const ay = a.totalYards ?? -1;
-    const by = b.totalYards ?? -1;
+    const ay = a.totalYards ?? (a.totalMeters ? Math.round(a.totalMeters / 0.9144) : -1);
+    const by = b.totalYards ?? (b.totalMeters ? Math.round(b.totalMeters / 0.9144) : -1);
     return by - ay; // longest first
   }
 
@@ -65,7 +66,11 @@ function sortTees(tees: any[]): any[] {
 
 // ── Tee row ───────────────────────────────────────────────────────────────────
 
-function TeeRow({ tee, expanded, onPress }: { tee: any; expanded: boolean; onPress: () => void }) {
+function TeeRow({ tee, expanded, onPress, fmt, fmtTotal }: {
+  tee: any; expanded: boolean; onPress: () => void;
+  fmt: (y?: number | null, m?: number | null) => string | null;
+  fmtTotal: (y?: number | null, m?: number | null) => string | null;
+}) {
   return (
     <Pressable
       onPress={onPress}
@@ -92,8 +97,8 @@ function TeeRow({ tee, expanded, onPress }: { tee: any; expanded: boolean; onPre
             {tee.par && (
               <Text className="text-xs text-gray-500">Par {tee.par}</Text>
             )}
-            {tee.totalYards && (
-              <Text className="text-xs text-gray-500">{tee.totalYards} yds</Text>
+            {fmtTotal(tee.totalYards, tee.totalMeters) && (
+              <Text className="text-xs text-gray-500">{fmtTotal(tee.totalYards, tee.totalMeters)}</Text>
             )}
           </View>
         </View>
@@ -118,8 +123,8 @@ function TeeRow({ tee, expanded, onPress }: { tee: any; expanded: boolean; onPre
                   >
                     <Text className="text-xs text-gray-400">H{hole.number}</Text>
                     <Text className="text-xs font-semibold text-gray-800">P{hole.par}</Text>
-                    {hole.yards && (
-                      <Text className="text-xs text-gray-400">{hole.yards}y</Text>
+                    {fmt(hole.yards, hole.meters) && (
+                      <Text className="text-xs text-gray-400">{fmt(hole.yards, hole.meters)}</Text>
                     )}
                   </View>
                 ))}
@@ -267,6 +272,7 @@ export default function CourseDetailScreen() {
   const userId = user?.id ?? "";
 
   const [expandedTeeId, setExpandedTeeId] = useState<string | null>(null);
+  const { fmt, fmtTotal } = useDistanceUnit();
 
   const courseWithTees = useQuery(
     api.golfCourses.getWithTees,
@@ -396,6 +402,8 @@ export default function CourseDetailScreen() {
                   onPress={() =>
                     setExpandedTeeId(expandedTeeId === tee._id ? null : tee._id)
                   }
+                  fmt={fmt}
+                  fmtTotal={fmtTotal}
                 />
               ))
             )}

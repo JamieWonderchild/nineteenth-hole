@@ -17,6 +17,7 @@ import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../../../lib/convex";
 import { LoadingSpinner } from "../../../components/ui";
+import { useDistanceUnit, DistanceUnit } from "../../../hooks/useDistanceUnit";
 
 // ── storage keys ──────────────────────────────────────────────────────────────
 
@@ -98,6 +99,8 @@ export default function SettingsScreen() {
   const [homeClub, setHomeClub] = useState("");
   const [goalsSaving, setGoalsSaving] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState("");
+
+  const { unit: distUnit, setUnit: setDistUnit } = useDistanceUnit();
 
   const appVersion =
     Constants.expoConfig?.version ?? Constants.manifest?.version ?? "1.0.0";
@@ -239,6 +242,35 @@ export default function SettingsScreen() {
               saveNotif(NOTIF_KEYS.teeTimeReminders, v);
             }}
           />
+        </View>
+
+        {/* preferences */}
+        <SectionLabel title="Preferences" />
+        <View className="border-t border-gray-100">
+          <View className="px-4 py-4 bg-white border-b border-gray-50">
+            <Text className="text-sm font-semibold text-gray-700 mb-3">Distances</Text>
+            <View className="flex-row gap-2">
+              {(["yards", "metres"] as DistanceUnit[]).map((u) => (
+                <TouchableOpacity
+                  key={u}
+                  onPress={() => setDistUnit(u)}
+                  className={`flex-1 py-2.5 rounded-xl border items-center ${
+                    distUnit === u
+                      ? "bg-green-600 border-green-600"
+                      : "bg-white border-gray-200"
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-semibold capitalize ${
+                      distUnit === u ? "text-white" : "text-gray-700"
+                    }`}
+                  >
+                    {u}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         </View>
 
         {/* profile */}
