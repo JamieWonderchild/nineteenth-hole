@@ -27,6 +27,23 @@ const UK_COUNTIES = [
   "Somerset",
 ];
 
+const SA_PROVINCES = [
+  "Gauteng",
+  "Western Cape",
+  "KwaZulu-Natal",
+  "Eastern Cape",
+  "Free State",
+  "Limpopo",
+  "Mpumalanga",
+  "North West",
+  "Northern Cape",
+];
+
+const COUNTRIES = [
+  { value: "", label: "United Kingdom" },
+  { value: "ZAF", label: "South Africa" },
+];
+
 type GolfCourse = {
   _id: string;
   name: string;
@@ -76,6 +93,7 @@ function CourseCard({ course }: { course: GolfCourse }) {
 export default function CoursesPage() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [country, setCountry] = useState("");
   const [county, setCounty] = useState("");
 
   useEffect(() => {
@@ -86,18 +104,21 @@ export default function CoursesPage() {
   const results = useQuery(
     api.golfCourses.search,
     debouncedQuery.length >= 2
-      ? { query: debouncedQuery, county: county || undefined, limit: 30 }
+      ? { query: debouncedQuery, country: country || undefined, county: county || undefined, limit: 30 }
       : "skip"
   );
 
   const hasQuery = debouncedQuery.length >= 2;
+  const isSA = country === "ZAF";
+  const regionOptions = isSA ? SA_PROVINCES : UK_COUNTIES;
+  const regionLabel = isSA ? "All provinces" : "All counties";
 
   return (
     <div className="px-6 py-8 space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Golf Courses</h1>
-        <p className="text-gray-500 text-sm mt-0.5">Search 2,666 UK courses</p>
+        <p className="text-gray-500 text-sm mt-0.5">Search UK &amp; South Africa courses</p>
       </div>
 
       {/* Search + filter */}
@@ -112,12 +133,21 @@ export default function CoursesPage() {
           />
         </div>
         <select
+          value={country}
+          onChange={e => { setCountry(e.target.value); setCounty(""); }}
+          className="rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-44"
+        >
+          {COUNTRIES.map(c => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </select>
+        <select
           value={county}
           onChange={e => setCounty(e.target.value)}
           className="rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-48"
         >
-          <option value="">All counties</option>
-          {UK_COUNTIES.map(c => (
+          <option value="">{regionLabel}</option>
+          {regionOptions.map(c => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
@@ -142,14 +172,14 @@ export default function CoursesPage() {
         <div className="text-center py-20 bg-white border border-dashed border-gray-200 rounded-xl">
           <p className="text-gray-500 font-medium">No courses found</p>
           <p className="text-gray-400 text-sm mt-1">
-            Try a different name or remove the county filter
+            Try a different name or remove the {isSA ? "province" : "county"} filter
           </p>
         </div>
       ) : (
         <>
           <p className="text-xs text-gray-400">
             {results.length} result{results.length !== 1 ? "s" : ""}
-            {county ? ` in ${county}` : ""}
+            {county ? ` in ${county}` : country === "ZAF" ? " in South Africa" : ""}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {results.map((course: GolfCourse) => (
