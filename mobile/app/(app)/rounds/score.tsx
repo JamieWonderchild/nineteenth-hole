@@ -17,7 +17,8 @@ import { useQuery, useMutation } from "convex/react";
 import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../../../lib/convex";
-import { Button, Input } from "../../../components/ui";
+import { Button } from "../../../components/ui";
+import { PlayedWithPicker } from "../../../components/PlayedWithPicker";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -70,7 +71,7 @@ export default function ResumeRoundScreen() {
 
   const [submitting, setSubmitting] = useState(false);
   const [showExtras, setShowExtras] = useState(false);
-  const [playedWith, setPlayedWith] = useState("");
+  const [playedWith, setPlayedWith] = useState<string[]>([]);
   const [conditions, setConditions] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -155,7 +156,7 @@ export default function ResumeRoundScreen() {
           await completeRound({
             roundId: round._id,
             holeScores,
-            ...(playedWith.trim() ? { playedWith: playedWith.split(",").map(s => s.trim()).filter(Boolean) } : {}),
+            ...(playedWith.length > 0 ? { playedWith } : {}),
             ...(conditions ? { conditions } : {}),
             ...(notes ? { notes } : {}),
           });
@@ -205,8 +206,8 @@ function ScoringUI({
   playingHandicap: number;
   showExtras: boolean;
   setShowExtras: (v: boolean) => void;
-  playedWith: string;
-  setPlayedWith: (v: string) => void;
+  playedWith: string[];
+  setPlayedWith: (v: string[]) => void;
   conditions: string;
   setConditions: (v: string) => void;
   notes: string;
@@ -267,7 +268,7 @@ function ScoringUI({
                 <Text className="text-green-500 text-xs mt-1">Stableford</Text>
               </View>
             </View>
-            <Input label="Playing with (optional)" placeholder="Names separated by commas" value={playedWith} onChangeText={setPlayedWith} />
+            <PlayedWithPicker players={playedWith} onChange={setPlayedWith} />
             <View className="gap-2">
               <Text className="text-sm font-medium text-gray-700">Conditions</Text>
               <View className="flex-row gap-2">

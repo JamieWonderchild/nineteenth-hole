@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { api } from "../../../lib/convex";
 import { Button, Input, Card, Badge } from "../../../components/ui";
 import { CoursePickerSheet, CourseSelection, CourseHole } from "../../../components/CoursePickerSheet";
+import { PlayedWithPicker } from "../../../components/PlayedWithPicker";
 import { useDistanceUnit, DistanceUnit } from "../../../hooks/useDistanceUnit";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -622,13 +623,13 @@ function Step3Quick({
   coursePar: number;
   onNext: (data: {
     grossScore: string;
-    playedWith: string;
+    playedWith: string[];
     conditions: string;
     notes: string;
   }) => void;
 }) {
   const [grossScore, setGrossScore] = useState("");
-  const [playedWith, setPlayedWith] = useState("");
+  const [playedWith, setPlayedWith] = useState<string[]>([]);
   const [conditions, setConditions] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -673,12 +674,7 @@ function Step3Quick({
           </View>
 
           {/* Playing with */}
-          <Input
-            label="Playing with (optional)"
-            placeholder="Names separated by commas"
-            value={playedWith}
-            onChangeText={setPlayedWith}
-          />
+          <PlayedWithPicker players={playedWith} onChange={setPlayedWith} />
 
           {/* Conditions */}
           <View className="gap-2">
@@ -759,7 +755,7 @@ function Step3HoleScoring({
   roundId?: string;
   initialScores?: (number | null)[];
   startHole?: number;
-  onNext: (data: { grossScore: string; holeScores: number[]; playedWith: string; conditions: string; notes: string }) => void;
+  onNext: (data: { grossScore: string; holeScores: number[]; playedWith: string[]; conditions: string; notes: string }) => void;
 }) {
   const saveHoleScore = useMutation(api.rounds.saveHoleScore);
   const pars = holesProp?.length === 18 ? holesProp.map(h => h.par) : STANDARD_PARS;
@@ -769,7 +765,7 @@ function Step3HoleScoring({
   const [scores, setScores] = useState<(number | null)[]>(initialScores ?? new Array(18).fill(null));
   const [currentHole, setCurrentHole] = useState(startHole ?? 0);
   const [showExtras, setShowExtras] = useState(false);
-  const [playedWith, setPlayedWith] = useState("");
+  const [playedWith, setPlayedWith] = useState<string[]>([]);
   const [conditions, setConditions] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -817,7 +813,7 @@ function Step3HoleScoring({
               <Text className="text-green-500 text-xs mt-1">Stableford</Text>
             </View>
           </View>
-          <Input label="Playing with (optional)" placeholder="Names separated by commas" value={playedWith} onChangeText={setPlayedWith} />
+          <PlayedWithPicker players={playedWith} onChange={setPlayedWith} />
           <View className="gap-2">
             <Text className="text-sm font-medium text-gray-700">Conditions</Text>
             <View className="flex-row gap-2">
@@ -1277,7 +1273,7 @@ export default function NewRoundScreen() {
   const [step3Data, setStep3Data] = useState<{
     grossScore: string;
     holeScores?: number[];
-    playedWith: string;
+    playedWith: string[];
     conditions: string;
     notes: string;
   } | null>(null);
@@ -1346,7 +1342,7 @@ export default function NewRoundScreen() {
             strokeIndex: step1Data.holes?.[i]?.strokeIndex ?? (i + 1),
             score,
           })),
-          ...(step3Data.playedWith.trim() ? { playedWith: step3Data.playedWith.split(",").map(s => s.trim()).filter(Boolean) } : {}),
+          ...(step3Data.playedWith.length > 0 ? { playedWith: step3Data.playedWith } : {}),
           ...(step3Data.conditions ? { conditions: step3Data.conditions } : {}),
           ...(step3Data.notes ? { notes: step3Data.notes } : {}),
           ...(step4Data?.markerId ? { markerId: step4Data.markerId, markerName: step4Data.markerName } : {}),
@@ -1372,14 +1368,7 @@ export default function NewRoundScreen() {
         grossScore: gross,
         ...(step3Data.holeScores ? { holeScores: step3Data.holeScores as any } : {}),
         date: step2Data.date,
-        ...(step3Data.playedWith.trim()
-          ? {
-              playedWith: step3Data.playedWith
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean),
-            }
-          : {}),
+        ...(step3Data.playedWith.length > 0 ? { playedWith: step3Data.playedWith } : {}),
         // Only count without marker if ratings were provided (handled by backend when marker present)
         isCountingRound: !step1Data.skipRatings,
         ...(step3Data.conditions ? { conditions: step3Data.conditions } : {}),
