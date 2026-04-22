@@ -11,14 +11,14 @@ export async function POST(request: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
 
-  let body: { command: string; context: Record<string, unknown> };
+  let body: { command: string; context: Record<string, unknown>; contextId?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { command, context } = body;
+  const { command, context, contextId } = body;
   if (!command?.trim()) return NextResponse.json({ error: 'command is required' }, { status: 400 });
 
   const capability = CAPABILITIES['tee-time-agent'];
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     const message = [`CONTEXT:\n${contextBlock}`, `COMMAND: ${command}`].join('\n\n');
 
-    const task = await client.sendTextMessage(agentId!, message);
+    const task = await client.sendTextMessage(agentId!, message, contextId);
     const { task: completed, timedOut, failed } = await pollCortiTask(client, agentId!, task, {
       label: 'tee-time-agent',
       maxAttempts: 120,
@@ -57,7 +57,9 @@ export async function POST(request: NextRequest) {
     const parsed = client.parseJson(completed) as { intents: unknown[]; summary: string } | null;
     if (!parsed) return NextResponse.json({ error: 'Could not parse agent response' }, { status: 500 });
 
-    return NextResponse.json({ ok: true, intents: parsed.intents ?? [], summary: parsed.summary ?? '' });
+    const returnedContextId = (completed as { contextId?: string }).contextId
+      ?? (task as { contextId?: string }).contextId;
+    return NextResponse.json({ ok: true, intents: parsed.intents ?? [], summary: parsed.summary ?? '', contextId: returnedContextId });
   } catch (e) {
     console.error('[tee-time-agent]', e);
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Unknown error' }, { status: 500 });

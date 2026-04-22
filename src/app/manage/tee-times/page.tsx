@@ -206,11 +206,13 @@ export default function ManageTeeTimes() {
   const [agentCommand, setAgentCommand] = useState("");
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentMsg, setAgentMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [agentContextId, setAgentContextId] = useState<string | undefined>(undefined);
 
   const slots = useQuery(api.teeTimes.listSlotsForDate, club ? { clubId: club._id, date: selectedDate } : "skip");
   const availableDates = useQuery(api.teeTimes.listAvailableDates, club ? { clubId: club._id } : "skip");
   const rangeSlots = useQuery(api.teeTimes.listSlotsForRange, club ? { clubId: club._id, startDate: today, days: 14 } : "skip");
   const allMembers = useQuery(api.clubMembers.listByClub, club ? { clubId: club._id } : "skip");
+  const upcomingComps = useQuery(api.competitions.listUpcomingClubComps, club ? { clubId: club._id } : "skip");
 
   const generateSlots = useMutation(api.teeTimes.generateSlots);
   const cancelBooking = useMutation(api.teeTimes.cancelBooking);
@@ -226,6 +228,7 @@ export default function ManageTeeTimes() {
   const sunset = getSunsetTime(selectedDate, club.latitude, club.longitude);
   const slotsMap: Record<string, number> = {};
   availableDates?.forEach(d => { slotsMap[d] = 1; });
+  const compNameById = Object.fromEntries((upcomingComps ?? []).map(c => [c.id as string, c.name]));
   const totalBookings = slots?.reduce((sum, s) => sum + s.bookings.length, 0) ?? 0;
   const totalPlayers = slots?.reduce((sum, s) => sum + s.takenPlayers, 0) ?? 0;
 
@@ -263,14 +266,16 @@ export default function ManageTeeTimes() {
         selectedDate,
         slots: rangeSlots ?? [],
         members: (allMembers ?? []).map(m => ({ id: m._id, displayName: m.displayName })),
+        competitions: (upcomingComps ?? []).map(c => ({ id: c.id, name: c.name, teeDate: c.teeDate })),
       };
       const res = await fetch("/api/tee-times/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command: agentCommand, context }),
+        body: JSON.stringify({ command: agentCommand, context, contextId: agentContextId }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Agent failed");
+      if (data.contextId) setAgentContextId(data.contextId);
 
       // Execute each intent
       for (const intent of data.intents as Array<{ tool: string; args: Record<string, unknown> }>) {
@@ -324,7 +329,7 @@ export default function ManageTeeTimes() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => { setShowAgent(v => !v); setAgentMsg(null); }}
+            onClick={() => { setShowAgent(v => !v); setAgentMsg(null); setAgentContextId(undefined); }}
             className={`flex items-center gap-1.5 px-3 py-2 border text-sm font-medium rounded-lg transition-colors ${showAgent ? "border-purple-400 bg-purple-50 text-purple-700" : "border-gray-300 hover:bg-gray-50 text-gray-700"}`}
             title="AI assistant"
           >
@@ -549,6 +554,11 @@ export default function ManageTeeTimes() {
                           <span className="text-gray-400 text-xs">· {b.playerCount} player{b.playerCount !== 1 ? "s" : ""}</span>
                           {(b as { bookingType?: string }).bookingType === "visitor" && (
                             <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">visitor</span>
+                          )}
+                          {(b as { competitionId?: string }).competitionId && compNameById[(b as { competitionId?: string }).competitionId!] && (
+                            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">
+                              {compNameById[(b as { competitionId?: string }).competitionId!]}
+                            </span>
                           )}
                           {b.notes && <span className="text-gray-400 text-xs">· {b.notes}</span>}
                         </div>

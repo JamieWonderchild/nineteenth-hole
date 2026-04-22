@@ -473,3 +473,121 @@ export const deleteSlotsForDate = mutation({
     return slots.length;
   },
 });
+
+// ── Competition tee time booking ──────────────────────────────────────────────
+
+// Book all groups from a competition draw into sequential tee time slots
+export const bookCompetitionGroups = mutation({
+  args: { competitionId: v.id("competitions"), clubId: v.id("clubs") },
+  handler: async (ctx, { competitionId, clubId }) => {
+    await assertClubAdmin(ctx, clubId);
+
+    const comp = await ctx.db.get(competitionId);
+    if (!comp) throw new Error("Competition not found");
+    if (comp.startType === "shotgun") throw new Error("Shotgun start: no tee time slots needed");
+
+    const teeDate = comp.teeDate ?? comp.startDate;
+    const startTime = comp.teeStartTime;
+    const interval = comp.teeInterval ?? 10;
+    const groupSize = comp.groupSize ?? 4;
+    if (!startTime) throw new Error("Set a tee start time first");
+
+    // Load entries ordered by group
+    const entries = await ctx.db
+      .query("entries")
+      .withIndex("by_competition", q => q.eq("competitionId", competitionId))
+      .filter(q => q.neq(q.field("drawOrder"), undefined))
+      .collect();
+
+    if (entries.length === 0) throw new Error("Generate the draw first");
+
+    entries.sort((a, b) => (a.drawOrder ?? 0) - (b.drawOrder ?? 0));
+    const maxGroup = Math.max(...entries.map(e => e.groupNumber ?? 1));
+
+    // Cancel any existing comp bookings for this date
+    const existing = await ctx.db
+      .query("teeTimeBookings")
+      .withIndex("by_club_and_date", q => q.eq("clubId", clubId).eq("date", teeDate))
+      .filter(q => q.eq(q.field("competitionId"), competitionId))
+      .collect();
+    const now = new Date().toISOString();
+    for (const b of existing) await ctx.db.patch(b._id, { status: "cancelled", updatedAt: now });
+
+    let booked = 0;
+    for (let g = 1; g <= maxGroup; g++) {
+      const groupEntries = entries.filter(e => e.groupNumber === g);
+      if (groupEntries.length === 0) continue;
+
+      // Compute time for this group
+      const [sh, sm] = startTime.split(":").map(Number);
+      const totalMins = sh * 60 + sm + (g - 1) * interval;
+      const time = `${Math.floor(totalMins / 60).toString().padStart(2, "0")}:${(totalMins % 60).toString().padStart(2, "0")}`;
+
+      // Find or create slot for this time
+      let slot = await ctx.db
+        .query("teeTimeSlots")
+        .withIndex("by_club_and_date", q => q.eq("clubId", clubId).eq("date", teeDate))
+        .filter(q => q.eq(q.field("time"), time))
+        .first();
+
+      if (!slot) {
+        const slotId = await ctx.db.insert("teeTimeSlots", {
+          clubId, date: teeDate, time, maxPlayers: groupSize, createdAt: now, updatedAt: now,
+        });
+        slot = await ctx.db.get(slotId);
+      }
+      if (!slot) continue;
+
+      // Book each member individually
+      for (const entry of groupEntries) {
+        await ctx.db.insert("teeTimeBookings", {
+          clubId,
+          slotId: slot._id,
+          date: teeDate,
+          time,
+          displayName: entry.displayName,
+          playerCount: 1,
+          status: "confirmed",
+          competitionId,
+          bookingType: "member",
+          createdAt: now,
+          updatedAt: now,
+        });
+        booked++;
+      }
+    }
+
+    return { booked, groups: maxGroup };
+  },
+});
+
+export const cancelCompetitionBookings = mutation({
+  args: { competitionId: v.id("competitions"), clubId: v.id("clubs") },
+  handler: async (ctx, { competitionId, clubId }) => {
+    await assertClubAdmin(ctx, clubId);
+    const bookings = await ctx.db
+      .query("teeTimeBookings")
+      .withIndex("by_club", q => q.eq("clubId", clubId))
+      .filter(q => q.eq(q.field("competitionId"), competitionId))
+      .collect();
+    const now = new Date().toISOString();
+    for (const b of bookings) await ctx.db.patch(b._id, { status: "cancelled", updatedAt: now });
+    return bookings.length;
+  },
+});
+
+export const listByCompetition = query({
+  args: { competitionId: v.id("competitions"), clubId: v.id("clubs") },
+  handler: async (ctx, { competitionId, clubId }) => {
+    return ctx.db
+      .query("teeTimeBookings")
+      .withIndex("by_club", q => q.eq("clubId", clubId))
+      .filter(q =>
+        q.and(
+          q.eq(q.field("competitionId"), competitionId),
+          q.eq(q.field("status"), "confirmed"),
+        )
+      )
+      .collect();
+  },
+});

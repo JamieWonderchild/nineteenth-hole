@@ -437,3 +437,129 @@ export const syncESPNPrizeMoney = action({
     };
   },
 });
+
+// ── Club comp draw + tee time config ─────────────────────────────────────────
+
+export const updateTeeConfig = mutation({
+  args: {
+    competitionId: v.id("competitions"),
+    startType: v.string(),
+    teeDate: v.optional(v.string()),
+    teeStartTime: v.string(),
+    teeInterval: v.number(),
+    groupSize: v.number(),
+  },
+  handler: async (ctx, { competitionId, ...fields }) => {
+    const comp = await ctx.db.get(competitionId);
+    if (!comp?.clubId) throw new Error("Not a club competition");
+    await assertClubAdminOrSuperAdmin(ctx, comp.clubId);
+    await ctx.db.patch(competitionId, { ...fields, updatedAt: new Date().toISOString() });
+  },
+});
+
+export const generateClubDraw = mutation({
+  args: {
+    competitionId: v.id("competitions"),
+    method: v.string(), // 'random'
+  },
+  handler: async (ctx, { competitionId, method: _method }) => {
+    const comp = await ctx.db.get(competitionId);
+    if (!comp?.clubId) throw new Error("Not a club competition");
+    await assertClubAdminOrSuperAdmin(ctx, comp.clubId);
+
+    const entries = await ctx.db
+      .query("entries")
+      .withIndex("by_competition", q => q.eq("competitionId", competitionId))
+      .collect();
+
+    // Shuffle
+    const shuffled = [...entries].sort(() => Math.random() - 0.5);
+    const groupSize = comp.groupSize ?? 4;
+    const totalGroups = Math.ceil(shuffled.length / groupSize);
+    const now = new Date().toISOString();
+
+    for (let i = 0; i < shuffled.length; i++) {
+      const groupNumber = Math.floor(i / groupSize) + 1;
+      // Shotgun: spread groups across 18 holes
+      const startingHole = comp.startType === "shotgun"
+        ? ((Math.floor(i / groupSize) % 18) + 1)
+        : undefined;
+      await ctx.db.patch(shuffled[i]._id, {
+        drawOrder: i + 1,
+        groupNumber,
+        ...(startingHole ? { startingHole } : {}),
+        updatedAt: now,
+      });
+    }
+
+    await ctx.db.patch(competitionId, { drawCompletedAt: now, updatedAt: now });
+    return { groups: totalGroups, entries: shuffled.length };
+  },
+});
+
+export const clearClubDraw = mutation({
+  args: { competitionId: v.id("competitions") },
+  handler: async (ctx, { competitionId }) => {
+    const comp = await ctx.db.get(competitionId);
+    if (!comp?.clubId) throw new Error("Not a club competition");
+    await assertClubAdminOrSuperAdmin(ctx, comp.clubId);
+
+    const entries = await ctx.db
+      .query("entries")
+      .withIndex("by_competition", q => q.eq("competitionId", competitionId))
+      .collect();
+
+    const now = new Date().toISOString();
+    for (const e of entries) {
+      await ctx.db.patch(e._id, {
+        drawOrder: undefined,
+        groupNumber: undefined,
+        startingHole: undefined,
+        updatedAt: now,
+      });
+    }
+    await ctx.db.patch(competitionId, { drawCompletedAt: undefined, updatedAt: now });
+  },
+});
+
+// Returns upcoming club comps with entries for agent context
+export const listUpcomingClubComps = query({
+  args: { clubId: v.id("clubs") },
+  handler: async (ctx, { clubId }) => {
+    const today = new Date().toISOString().split("T")[0];
+    const comps = await ctx.db
+      .query("competitions")
+      .withIndex("by_club", q => q.eq("clubId", clubId))
+      .filter(q => q.eq(q.field("type"), "club_comp"))
+      .collect();
+
+    const upcoming = comps.filter(c => c.endDate >= today && c.status !== "complete");
+
+    return Promise.all(upcoming.map(async comp => {
+      const entries = await ctx.db
+        .query("entries")
+        .withIndex("by_competition", q => q.eq("competitionId", comp._id))
+        .collect();
+      return {
+        id: comp._id,
+        name: comp.name,
+        startDate: comp.startDate,
+        teeDate: comp.teeDate ?? comp.startDate,
+        startType: comp.startType ?? "sequential",
+        teeStartTime: comp.teeStartTime,
+        teeInterval: comp.teeInterval ?? 10,
+        groupSize: comp.groupSize ?? 4,
+        drawGenerated: !!comp.drawCompletedAt,
+        entries: entries
+          .sort((a, b) => (a.drawOrder ?? 999) - (b.drawOrder ?? 999))
+          .map(e => ({
+            id: e._id,
+            displayName: e.displayName,
+            drawOrder: e.drawOrder,
+            groupNumber: e.groupNumber,
+            startingHole: e.startingHole,
+          })),
+      };
+    }));
+  },
+});

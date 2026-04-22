@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, use, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery, useAction } from "convex/react";
@@ -9,7 +9,7 @@ import type { Id } from "convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, ExternalLink, Copy, CheckCircle } from "lucide-react";
+import { ArrowLeft, ExternalLink, Copy, CheckCircle, Shuffle } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -193,6 +193,41 @@ export default function CompetitionManagePage({
   const markEntryPaid = useMutation(api.entries.markEntryPaidByAdmin);
   const syncESPN = useAction(api.competitions.syncESPNPrizeMoney);
 
+  // Draw & Tee Times
+  const updateTeeConfig = useMutation(api.competitions.updateTeeConfig);
+  const generateClubDraw = useMutation(api.competitions.generateClubDraw);
+  const clearClubDraw = useMutation(api.competitions.clearClubDraw);
+  const bookCompetitionGroups = useMutation(api.teeTimes.bookCompetitionGroups);
+  const cancelCompetitionBookings = useMutation(api.teeTimes.cancelCompetitionBookings);
+  const compBookings = useQuery(
+    api.teeTimes.listByCompetition,
+    competition?.type === "club_comp" && competition?.clubId
+      ? { competitionId: competitionId as Id<"competitions">, clubId: competition.clubId }
+      : "skip"
+  );
+
+  const [teeStartType, setTeeStartType] = useState<"sequential" | "shotgun">("sequential");
+  const [teeDate, setTeeDate] = useState("");
+  const [teeStartTime, setTeeStartTime] = useState("09:00");
+  const [teeInterval, setTeeInterval] = useState(10);
+  const [teeGroupSize, setTeeGroupSize] = useState(4);
+  const [savingTeeConfig, setSavingTeeConfig] = useState(false);
+  const [generatingDraw, setGeneratingDraw] = useState(false);
+  const [bookingTeeSlots, setBookingTeeSlots] = useState(false);
+  const [teeMsg, setTeeMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  const teeConfigInit = useRef(false);
+  useEffect(() => {
+    if (competition && !teeConfigInit.current) {
+      teeConfigInit.current = true;
+      setTeeStartType((competition.startType ?? "sequential") as "sequential" | "shotgun");
+      setTeeDate((competition.teeDate ?? competition.startDate) as string);
+      setTeeStartTime((competition.teeStartTime ?? "09:00") as string);
+      setTeeInterval((competition.teeInterval ?? 10) as number);
+      setTeeGroupSize((competition.groupSize ?? 4) as number);
+    }
+  }, [competition]);
+
   const [scoreEdits, setScoreEdits] = useState<Record<string, { r1?: string; r2?: string; r3?: string; r4?: string }>>({});
   const [prizeEdits, setPrizeEdits] = useState<Record<string, string>>({}); // playerId → prize money string (in whole currency units)
   const [loading, setLoading] = useState<string | null>(null);
@@ -301,6 +336,65 @@ export default function CompetitionManagePage({
       setDeleteError(err instanceof Error ? err.message : "Delete failed");
       setLoading(null);
     }
+  }
+
+  // Draw & Tee Times handlers
+  const drawGenerated = entries.some(e => e.drawOrder !== undefined);
+  const groups = entries.reduce((acc, entry) => {
+    if (entry.groupNumber !== undefined) {
+      if (!acc[entry.groupNumber]) acc[entry.groupNumber] = [];
+      acc[entry.groupNumber].push(entry);
+    }
+    return acc;
+  }, {} as Record<number, typeof entries>);
+
+  async function handleSaveTeeConfig() {
+    setSavingTeeConfig(true); setTeeMsg(null);
+    try {
+      await updateTeeConfig({ competitionId: competitionId as Id<"competitions">, startType: teeStartType, teeDate, teeStartTime, teeInterval, groupSize: teeGroupSize });
+      setTeeMsg({ text: "Tee config saved.", ok: true });
+    } catch (err) {
+      setTeeMsg({ text: err instanceof Error ? err.message : "Save failed", ok: false });
+    }
+    setSavingTeeConfig(false);
+  }
+
+  async function handleGenerateDraw() {
+    if (!confirm(`Generate a random draw for ${entries?.length ?? 0} entries?`)) return;
+    setGeneratingDraw(true); setTeeMsg(null);
+    try {
+      const result = await generateClubDraw({ competitionId: competitionId as Id<"competitions">, method: "random" });
+      setTeeMsg({ text: `Draw complete: ${result.groups} groups, ${result.entries} entries.`, ok: true });
+    } catch (err) {
+      setTeeMsg({ text: err instanceof Error ? err.message : "Draw failed", ok: false });
+    }
+    setGeneratingDraw(false);
+  }
+
+  async function handleBookTeeSlots() {
+    if (!competition?.clubId) return;
+    if (!confirm(`Book tee time slots for ${entries?.length ?? 0} players?`)) return;
+    setBookingTeeSlots(true); setTeeMsg(null);
+    try {
+      const result = await bookCompetitionGroups({ competitionId: competitionId as Id<"competitions">, clubId: competition.clubId });
+      setTeeMsg({ text: `Booked ${result.booked} players into ${result.groups} tee slots.`, ok: true });
+    } catch (err) {
+      setTeeMsg({ text: err instanceof Error ? err.message : "Booking failed", ok: false });
+    }
+    setBookingTeeSlots(false);
+  }
+
+  async function handleCancelTeeBookings() {
+    if (!competition?.clubId) return;
+    if (!confirm("Cancel all tee time bookings for this competition?")) return;
+    setBookingTeeSlots(true); setTeeMsg(null);
+    try {
+      const count = await cancelCompetitionBookings({ competitionId: competitionId as Id<"competitions">, clubId: competition.clubId });
+      setTeeMsg({ text: `Cancelled ${count} booking${count !== 1 ? "s" : ""}.`, ok: true });
+    } catch (err) {
+      setTeeMsg({ text: err instanceof Error ? err.message : "Cancel failed", ok: false });
+    }
+    setBookingTeeSlots(false);
   }
 
   const statusFlow = ["draft", "open", "live", "complete"] as const;
@@ -563,6 +657,174 @@ export default function CompetitionManagePage({
                 })}
               </tbody>
             </table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Draw & Tee Times — club comps only */}
+      {competition.type === "club_comp" && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Shuffle size={15} /> Draw & Tee Times
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Start format toggle */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Start format</label>
+              <div className="flex gap-2">
+                {(["sequential", "shotgun"] as const).map(type => (
+                  <button key={type} onClick={() => setTeeStartType(type)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                      teeStartType === type
+                        ? "bg-green-700 text-white border-green-700"
+                        : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                    }`}>
+                    {type === "sequential" ? "Sequential" : "Shotgun start"}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                {teeStartType === "sequential"
+                  ? "Groups tee off one after another from the first hole."
+                  : "All groups start simultaneously from different holes."}
+              </p>
+            </div>
+
+            {/* Config grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Tee date</label>
+                <input type="date" value={teeDate} onChange={e => setTeeDate(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Start time</label>
+                <input type="time" value={teeStartTime} onChange={e => setTeeStartTime(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
+              {teeStartType === "sequential" && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Interval (min)</label>
+                  <input type="number" value={teeInterval} onChange={e => setTeeInterval(parseInt(e.target.value))} min={5} max={30}
+                    className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Group size</label>
+                <input type="number" value={teeGroupSize} onChange={e => setTeeGroupSize(parseInt(e.target.value))} min={1} max={6}
+                  className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button size="sm" onClick={handleSaveTeeConfig} disabled={savingTeeConfig}>
+                {savingTeeConfig ? "Saving…" : "Save config"}
+              </Button>
+            </div>
+
+            {/* Draw */}
+            <div className="border-t border-gray-100 pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-900">Draw</h3>
+                <div className="flex gap-2">
+                  {drawGenerated && (
+                    <Button size="sm" variant="outline"
+                      onClick={() => clearClubDraw({ competitionId: competitionId as Id<"competitions"> })}>
+                      Clear
+                    </Button>
+                  )}
+                  <Button size="sm" onClick={handleGenerateDraw} disabled={generatingDraw || entries.length === 0}>
+                    {generatingDraw ? "Drawing…" : drawGenerated ? "Re-draw" : "Generate draw"}
+                  </Button>
+                </div>
+              </div>
+
+              {entries.length === 0 && (
+                <p className="text-xs text-gray-400">No entries yet — entries will appear here once members sign up.</p>
+              )}
+
+              {!drawGenerated && entries.length > 0 && (
+                <p className="text-xs text-gray-400">{entries.length} entries · draw not yet generated.</p>
+              )}
+
+              {drawGenerated && (
+                <div className="space-y-2">
+                  {Object.entries(groups)
+                    .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                    .map(([groupNum, groupEntries]) => {
+                      const idx = parseInt(groupNum) - 1;
+                      const [sh, sm] = teeStartTime.split(":").map(Number);
+                      const totalMins = sh * 60 + sm + idx * teeInterval;
+                      const groupTime = `${Math.floor(totalMins / 60).toString().padStart(2, "0")}:${(totalMins % 60).toString().padStart(2, "0")}`;
+                      const holeNum = (idx % 18) + 1;
+                      return (
+                        <div key={groupNum} className="bg-gray-50 rounded-lg px-3 py-2.5">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-xs font-semibold text-gray-700">Group {groupNum}</span>
+                            <span className="text-xs text-gray-400">·</span>
+                            <span className="text-xs text-gray-500 font-mono">
+                              {teeStartType === "sequential" ? groupTime : `Hole ${holeNum}`}
+                            </span>
+                          </div>
+                          <div className="space-y-0.5">
+                            {[...groupEntries]
+                              .sort((a, b) => (a.drawOrder ?? 0) - (b.drawOrder ?? 0))
+                              .map(entry => (
+                                <div key={entry._id} className="text-sm text-gray-800">{entry.displayName}</div>
+                              ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+
+            {/* Tee bookings (sequential only) */}
+            {drawGenerated && teeStartType === "sequential" && (
+              <div className="border-t border-gray-100 pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Tee sheet bookings</h3>
+                    {compBookings && compBookings.length > 0 && (
+                      <p className="text-xs text-gray-500">{compBookings.length} player{compBookings.length !== 1 ? "s" : ""} booked on {teeDate}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {compBookings && compBookings.length > 0 && (
+                      <Button size="sm" variant="outline" onClick={handleCancelTeeBookings} disabled={bookingTeeSlots}
+                        className="text-red-600 border-red-200 hover:bg-red-50">
+                        Cancel bookings
+                      </Button>
+                    )}
+                    <Button size="sm" onClick={handleBookTeeSlots} disabled={bookingTeeSlots || !teeDate || !teeStartTime}>
+                      {bookingTeeSlots ? "Booking…" : compBookings && compBookings.length > 0 ? "Re-book tee times" : "Book tee times"}
+                    </Button>
+                  </div>
+                </div>
+                <Link href="/manage/tee-times" className="text-xs text-green-700 hover:underline">
+                  View tee sheet →
+                </Link>
+              </div>
+            )}
+
+            {/* Shotgun info */}
+            {drawGenerated && teeStartType === "shotgun" && (
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs text-gray-500">
+                  Shotgun start — all groups tee off simultaneously at{" "}
+                  <span className="font-medium">{teeStartTime || "—"}</span> on{" "}
+                  <span className="font-medium">{teeDate || "—"}</span> from their assigned holes above.
+                </p>
+              </div>
+            )}
+
+            {teeMsg && (
+              <p className={`text-sm rounded-lg px-3 py-2 ${teeMsg.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+                {teeMsg.ok ? "✓ " : "✗ "}{teeMsg.text}
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

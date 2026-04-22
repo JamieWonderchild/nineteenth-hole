@@ -170,6 +170,12 @@ export default defineSchema({
     roundHoles: v.optional(v.number()),   // 9 or 18 (default 18)
     // Metadata
     drawCompletedAt: v.optional(v.string()),
+    // Club comp tee time / draw config
+    startType: v.optional(v.string()),      // 'sequential' | 'shotgun'
+    teeDate: v.optional(v.string()),        // YYYY-MM-DD (defaults to startDate if unset)
+    teeStartTime: v.optional(v.string()),   // "08:00"
+    teeInterval: v.optional(v.number()),    // minutes between groups (sequential only)
+    groupSize: v.optional(v.number()),      // players per group, default 4
     // 'stripe' (default) | 'cash' — cash means admin marks entries as paid manually
     paymentCollection: v.optional(v.string()),
     // Total participant count (including non-racers) — used for accurate race-points calculation
@@ -226,6 +232,10 @@ export default defineSchema({
     paidAt: v.optional(v.string()),
     stripePaymentIntentId: v.optional(v.string()),
     stripeCheckoutSessionId: v.optional(v.string()),
+    // Club comp draw position (sequential or shotgun start)
+    drawOrder: v.optional(v.number()),      // 1, 2, 3... (position in the draw)
+    groupNumber: v.optional(v.number()),    // which group (derived: ceil(drawOrder/groupSize))
+    startingHole: v.optional(v.number()),   // shotgun only: which hole this group starts on
     // Drawn players — populated after draw ceremony (or chosen players for pick format)
     drawnPlayerIds: v.optional(v.array(v.id("players"))), // one per tier, or N for pick
     // Reserve picks (pick format only) — activated if two entries share same 5 picks
@@ -525,6 +535,8 @@ export default defineSchema({
     playerCount: v.number(),    // 1–4
     notes: v.optional(v.string()),
     status: v.string(),         // "confirmed" | "cancelled"
+    // Competition link
+    competitionId: v.optional(v.id("competitions")),
     // Visitor fields
     bookingType: v.optional(v.string()),      // "member" | "visitor"
     visitorEmail: v.optional(v.string()),
