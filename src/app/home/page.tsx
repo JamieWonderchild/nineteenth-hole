@@ -5,6 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
 import Link from "next/link";
 import { Trophy, TrendingDown, TrendingUp, Flag, Users, ChevronRight, Smartphone, Plus } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 
 function HandicapCard({ userId }: { userId: string }) {
   const profile = useQuery(api.golferProfiles.get, { userId });
@@ -64,7 +65,10 @@ function RoundCard({ round }: {
   });
 
   return (
-    <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-4 hover:border-green-400 transition-colors">
+    <Link
+      href={`/rounds/${round._id}`}
+      className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-4 hover:border-green-400 hover:shadow-sm transition-all"
+    >
       <div>
         <div className="flex items-center gap-2 mb-0.5">
           <span className="font-semibold text-gray-900">
@@ -87,11 +91,75 @@ function RoundCard({ round }: {
           {round.stablefordPoints !== undefined && ` · ${round.stablefordPoints} pts`}
         </p>
       </div>
-      {round.differential !== undefined && (
-        <span className="text-sm font-medium text-gray-600 shrink-0">
-          Diff {round.differential > 0 ? "+" : ""}{round.differential.toFixed(1)}
-        </span>
-      )}
+      <div className="flex items-center gap-3 shrink-0">
+        {round.differential !== undefined && (
+          <span className="text-sm font-medium text-gray-600">
+            Diff {round.differential > 0 ? "+" : ""}{round.differential.toFixed(1)}
+          </span>
+        )}
+        <ChevronRight size={15} className="text-gray-300" />
+      </div>
+    </Link>
+  );
+}
+
+function HandicapChart({ userId }: { userId: string }) {
+  const differentials = useQuery(api.handicap.getDifferentials, { userId });
+
+  if (!differentials || differentials.length < 3) return null;
+
+  const data = [...differentials].reverse().map((d, i) => ({
+    i,
+    diff: d.differential,
+    date: new Date(d.date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+    course: d.grossScore,
+  }));
+
+  const min = Math.min(...data.map(d => d.diff));
+  const max = Math.max(...data.map(d => d.diff));
+  const avg = data.reduce((a, d) => a + d.diff, 0) / data.length;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-gray-900">Differential Trend</h3>
+        <span className="text-xs text-gray-400">Last {data.length} rounds</span>
+      </div>
+      <ResponsiveContainer width="100%" height={140}>
+        <LineChart data={data} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+          <XAxis
+            dataKey="date"
+            tick={{ fontSize: 10, fill: "#9ca3af" }}
+            tickLine={false}
+            axisLine={false}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            domain={[Math.floor(min - 1), Math.ceil(max + 1)]}
+            tick={{ fontSize: 10, fill: "#9ca3af" }}
+            tickLine={false}
+            axisLine={false}
+            reversed
+          />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
+            formatter={(v: any) => [Number(v).toFixed(1), "Differential"]}
+            labelFormatter={(l) => l}
+          />
+          <ReferenceLine y={avg} stroke="#d1fae5" strokeDasharray="3 3" />
+          <Line
+            type="monotone"
+            dataKey="diff"
+            stroke="#16a34a"
+            strokeWidth={2}
+            dot={{ r: 3, fill: "#16a34a", strokeWidth: 0 }}
+            activeDot={{ r: 5 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+      <p className="text-xs text-gray-400 mt-1 text-center">
+        Lower is better · dashed line = average ({avg.toFixed(1)})
+      </p>
     </div>
   );
 }
@@ -117,6 +185,14 @@ function StatsCard({ userId }: { userId: string }) {
           <p className="text-2xl font-bold text-gray-900">{stats.bestGross}</p>
           <p className="text-xs text-gray-500 mt-0.5">Best Round</p>
         </div>
+        {stats.avgDifferential !== null && (
+          <div>
+            <p className="text-2xl font-bold text-gray-900">
+              {stats.avgDifferential > 0 ? "+" : ""}{stats.avgDifferential.toFixed(1)}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">Avg Diff</p>
+          </div>
+        )}
         {stats.girPct !== null && (
           <div>
             <p className="text-2xl font-bold text-gray-900">{stats.girPct}%</p>
@@ -169,6 +245,9 @@ export default function IndividualHomePage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Handicap card */}
           <HandicapCard userId={user.id} />
+
+          {/* Differential trend chart */}
+          <HandicapChart userId={user.id} />
 
           {/* Active competitions */}
           {activeCompetitions && activeCompetitions.length > 0 && (
