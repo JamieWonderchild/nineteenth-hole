@@ -190,10 +190,12 @@ export default function ManageTeeTimes() {
     try {
       const dates = datesInRange(genStartDate, genEndDate);
       const count = await generateSlots({ clubId: club._id, dates, firstTime: genFirstTime, lastTime: genLastTime, intervalMinutes: genInterval, maxPlayers: genMaxPlayers });
-      setGenMsg(`Created ${count} new slot${count !== 1 ? "s" : ""} across ${dates.length} day${dates.length !== 1 ? "s" : ""}`);
       setShowGen(false);
+      setGenMsg(`✓ Created ${count} new slot${count !== 1 ? "s" : ""} across ${dates.length} day${dates.length !== 1 ? "s" : ""}`);
+      // Navigate to the first generated date so slots are immediately visible
+      setSelectedDate(genStartDate);
     } catch (err) {
-      setGenMsg(err instanceof Error ? err.message : "Failed");
+      setGenMsg(err instanceof Error ? err.message : "Failed to generate slots");
     }
     setGenerating(false);
   }
@@ -299,12 +301,7 @@ export default function ManageTeeTimes() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
             </div>
-            {genMsg && (
-              <p className={`text-sm rounded-lg px-4 py-2 ${genMsg.includes("Created") ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
-                {genMsg}
-              </p>
-            )}
-            <div className="flex gap-2 justify-end">
+                  <div className="flex gap-2 justify-end">
               <button type="button" onClick={() => setShowGen(false)} className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50">Cancel</button>
               <button type="submit" disabled={generating} className="px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600 disabled:opacity-50">
                 {generating ? "Generating…" : "Generate"}
@@ -312,6 +309,13 @@ export default function ManageTeeTimes() {
             </div>
           </form>
         </div>
+      )}
+
+      {/* Generation result */}
+      {genMsg && (
+        <p className={`text-sm rounded-lg px-4 py-2.5 ${genMsg.startsWith("✓") ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+          {genMsg}
+        </p>
       )}
 
       {/* Week strip */}
