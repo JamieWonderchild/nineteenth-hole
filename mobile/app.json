@@ -2,7 +2,7 @@
   "expo": {
     "name": "The 19th Hole",
     "slug": "nineteenth-hole",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
@@ -12,7 +12,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "golf.the19thhole.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "The 19th Hole uses your location to find nearby golf courses.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "The 19th Hole uses your location to find nearby golf courses."
       },
       "entitlements": {
         "com.apple.developer.applesignin": ["Default"]

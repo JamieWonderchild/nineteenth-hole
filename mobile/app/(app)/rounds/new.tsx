@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { api } from "../../../lib/convex";
 import { Button, Input, Card, Badge } from "../../../components/ui";
 import { CoursePickerSheet, CourseSelection, CourseHole } from "../../../components/CoursePickerSheet";
+import { useDistanceUnit, DistanceUnit } from "../../../hooks/useDistanceUnit";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -147,6 +148,7 @@ function Step1Course({ onNext, initialCourseId }: {
   onNext: (data: Step1Data) => void;
   initialCourseId?: string;
 }) {
+  const { fmtTotal } = useDistanceUnit();
   const preloadedCourse = useQuery(
     api.golfCourses.getWithTees,
     initialCourseId ? { courseId: initialCourseId as any } : "skip"
@@ -201,7 +203,9 @@ function Step1Course({ onNext, initialCourseId }: {
           const ga = a.gender === "female" ? 1 : 0;
           const gb = b.gender === "female" ? 1 : 0;
           if (ga !== gb) return ga - gb;
-          return (b.totalYards ?? -1) - (a.totalYards ?? -1);
+          const ay = a.totalYards ?? (a.totalMeters ? Math.round(a.totalMeters / 0.9144) : -1);
+          const by = b.totalYards ?? (b.totalMeters ? Math.round(b.totalMeters / 0.9144) : -1);
+          return by - ay;
         })
       : [];
 
@@ -280,7 +284,7 @@ function Step1Course({ onNext, initialCourseId }: {
                             tee.courseRating ? `CR ${tee.courseRating}` : null,
                             tee.slopeRating ? `Slope ${tee.slopeRating}` : null,
                             tee.par ? `Par ${tee.par}` : null,
-                            tee.totalYards ? `${tee.totalYards} yds` : null,
+                            fmtTotal(tee.totalYards, tee.totalMeters),
                           ].filter(Boolean).join("  ·  ")}
                         </Text>
                       </View>
@@ -357,7 +361,7 @@ function Step1Course({ onNext, initialCourseId }: {
                     </Text>
                     <Text className="text-xs text-green-700">
                       {courseSelection.teeName} tees · Par {courseSelection.par}
-                      {courseSelection.totalYards ? ` · ${courseSelection.totalYards} yds` : ""}
+                      {fmtTotal(courseSelection.totalYards, courseSelection.totalMeters) ? ` · ${fmtTotal(courseSelection.totalYards, courseSelection.totalMeters)}` : ""}
                     </Text>
                   </View>
                   <TouchableOpacity onPress={() => setCourseSelection(null)} hitSlop={8}>
@@ -373,7 +377,7 @@ function Step1Course({ onNext, initialCourseId }: {
                   <View className="flex-1">
                     <Text className="text-sm text-gray-500">Search for a course</Text>
                     <Text className="text-xs text-gray-400 mt-0.5">
-                      2,000+ UK courses with ratings
+                      UK & SA courses with ratings
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
@@ -744,10 +748,14 @@ function Step3HoleScoring({
   initialScores,
   startHole,
   onNext,
+  distUnit,
+  fmtDist,
 }: {
   format: Format;
   handicap: number | null;
   holes?: CourseHole[];
+  distUnit?: DistanceUnit;
+  fmtDist?: (y?: number | null, m?: number | null) => string | null;
   roundId?: string;
   initialScores?: (number | null)[];
   startHole?: number;
@@ -945,9 +953,12 @@ function Step3HoleScoring({
       <View className="flex-1 items-center justify-center px-8 gap-6">
         <View className="items-center gap-1">
           <Text className="text-5xl font-bold text-gray-900">Hole {currentHole + 1}</Text>
-          <View className="flex-row gap-4 mt-1">
+          <View className="flex-row gap-4 mt-1 flex-wrap justify-center">
             <Text className="text-base text-gray-500">Par {par}</Text>
             <Text className="text-base text-gray-400">SI {si}</Text>
+            {fmtDist && holesProp?.[currentHole] && fmtDist(holesProp[currentHole].yards, holesProp[currentHole].meters) && (
+              <Text className="text-base text-gray-400">{fmtDist(holesProp[currentHole].yards, holesProp[currentHole].meters)}</Text>
+            )}
             {shotsReceived > 0 && (
               <Text className="text-base text-green-600 font-semibold">+{shotsReceived} shot{shotsReceived > 1 ? "s" : ""}</Text>
             )}
@@ -1139,6 +1150,7 @@ function Step4Review({
     format: Format;
     handicap: number | null;
     holeScores?: number[];
+    holePars?: number[];
     markerName?: string;
   };
   onSubmit: () => void;
@@ -1152,7 +1164,7 @@ function Step4Review({
   const stableford =
     summary.format === "stableford" && !isNaN(gross)
       ? summary.holeScores
-        ? computeStableford(summary.holeScores, STANDARD_PARS, playingHandicap)
+        ? computeStableford(summary.holeScores, summary.holePars ?? STANDARD_PARS, playingHandicap)
         : computeStablefordQuick(gross, coursePar, playingHandicap)
       : null;
 
@@ -1230,6 +1242,7 @@ export default function NewRoundScreen() {
   const { user } = useUser();
   const userId = user?.id ?? "";
   const { courseId } = useLocalSearchParams<{ courseId?: string }>();
+  const { unit: distUnit, fmt: fmtDist } = useDistanceUnit();
 
   const handicap = useQuery(
     api.handicap.getLatest,
@@ -1431,6 +1444,8 @@ export default function NewRoundScreen() {
             holes={step1Data?.holes}
             roundId={inProgressRoundId ?? undefined}
             onNext={handleStep3}
+            distUnit={distUnit}
+            fmtDist={fmtDist}
           />
         )}
         {step === 4 && <Step4Marker onNext={handleStep4} />}
@@ -1446,6 +1461,7 @@ export default function NewRoundScreen() {
               format: step2Data.format,
               handicap: handicap ?? null,
               holeScores: step3Data.holeScores,
+              holePars: step1Data.holes?.map(h => h.par),
               markerName: step4Data?.markerName,
             }}
             onSubmit={handleSubmit}

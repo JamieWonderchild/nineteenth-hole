@@ -29,6 +29,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAction, useQuery } from "convex/react";
 import { api } from "../lib/convex";
+import { useDistanceUnit } from "../hooks/useDistanceUnit";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,7 @@ export interface CourseSelection {
   slopeRating?: number;
   par: number;
   totalYards?: number;
+  totalMeters?: number;
   holes: CourseHole[];
 }
 
@@ -59,7 +61,7 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   onSelect: (selection: CourseSelection) => void;
-  /** Default country filter — defaults to "ENG" */
+  /** Optional country filter — omit to search all countries */
   country?: string;
 }
 
@@ -96,7 +98,8 @@ function TeeCircle({ colour }: { colour: string }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function CoursePickerSheet({ visible, onClose, onSelect, country = "ENG" }: Props) {
+export function CoursePickerSheet({ visible, onClose, onSelect, country }: Props) {
+  const { fmtTotal } = useDistanceUnit();
   const [rawQuery, setRawQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
@@ -161,6 +164,7 @@ export function CoursePickerSheet({ visible, onClose, onSelect, country = "ENG" 
       slopeRating: tee.slopeRating,
       par: tee.par,
       totalYards: tee.totalYards,
+      totalMeters: tee.totalMeters,
       holes: courseWithTees.clubCourseHoles ?? tee.holes ?? [],
     });
   }
@@ -357,8 +361,10 @@ export function CoursePickerSheet({ visible, onClose, onSelect, country = "ENG" 
                           {tee.par && (
                             <Text className="text-xs text-gray-500">Par {tee.par}</Text>
                           )}
-                          {tee.totalYards && (
-                            <Text className="text-xs text-gray-500">{tee.totalYards} yds</Text>
+                          {fmtTotal(tee.totalYards, tee.totalMeters) && (
+                            <Text className="text-xs text-gray-500">
+                              {fmtTotal(tee.totalYards, tee.totalMeters)}
+                            </Text>
                           )}
                           {tee.courseRating && (
                             <Text className="text-xs text-gray-500">
