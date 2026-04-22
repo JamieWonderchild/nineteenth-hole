@@ -37,6 +37,14 @@ function teeDotStyle(colour: string): React.CSSProperties {
   };
 }
 
+type TeeHole = {
+  number: number;
+  par: number;
+  strokeIndex: number;
+  yards?: number;
+  meters?: number;
+};
+
 type Tee = {
   _id: string;
   name: string;
@@ -46,6 +54,8 @@ type Tee = {
   courseRating?: number;
   slopeRating?: number;
   totalYards?: number;
+  totalMeters?: number;
+  holes: TeeHole[];
 };
 
 type CourseWithTees = {
@@ -64,6 +74,119 @@ type CourseWithTees = {
   phone?: string;
   tees: Tee[];
 };
+
+function CourseCard({ tees }: { tees: Tee[] }) {
+  const teesWithHoles = tees.filter(t => t.holes?.length > 0);
+  const [selectedTeeId, setSelectedTeeId] = useState<string>(teesWithHoles[0]?._id ?? "");
+
+  if (teesWithHoles.length === 0) return null;
+
+  const tee = teesWithHoles.find(t => t._id === selectedTeeId) ?? teesWithHoles[0];
+  const holes = [...tee.holes].sort((a, b) => a.number - b.number);
+  const front = holes.slice(0, 9);
+  const back = holes.slice(9, 18);
+
+  const frontPar = front.reduce((s, h) => s + h.par, 0);
+  const backPar = back.reduce((s, h) => s + h.par, 0);
+  const frontYards = front.reduce((s, h) => s + (h.yards ?? 0), 0);
+  const backYards = back.reduce((s, h) => s + (h.yards ?? 0), 0);
+  const frontMeters = front.reduce((s, h) => s + (h.meters ?? 0), 0);
+  const backMeters = back.reduce((s, h) => s + (h.meters ?? 0), 0);
+  const hasYards = holes.some(h => h.yards);
+  const hasMeters = holes.some(h => h.meters);
+
+  const thCls = "px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wide";
+  const tdCls = "px-2 py-2 text-center text-sm text-gray-700 tabular-nums";
+  const totalCls = "px-2 py-2 text-center text-sm font-semibold text-gray-900 bg-gray-50 tabular-nums";
+
+  function HoleRow({ label, nineHoles, nineTotal }: { label: string; nineHoles: (string | number)[]; nineTotal: string | number }) {
+    return (
+      <tr className="border-t border-gray-100">
+        <td className="px-2 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">{label}</td>
+        {nineHoles.map((val, i) => (
+          <td key={i} className={tdCls}>{val || "—"}</td>
+        ))}
+        <td className={totalCls}>{nineTotal || "—"}</td>
+      </tr>
+    );
+  }
+
+  function HalfCard({ halfHoles, halfPar, halfYards, halfMeters }: {
+    halfHoles: TeeHole[];
+    halfPar: number;
+    halfYards: number;
+    halfMeters: number;
+  }) {
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-gray-50">
+              <th className={`${thCls} text-left w-16`}>Hole</th>
+              {halfHoles.map(h => (
+                <th key={h.number} className={thCls}>{h.number}</th>
+              ))}
+              <th className={thCls}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <HoleRow
+              label="Par"
+              nineHoles={halfHoles.map(h => h.par)}
+              nineTotal={halfPar}
+            />
+            <HoleRow
+              label="SI"
+              nineHoles={halfHoles.map(h => h.strokeIndex)}
+              nineTotal=""
+            />
+            {hasYards && (
+              <HoleRow
+                label="Yards"
+                nineHoles={halfHoles.map(h => h.yards ?? "")}
+                nineTotal={halfYards || ""}
+              />
+            )}
+            {hasMeters && (
+              <HoleRow
+                label="Metres"
+                nineHoles={halfHoles.map(h => h.meters ?? "")}
+                nineTotal={halfMeters || ""}
+              />
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardTitle className="text-base">Course Card</CardTitle>
+        <select
+          value={selectedTeeId}
+          onChange={e => setSelectedTeeId(e.target.value)}
+          className="rounded-md border border-input bg-background px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {teesWithHoles.map(t => (
+            <option key={t._id} value={t._id}>
+              {t.name} ({t.gender === "female" ? "F" : "M"})
+            </option>
+          ))}
+        </select>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-0">
+        {front.length > 0 && (
+          <HalfCard halfHoles={front} halfPar={frontPar} halfYards={frontYards} halfMeters={frontMeters} />
+        )}
+        {back.length > 0 && (
+          <HalfCard halfHoles={back} halfPar={backPar} halfYards={backYards} halfMeters={backMeters} />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function HandicapCalculator({ tees, coursePar }: { tees: Tee[]; coursePar?: number }) {
   const [handicapIndex, setHandicapIndex] = useState<string>("");
@@ -281,6 +404,9 @@ export default function CourseDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Course Card (scorecard) */}
+      <CourseCard tees={sortedTees} />
 
       {/* Handicap Calculator */}
       <HandicapCalculator tees={sortedTees} coursePar={displayPar} />
