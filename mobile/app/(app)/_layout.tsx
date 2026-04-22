@@ -214,6 +214,7 @@ export default function AppLayout() {
   const isClubMember = myClubs === undefined || myClubs.length > 0;
 
   return (
+    <>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: "#16a34a",
@@ -352,5 +353,6 @@ export default function AppLayout() {
       onLogRound={() => { setShowActionSheet(false); router.push("/(app)/rounds/new" as any); }}
       onQuickGame={() => { setShowActionSheet(false); router.push("/(app)/play/games/new" as any); }}
     />
+    </>
   );
 }
