@@ -88,18 +88,32 @@ function BookForMemberForm({ slotId, clubId, available, onDone }: {
   slotId: Id<"teeTimeSlots">; clubId: Id<"clubs">; available: number; onDone: () => void;
 }) {
   const bookForMember = useMutation(api.teeTimes.bookForMember);
-  const [name, setName] = useState("");
+  const members = useQuery(api.clubMembers.listByClub, { clubId });
+  const [search, setSearch] = useState("");
+  const [selectedName, setSelectedName] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
   const [playerCount, setPlayerCount] = useState(1);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const filtered = search.length >= 1
+    ? (members ?? []).filter(m => m.displayName.toLowerCase().includes(search.toLowerCase())).slice(0, 8)
+    : [];
+
+  function selectMember(name: string) {
+    setSelectedName(name);
+    setSearch(name);
+    setShowDropdown(false);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
+    const displayName = selectedName || search.trim();
+    if (!displayName) return;
     setLoading(true); setError(null);
     try {
-      await bookForMember({ slotId, clubId, displayName: name.trim(), playerCount, notes: notes.trim() || undefined });
+      await bookForMember({ slotId, clubId, displayName, playerCount, notes: notes.trim() || undefined });
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -109,10 +123,33 @@ function BookForMemberForm({ slotId, clubId, available, onDone }: {
 
   return (
     <form onSubmit={handleSubmit} className="mt-2 flex flex-wrap items-end gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2.5">
-      <div>
-        <label className="block text-[10px] font-medium text-gray-500 mb-1">Name</label>
-        <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Member name" required autoFocus
-          className="border border-gray-300 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white w-36" />
+      <div className="relative">
+        <label className="block text-[10px] font-medium text-gray-500 mb-1">Member</label>
+        <input
+          type="text"
+          value={search}
+          onChange={e => { setSearch(e.target.value); setSelectedName(""); setShowDropdown(true); }}
+          onFocus={() => setShowDropdown(true)}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+          placeholder="Search member…"
+          autoFocus
+          autoComplete="off"
+          className="border border-gray-300 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white w-44"
+        />
+        {showDropdown && filtered.length > 0 && (
+          <div className="absolute z-10 top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+            {filtered.map(m => (
+              <button
+                key={m._id}
+                type="button"
+                onMouseDown={() => selectMember(m.displayName)}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 text-gray-900"
+              >
+                {m.displayName}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div>
         <label className="block text-[10px] font-medium text-gray-500 mb-1">Players</label>
