@@ -104,6 +104,7 @@ export function CoursePickerSheet({ visible, onClose, onSelect, country }: Props
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [fetchingDetail, setFetchingDetail] = useState(false);
+  const [showAllTees, setShowAllTees] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ensureDetail = useAction(api.golfCourses.ensureDetail);
 
@@ -133,6 +134,7 @@ export function CoursePickerSheet({ visible, onClose, onSelect, country }: Props
       setDebouncedQuery("");
       setSelectedCourseId(null);
       setFetchingDetail(false);
+      setShowAllTees(false);
     }
   }, [visible]);
 
@@ -328,55 +330,81 @@ export function CoursePickerSheet({ visible, onClose, onSelect, country }: Props
                   </View>
                 )}
 
-                <FlatList
-                  data={courseWithTees.tees}
-                  keyExtractor={(item: any) => item._id}
-                  ListHeaderComponent={
-                    courseWithTees.tees.length > 0 ? (
-                      <Text className="px-4 pt-4 pb-2 text-xs font-medium text-gray-500 uppercase tracking-wide">
-                        Select tees
-                      </Text>
-                    ) : null
-                  }
-                  renderItem={({ item: tee }: { item: any }) => (
+                {courseWithTees.tees.length > 0 && (() => {
+                  const allTees: any[] = courseWithTees.tees;
+
+                  // Pick the "back" men's tee (highest CR among male/both)
+                  const mensTees = allTees.filter((t: any) => t.gender === "male" || t.gender === "both");
+                  const backTee = mensTees.sort((a: any, b: any) =>
+                    (b.courseRating ?? b.totalYards ?? 0) - (a.courseRating ?? a.totalYards ?? 0)
+                  )[0];
+
+                  // Pick the ladies' / forward tee (highest CR among female, fallback to lowest CR)
+                  const ladiesTees = allTees.filter((t: any) => t.gender === "female");
+                  const forwardTee = ladiesTees.length > 0
+                    ? ladiesTees.sort((a: any, b: any) => (b.courseRating ?? 0) - (a.courseRating ?? 0))[0]
+                    : allTees.sort((a: any, b: any) => (a.courseRating ?? a.totalYards ?? 99) - (b.courseRating ?? b.totalYards ?? 99))[0];
+
+                  const featuredIds = [backTee?._id, forwardTee?._id].filter(Boolean);
+                  const remainingCount = allTees.filter((t: any) => !featuredIds.includes(t._id)).length;
+                  const visibleTees = showAllTees ? allTees : allTees.filter((t: any) => featuredIds.includes(t._id));
+
+                  const TeeRow = ({ tee }: { tee: any }) => (
                     <TouchableOpacity
                       onPress={() => handleSelectTee(tee)}
-                      className="flex-row items-center px-4 py-4 border-b border-gray-50"
+                      style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "#f9fafb" }}
                     >
                       <TeeCircle colour={tee.colour} />
-                      <View className="flex-1 ml-3">
-                        <View className="flex-row items-center gap-2">
-                          <Text className="text-sm font-semibold text-gray-900">
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                          <Text style={{ fontSize: 14, fontWeight: "600", color: "#111827" }}>
                             {tee.name}
                           </Text>
-                          {tee.gender !== "both" && (
-                            <View className="bg-gray-100 rounded-full px-2 py-0.5">
-                              <Text className="text-xs text-gray-500 capitalize">
-                                {tee.gender}
-                              </Text>
+                          {tee._id === backTee?._id && !showAllTees && (
+                            <View style={{ backgroundColor: "#dcfce7", borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 }}>
+                              <Text style={{ fontSize: 11, color: "#16a34a", fontWeight: "600" }}>Men's</Text>
+                            </View>
+                          )}
+                          {tee._id === forwardTee?._id && !showAllTees && (
+                            <View style={{ backgroundColor: "#fef9c3", borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 }}>
+                              <Text style={{ fontSize: 11, color: "#854d0e", fontWeight: "600" }}>Forward</Text>
                             </View>
                           )}
                         </View>
-                        <View className="flex-row gap-3 mt-1">
-                          {tee.par && (
-                            <Text className="text-xs text-gray-500">Par {tee.par}</Text>
-                          )}
+                        <View style={{ flexDirection: "row", gap: 12, marginTop: 3 }}>
+                          {tee.par && <Text style={{ fontSize: 12, color: "#6b7280" }}>Par {tee.par}</Text>}
                           {fmtTotal(tee.totalYards, tee.totalMeters) && (
-                            <Text className="text-xs text-gray-500">
-                              {fmtTotal(tee.totalYards, tee.totalMeters)}
-                            </Text>
+                            <Text style={{ fontSize: 12, color: "#6b7280" }}>{fmtTotal(tee.totalYards, tee.totalMeters)}</Text>
                           )}
                           {tee.courseRating && (
-                            <Text className="text-xs text-gray-500">
-                              CR {tee.courseRating} / S {tee.slopeRating}
-                            </Text>
+                            <Text style={{ fontSize: 12, color: "#6b7280" }}>CR {tee.courseRating} / S {tee.slopeRating}</Text>
                           )}
                         </View>
                       </View>
                       <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
                     </TouchableOpacity>
-                  )}
-                />
+                  );
+
+                  return (
+                    <>
+                      <Text style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, fontSize: 11, fontWeight: "500", color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        Select tees
+                      </Text>
+                      {visibleTees.map((tee: any) => <TeeRow key={tee._id} tee={tee} />)}
+                      {!showAllTees && remainingCount > 0 && (
+                        <TouchableOpacity
+                          onPress={() => setShowAllTees(true)}
+                          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 14, gap: 6 }}
+                        >
+                          <Text style={{ fontSize: 13, color: "#16a34a", fontWeight: "600" }}>
+                            More tees ({remainingCount})
+                          </Text>
+                          <Ionicons name="chevron-down" size={14} color="#16a34a" />
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  );
+                })()}
               </>
             )}
           </View>

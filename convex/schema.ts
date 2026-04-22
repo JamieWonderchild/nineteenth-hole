@@ -305,6 +305,10 @@ export default defineSchema({
     .searchIndex("search_name", {
       searchField: "name",
       filterFields: ["country", "county"],
+    })
+    .searchIndex("search_venue_name", {
+      searchField: "venueName",
+      filterFields: ["country", "county"],
     }),
 
   // One row per tee set — the atomic unit for WHS calculations and scoring

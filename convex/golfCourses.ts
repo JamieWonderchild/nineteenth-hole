@@ -20,7 +20,10 @@ export const search = query({
   },
   handler: async (ctx, { query: q, country, county, limit }) => {
     if (!q.trim()) return [];
-    return ctx.db
+    const cap = limit ?? 20;
+
+    // Search by course name
+    const byName = await ctx.db
       .query("golfCourses")
       .withSearchIndex("search_name", s => {
         let search = s.search("name", q);
@@ -28,7 +31,29 @@ export const search = query({
         if (county) search = search.eq("county", county);
         return search;
       })
-      .take(limit ?? 20);
+      .take(cap);
+
+    // Also search venue name (catches multi-course clubs like Fancourt)
+    const byVenue = await ctx.db
+      .query("golfCourses")
+      .withSearchIndex("search_venue_name", s => {
+        let search = s.search("venueName", q);
+        if (country) search = search.eq("country", country);
+        if (county) search = search.eq("county", county);
+        return search;
+      })
+      .take(cap);
+
+    // Merge, deduplicate, return up to cap
+    const seen = new Set<string>();
+    const merged = [];
+    for (const c of [...byName, ...byVenue]) {
+      if (!seen.has(c._id)) {
+        seen.add(c._id);
+        merged.push(c);
+      }
+    }
+    return merged.slice(0, cap);
   },
 });
 
