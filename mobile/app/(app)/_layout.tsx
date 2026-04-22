@@ -33,7 +33,7 @@ async function registerForPushNotifications(): Promise<string | null> {
     }
     if (finalStatus !== "granted") return null;
     const token = await Notifications.getExpoPushTokenAsync({
-      projectId: "your-eas-project-id",
+      projectId: "064fd2c1-f2d3-492d-9e1f-64d2b19a4892",
     });
     return token.data;
   } catch {
@@ -87,7 +87,7 @@ export default function AppLayout() {
     return <Redirect href="/(app)/onboarding" />;
   }
 
-  const isClubMember = myClubs !== undefined && myClubs.length > 0;
+  const isClubMember = !!myClubs && myClubs.length > 0;
 
   return (
     <Tabs
@@ -192,7 +192,6 @@ export default function AppLayout() {
         options={{
           href: null,
           headerShown: false,
-          tabBarButton: () => null,
         }}
       />
       <Tabs.Screen
@@ -200,7 +199,6 @@ export default function AppLayout() {
         options={{
           href: null,
           headerShown: false,
-          tabBarButton: () => null,
         }}
       />
     </Tabs>
