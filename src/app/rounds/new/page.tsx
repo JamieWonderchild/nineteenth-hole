@@ -49,6 +49,7 @@ export default function WebNewRoundPage() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<CourseWithTees | null>(null);
   const [selectedTee, setSelectedTee] = useState<Tee | null>(null);
+  const [showAllTees, setShowAllTees] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query), 300);
@@ -212,37 +213,68 @@ export default function WebNewRoundPage() {
                 <Label className="text-sm font-medium text-gray-700">Select Tee</Label>
                 {tees.length === 0 ? (
                   <p className="text-sm text-gray-400">Loading tee data…</p>
-                ) : (
-                  <div className="border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
-                    {tees.map(tee => (
-                      <button
-                        key={tee._id}
-                        type="button"
-                        onClick={() => setSelectedTee(tee)}
-                        className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors ${
-                          selectedTee?._id === tee._id ? "bg-green-50" : ""
-                        }`}
-                      >
-                        <TeeDot colour={tee.colour} />
-                        <div className="flex-1">
-                          <span className="text-sm font-medium text-gray-900">{tee.name}</span>
-                          <span className="text-xs text-gray-400 ml-2 capitalize">{tee.gender}</span>
-                          <div className="text-xs text-gray-400 mt-0.5">
-                            {[
-                              tee.courseRating ? `CR ${tee.courseRating}` : null,
-                              tee.slopeRating ? `Slope ${tee.slopeRating}` : null,
-                              `Par ${tee.par}`,
-                              tee.totalYards ? `${tee.totalYards} yds` : null,
-                            ].filter(Boolean).join(" · ")}
+                ) : (() => {
+                  // Back tee: highest-rated male/both
+                  const mensTees = tees.filter(t => t.gender === "male" || t.gender === "both");
+                  const backTee = [...mensTees].sort((a, b) =>
+                    (b.courseRating ?? b.totalYards ?? 0) - (a.courseRating ?? a.totalYards ?? 0)
+                  )[0];
+                  // Forward tee: best ladies', or shortest overall
+                  const ladiesTees = tees.filter(t => t.gender === "female");
+                  const forwardTee = ladiesTees.length > 0
+                    ? [...ladiesTees].sort((a, b) => (b.courseRating ?? 0) - (a.courseRating ?? 0))[0]
+                    : [...tees].sort((a, b) => (a.courseRating ?? a.totalYards ?? 99) - (b.courseRating ?? b.totalYards ?? 99))[0];
+                  const featuredIds = [backTee?._id, forwardTee?._id].filter(Boolean);
+                  const remaining = tees.filter(t => !featuredIds.includes(t._id));
+                  const visibleTees = showAllTees ? tees : tees.filter(t => featuredIds.includes(t._id));
+                  return (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
+                      {visibleTees.map(tee => (
+                        <button
+                          key={tee._id}
+                          type="button"
+                          onClick={() => setSelectedTee(tee)}
+                          className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors ${
+                            selectedTee?._id === tee._id ? "bg-green-50" : ""
+                          }`}
+                        >
+                          <TeeDot colour={tee.colour} />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-900">{tee.name}</span>
+                              {!showAllTees && tee._id === backTee?._id && (
+                                <span className="text-xs bg-green-100 text-green-700 font-medium px-1.5 py-0.5 rounded-full">Men's</span>
+                              )}
+                              {!showAllTees && tee._id === forwardTee?._id && (
+                                <span className="text-xs bg-yellow-100 text-yellow-800 font-medium px-1.5 py-0.5 rounded-full">Forward</span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              {[
+                                tee.courseRating ? `CR ${tee.courseRating}` : null,
+                                tee.slopeRating ? `Slope ${tee.slopeRating}` : null,
+                                `Par ${tee.par}`,
+                                tee.totalYards ? `${tee.totalYards} yds` : null,
+                              ].filter(Boolean).join(" · ")}
+                            </div>
                           </div>
-                        </div>
-                        {selectedTee?._id === tee._id && (
-                          <Check size={16} className="text-green-600 shrink-0" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                          {selectedTee?._id === tee._id && (
+                            <Check size={16} className="text-green-600 shrink-0" />
+                          )}
+                        </button>
+                      ))}
+                      {!showAllTees && remaining.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAllTees(true)}
+                          className="w-full text-center px-4 py-2.5 text-sm text-green-700 hover:bg-gray-50 font-medium"
+                        >
+                          More tees ({remaining.length}) ↓
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </CardContent>
