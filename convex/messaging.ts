@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
 // ============================================================================
@@ -289,6 +290,24 @@ export const sendMessage = mutation({
 
     // Auto-mark as read for sender
     await ctx.db.patch(membership._id, { lastReadAt: now });
+
+    // Push notification to all other members
+    const allMembers = await ctx.db
+      .query("conversationMembers")
+      .withIndex("by_conversation", q => q.eq("conversationId", args.conversationId))
+      .collect();
+
+    for (const member of allMembers) {
+      if (member.userId === args.senderId) continue;
+      await ctx.scheduler.runAfter(0, internal.pushNotifications.sendToUser, {
+        userId: member.userId,
+        title: args.senderName,
+        body: args.body.trim().length > 100
+          ? args.body.trim().slice(0, 97) + "…"
+          : args.body.trim(),
+        data: { type: "message", conversationId: args.conversationId },
+      });
+    }
   },
 });
 

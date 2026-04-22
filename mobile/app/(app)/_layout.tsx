@@ -1,9 +1,9 @@
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Redirect, Tabs, useSegments, useRouter } from "expo-router";
-import { View, ActivityIndicator, Platform, TouchableOpacity, Modal, Text, Pressable } from "react-native";
+import { View, ActivityIndicator, Platform, TouchableOpacity, Modal, Text, Pressable, AppState } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "convex/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api } from "../../lib/convex";
 
 // expo-notifications requires a compiled native module — load lazily so a
@@ -147,7 +147,39 @@ export default function AppLayout() {
   );
 
   const inProgressRound = useQuery(api.rounds.getInProgress);
+  const unreadCount = useQuery(
+    api.messaging.totalUnread,
+    user?.id ? { userId: user.id } : "skip"
+  );
   const savePushToken = useMutation(api.pushNotifications.saveToken);
+
+  // Re-subscribe to Convex when app returns to foreground after lock/background
+  const appState = useRef(AppState.currentState);
+  const [, forceRefresh] = useState(0);
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (appState.current.match(/inactive|background/) && next === "active") {
+        forceRefresh(n => n + 1);
+      }
+      appState.current = next;
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Deep-link from notification tap → navigate to the right screen
+  useEffect(() => {
+    if (!Notifications) return;
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as any;
+      if (!data?.type) return;
+      if (data.type === "message" && data.conversationId) {
+        router.push(`/(app)/club/messages/${data.conversationId}` as any);
+      } else if (data.type === "attestation" || data.type === "attestation_result") {
+        router.push("/(app)/rounds" as any);
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (!user || profile === undefined || profile === null) return;
@@ -271,7 +303,21 @@ export default function AppLayout() {
           title: "Club",
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people-outline" size={size} color={color} />
+            <View>
+              <Ionicons name="people-outline" size={size} color={color} />
+              {!!unreadCount && unreadCount > 0 && (
+                <View style={{
+                  position: "absolute", top: -4, right: -8,
+                  backgroundColor: "#dc2626", borderRadius: 8,
+                  minWidth: 16, height: 16, paddingHorizontal: 3,
+                  alignItems: "center", justifyContent: "center",
+                }}>
+                  <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>
+                    {unreadCount > 99 ? "99+" : String(unreadCount)}
+                  </Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />
