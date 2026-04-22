@@ -1,6 +1,6 @@
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Redirect, Tabs, useSegments, useRouter } from "expo-router";
-import { View, ActivityIndicator, Platform, TouchableOpacity, Modal, Text, Pressable, AppState, Animated } from "react-native";
+import { View, ActivityIndicator, Platform, TouchableOpacity, Modal, Text, Pressable, AppState, Animated, Dimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "convex/react";
 import { useEffect, useState, useRef } from "react";
@@ -41,6 +41,19 @@ async function registerForPushNotifications(): Promise<string | null> {
   }
 }
 
+const SCREEN_W = Dimensions.get("window").width;
+const BTN_SIZE = 56;
+// Approximate center of the "+" button from screen bottom
+const FAB_CENTER_BOTTOM = Platform.OS === "ios" ? 44 : 36;
+// Radial spread: 45° from vertical, radius 90px
+const RAD_R = 90;
+const RAD_DX = Math.round(RAD_R * Math.sin(Math.PI / 4)); // ≈ 64
+const RAD_DY = Math.round(RAD_R * Math.cos(Math.PI / 4)); // ≈ 64
+// Static start: container bottom edge so circle center aligns with "+"
+const BTN_START_BOTTOM = FAB_CENTER_BOTTOM - BTN_SIZE / 2;
+// Horizontally centered
+const BTN_START_LEFT = SCREEN_W / 2 - BTN_SIZE / 2;
+
 function FABMenu({
   visible,
   btn1Anim,
@@ -56,97 +69,93 @@ function FABMenu({
   onLogRound: () => void;
   onQuickGame: () => void;
 }) {
-  const btn1TranslateY = btn1Anim.interpolate({ inputRange: [0, 1], outputRange: [60, 0] });
-  const btn1Scale = btn1Anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] });
-  const btn2TranslateY = btn2Anim.interpolate({ inputRange: [0, 1], outputRange: [120, 0] });
-  const btn2Scale = btn2Anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] });
+  // Log a Round — springs upper-left at 45°
+  const btn1TX = btn1Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -RAD_DX] });
+  const btn1TY = btn1Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -RAD_DY] });
+  const btn1Scale = btn1Anim.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] });
 
-  const tabBarBottom = Platform.OS === "ios" ? 88 : 64;
+  // Quick Game — springs upper-right at 45°
+  const btn2TX = btn2Anim.interpolate({ inputRange: [0, 1], outputRange: [0, RAD_DX] });
+  const btn2TY = btn2Anim.interpolate({ inputRange: [0, 1], outputRange: [0, -RAD_DY] });
+  const btn2Scale = btn2Anim.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] });
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      {/* Backdrop — tap to close */}
+      {/* Backdrop — tap anywhere outside buttons to close */}
       <Pressable
-        style={{
-          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.45)",
-        }}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.45)" }}
         onPress={onClose}
       />
 
-      {/* Action buttons — inner Pressable stops touch propagation to backdrop */}
-      <Pressable
-        onPress={() => {}}
+      {/* Log a Round — upper-left of "+" */}
+      <Animated.View
         style={{
           position: "absolute",
-          bottom: tabBarBottom + 16,
-          right: 20,
+          bottom: BTN_START_BOTTOM,
+          left: BTN_START_LEFT,
+          width: BTN_SIZE,
+          alignItems: "center",
+          overflow: "visible",
+          transform: [{ translateX: btn1TX }, { translateY: btn1TY }, { scale: btn1Scale }],
+          opacity: btn1Anim,
         }}
       >
-        <View style={{ alignItems: "flex-end", gap: 16 }}>
-          {/* Quick Game (further from +, animates second) */}
-          <Animated.View style={{
-            transform: [{ translateY: btn2TranslateY }, { scale: btn2Scale }],
-            opacity: btn2Anim,
-          }}>
-            <TouchableOpacity
-              onPress={onQuickGame}
-              activeOpacity={0.8}
-              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
-            >
-              <View style={{
-                backgroundColor: "rgba(255,255,255,0.95)",
-                paddingHorizontal: 14, paddingVertical: 7,
-                borderRadius: 20,
-                shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.15, shadowRadius: 3, elevation: 3,
-              }}>
-                <Text style={{ color: "#111827", fontWeight: "600", fontSize: 14 }}>Quick Game</Text>
-              </View>
-              <View style={{
-                width: 52, height: 52, borderRadius: 26,
-                backgroundColor: "#fef3c7",
-                alignItems: "center", justifyContent: "center",
-                shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.18, shadowRadius: 5, elevation: 4,
-              }}>
-                <Ionicons name="flash" size={22} color="#d97706" />
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
+        <TouchableOpacity
+          onPress={onLogRound}
+          activeOpacity={0.85}
+          style={{
+            width: BTN_SIZE, height: BTN_SIZE, borderRadius: BTN_SIZE / 2,
+            backgroundColor: "#16a34a",
+            alignItems: "center", justifyContent: "center",
+            shadowColor: "#16a34a", shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.45, shadowRadius: 10, elevation: 6,
+          }}
+        >
+          <Ionicons name="golf" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={{
+          color: "#fff", fontSize: 11, fontWeight: "700", marginTop: 6,
+          textAlign: "center", width: 80, marginLeft: -12,
+          textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+        }}>
+          Log a Round
+        </Text>
+      </Animated.View>
 
-          {/* Log a Round (closer to +, animates first) */}
-          <Animated.View style={{
-            transform: [{ translateY: btn1TranslateY }, { scale: btn1Scale }],
-            opacity: btn1Anim,
-          }}>
-            <TouchableOpacity
-              onPress={onLogRound}
-              activeOpacity={0.8}
-              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
-            >
-              <View style={{
-                backgroundColor: "rgba(255,255,255,0.95)",
-                paddingHorizontal: 14, paddingVertical: 7,
-                borderRadius: 20,
-                shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.15, shadowRadius: 3, elevation: 3,
-              }}>
-                <Text style={{ color: "#111827", fontWeight: "600", fontSize: 14 }}>Log a Round</Text>
-              </View>
-              <View style={{
-                width: 52, height: 52, borderRadius: 26,
-                backgroundColor: "#16a34a",
-                alignItems: "center", justifyContent: "center",
-                shadowColor: "#16a34a", shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.4, shadowRadius: 10, elevation: 6,
-              }}>
-                <Ionicons name="golf" size={22} color="#fff" />
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-      </Pressable>
+      {/* Quick Game — upper-right of "+" */}
+      <Animated.View
+        style={{
+          position: "absolute",
+          bottom: BTN_START_BOTTOM,
+          left: BTN_START_LEFT,
+          width: BTN_SIZE,
+          alignItems: "center",
+          overflow: "visible",
+          transform: [{ translateX: btn2TX }, { translateY: btn2TY }, { scale: btn2Scale }],
+          opacity: btn2Anim,
+        }}
+      >
+        <TouchableOpacity
+          onPress={onQuickGame}
+          activeOpacity={0.85}
+          style={{
+            width: BTN_SIZE, height: BTN_SIZE, borderRadius: BTN_SIZE / 2,
+            backgroundColor: "#fef3c7",
+            alignItems: "center", justifyContent: "center",
+            shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.2, shadowRadius: 6, elevation: 4,
+          }}
+        >
+          <Ionicons name="flash" size={24} color="#d97706" />
+        </TouchableOpacity>
+        <Text style={{
+          color: "#fff", fontSize: 11, fontWeight: "700", marginTop: 6,
+          textAlign: "center", width: 80, marginLeft: -12,
+          textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+        }}>
+          Quick Game
+        </Text>
+      </Animated.View>
     </Modal>
   );
 }
