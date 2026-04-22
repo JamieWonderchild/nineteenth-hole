@@ -1,9 +1,9 @@
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Redirect, Tabs, useSegments, useRouter } from "expo-router";
-import { View, ActivityIndicator, Platform, TouchableOpacity } from "react-native";
+import { View, ActivityIndicator, Platform, TouchableOpacity, Modal, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "convex/react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../lib/convex";
 
 // expo-notifications requires a compiled native module — load lazily so a
@@ -41,11 +41,100 @@ async function registerForPushNotifications(): Promise<string | null> {
   }
 }
 
+function ActionSheet({
+  visible,
+  onClose,
+  onLogRound,
+  onQuickGame,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onLogRound: () => void;
+  onQuickGame: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable
+        style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+        onPress={onClose}
+      >
+        <Pressable onPress={() => {}}>
+          <View style={{
+            backgroundColor: "#fff",
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            paddingTop: 8,
+            paddingBottom: Platform.OS === "ios" ? 36 : 20,
+            paddingHorizontal: 16,
+          }}>
+            {/* Drag handle */}
+            <View style={{ width: 36, height: 4, backgroundColor: "#e5e7eb", borderRadius: 2, alignSelf: "center", marginBottom: 20 }} />
+
+            {/* Log a Round */}
+            <TouchableOpacity
+              onPress={onLogRound}
+              activeOpacity={0.85}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#16a34a",
+                borderRadius: 16,
+                padding: 18,
+                marginBottom: 10,
+                gap: 14,
+              }}
+            >
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="golf" size={22} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>Log a Round</Text>
+                <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 13, marginTop: 2 }}>
+                  Track your score · counts toward handicap
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.6)" />
+            </TouchableOpacity>
+
+            {/* Quick Game */}
+            <TouchableOpacity
+              onPress={onQuickGame}
+              activeOpacity={0.85}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#f9fafb",
+                borderWidth: 1,
+                borderColor: "#e5e7eb",
+                borderRadius: 16,
+                padding: 18,
+                gap: 14,
+              }}
+            >
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "#fef3c7", alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="flash" size={22} color="#d97706" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: "#111827", fontWeight: "700", fontSize: 16 }}>Quick Game</Text>
+                <Text style={{ color: "#6b7280", fontSize: 13, marginTop: 2 }}>
+                  Skins · Nassau · Stableford with friends
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 export default function AppLayout() {
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const segments = useSegments();
   const router = useRouter();
+  const [showActionSheet, setShowActionSheet] = useState(false);
 
   const profile = useQuery(
     api.golferProfiles.get,
@@ -149,7 +238,7 @@ export default function AppLayout() {
                 if (inProgressRound) {
                   router.push(`/(app)/rounds/score?roundId=${inProgressRound._id}` as any);
                 } else {
-                  router.push("/(app)/rounds/new" as any);
+                  setShowActionSheet(true);
                 }
               }}
             >
@@ -211,5 +300,11 @@ export default function AppLayout() {
         }}
       />
     </Tabs>
+    <ActionSheet
+      visible={showActionSheet}
+      onClose={() => setShowActionSheet(false)}
+      onLogRound={() => { setShowActionSheet(false); router.push("/(app)/rounds/new" as any); }}
+      onQuickGame={() => { setShowActionSheet(false); router.push("/(app)/play/games/new" as any); }}
+    />
   );
 }

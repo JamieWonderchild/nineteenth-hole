@@ -271,38 +271,6 @@ function ClubMemberHome({
       {/* In-progress round */}
       <InProgressRoundBanner router={router} />
 
-      {/* Quick Game */}
-      <View className="px-5 mt-5 mb-5">
-        <TouchableOpacity
-          onPress={() => router.push("/(app)/play/games/new")}
-          activeOpacity={0.85}
-          className="flex-row items-center gap-3.5 bg-white rounded-2xl p-4 border border-gray-100"
-          style={{
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.07,
-            shadowRadius: 8,
-            elevation: 2,
-          }}
-        >
-          <View className="w-12 h-12 rounded-full bg-green-600 items-center justify-center"
-            style={{
-              shadowColor: "#16a34a",
-              shadowOffset: { width: 0, height: 3 },
-              shadowOpacity: 0.4,
-              shadowRadius: 6,
-            }}
-          >
-            <Ionicons name="play" size={20} color="#fff" />
-          </View>
-          <View className="flex-1">
-            <Text className="text-gray-900 font-bold text-base">Start a Quick Game</Text>
-            <Text className="text-gray-400 text-xs mt-0.5">Skins, Stableford, Nassau & more</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
-        </TouchableOpacity>
-      </View>
-
       {/* Pending attestation requests */}
       <PendingAttestationsCard router={router} />
 
@@ -700,31 +668,6 @@ function IndividualHome({
             ))}
           </>
         )}
-      </View>
-
-      {/* Quick Games — secondary */}
-      <View className="px-5 mb-4">
-        <TouchableOpacity
-          onPress={() => router.push("/(app)/play/games/new" as any)}
-          activeOpacity={0.85}
-          className="flex-row items-center gap-3 bg-white rounded-2xl p-4 border border-gray-100"
-          style={{
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.06,
-            shadowRadius: 6,
-            elevation: 2,
-          }}
-        >
-          <View className="w-10 h-10 rounded-full bg-amber-50 items-center justify-center">
-            <Ionicons name="flash-outline" size={20} color="#d97706" />
-          </View>
-          <View className="flex-1">
-            <Text className="font-semibold text-gray-900 text-sm">Quick Games</Text>
-            <Text className="text-xs text-gray-400 mt-0.5">Skins · Stableford · Nassau · more</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
-        </TouchableOpacity>
       </View>
 
       {/* Club upsell */}
