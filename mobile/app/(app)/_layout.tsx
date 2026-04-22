@@ -57,6 +57,7 @@ export default function AppLayout() {
     isSignedIn ? {} : "skip"
   );
 
+  const inProgressRound = useQuery(api.rounds.getInProgress);
   const savePushToken = useMutation(api.pushNotifications.saveToken);
 
   useEffect(() => {
@@ -142,7 +143,13 @@ export default function AppLayout() {
             <TouchableOpacity
               style={style}
               activeOpacity={0.85}
-              onPress={() => router.push("/(app)/rounds/new" as any)}
+              onPress={() => {
+                if (inProgressRound) {
+                  router.push(`/(app)/rounds/score?roundId=${inProgressRound._id}` as any);
+                } else {
+                  router.push("/(app)/rounds/new" as any);
+                }
+              }}
             >
               <View
                 style={{

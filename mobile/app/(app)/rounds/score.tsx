@@ -61,6 +61,7 @@ export default function ResumeRoundScreen() {
   );
   const saveHoleScore = useMutation(api.rounds.saveHoleScore);
   const completeRound = useMutation(api.rounds.completeRound);
+  const deleteRound = useMutation(api.rounds.deleteRound);
 
   const handicap = useQuery(
     api.handicap.getLatest,
@@ -131,6 +132,23 @@ export default function ResumeRoundScreen() {
       onSaveHole={(hole, par, si, score) => {
         saveHoleScore({ roundId: round._id, hole, par, strokeIndex: si, score }).catch(() => {});
       }}
+      onCancel={() => {
+        Alert.alert(
+          "Cancel round?",
+          "This round will be permanently deleted.",
+          [
+            { text: "Keep playing", style: "cancel" },
+            {
+              text: "Cancel round",
+              style: "destructive",
+              onPress: () =>
+                deleteRound({ roundId: round._id }).then(() => router.replace("/(app)" as any)).catch((e: any) =>
+                  Alert.alert("Error", e?.message ?? "Failed to cancel round")
+                ),
+            },
+          ]
+        );
+      }}
       onComplete={async (holeScores) => {
         setSubmitting(true);
         try {
@@ -174,6 +192,7 @@ function ScoringUI({
   notes,
   setNotes,
   onSaveHole,
+  onCancel,
   onComplete,
   submitting,
   router,
@@ -193,6 +212,7 @@ function ScoringUI({
   notes: string;
   setNotes: (v: string) => void;
   onSaveHole: (hole: number, par: number, si: number, score: number) => void;
+  onCancel: () => void;
   onComplete: (holeScores: { hole: number; par: number; strokeIndex: number; score: number }[]) => void;
   submitting: boolean;
   router: ReturnType<typeof useRouter>;
@@ -296,7 +316,14 @@ function ScoringUI({
   if (viewMode === "scorecard") {
     return (
       <>
-        <Stack.Screen options={{ title: round.courseNameFreetext ?? "In Progress" }} />
+        <Stack.Screen options={{
+          title: round.courseNameFreetext ?? "In Progress",
+          headerRight: () => (
+            <TouchableOpacity onPress={onCancel} style={{ paddingRight: 4 }}>
+              <Text style={{ color: "#dc2626", fontSize: 14, fontWeight: "600" }}>Cancel round</Text>
+            </TouchableOpacity>
+          ),
+        }} />
         <View className="flex-1 bg-gray-50">
           {viewToggle}
           <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
@@ -362,7 +389,14 @@ function ScoringUI({
 
   return (
     <>
-      <Stack.Screen options={{ title: round.courseNameFreetext ?? "In Progress" }} />
+      <Stack.Screen options={{
+        title: round.courseNameFreetext ?? "In Progress",
+        headerRight: () => (
+          <TouchableOpacity onPress={onCancel} style={{ paddingRight: 4 }}>
+            <Text style={{ color: "#dc2626", fontSize: 14, fontWeight: "600" }}>Cancel round</Text>
+          </TouchableOpacity>
+        ),
+      }} />
       <View className="flex-1 bg-white">
         {viewToggle}
         <View className="flex-row px-4 pt-1 gap-1">
