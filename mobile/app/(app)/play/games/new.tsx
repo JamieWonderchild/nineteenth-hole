@@ -12,6 +12,7 @@ import {
 import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "convex/react";
+import { useUser } from "@clerk/clerk-expo";
 import { api } from "../../../../lib/convex";
 import { Button, Card } from "../../../../components/ui";
 import { CoursePickerSheet, CourseSelection } from "../../../../components/CoursePickerSheet";
@@ -300,14 +301,22 @@ function Step2Players({
   const [hcpInput, setHcpInput] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  const { user } = useUser();
+  const myProfile = useQuery(
+    api.golferProfiles.get,
+    user?.id ? { userId: user.id } : "skip"
+  );
+
   const searchResults = useQuery(
     api.golferProfiles.search,
-    nameInput.trim().length >= 2 ? { term: nameInput.trim() } : "skip"
+    nameInput.trim().length >= 2 ? { term: nameInput.trim(), includeSelf: true } : "skip"
   );
 
   const suggestions = showSuggestions && searchResults && searchResults.length > 0
     ? searchResults
     : [];
+
+  const alreadyAddedSelf = myProfile && players.some((p) => p.userId === myProfile.userId);
 
   function handleAddManual() {
     const name = nameInput.trim();
@@ -359,6 +368,25 @@ function Step2Players({
           Players{" "}
           <Text className="text-gray-400 font-normal">(min. 2)</Text>
         </Text>
+
+        {/* Quick-add yourself */}
+        {myProfile && !alreadyAddedSelf && (
+          <TouchableOpacity
+            onPress={() => handleSelectProfile(myProfile)}
+            className="flex-row items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2.5"
+          >
+            <Ionicons name="person-circle" size={18} color="#16a34a" />
+            <View className="flex-1">
+              <Text className="text-sm font-medium text-green-900">
+                Add me — {myProfile.displayName}
+              </Text>
+              {myProfile.handicapIndex != null && (
+                <Text className="text-xs text-green-700">HCP {myProfile.handicapIndex.toFixed(1)}</Text>
+              )}
+            </View>
+            <Ionicons name="add-circle" size={18} color="#16a34a" />
+          </TouchableOpacity>
+        )}
 
         {/* Add player row */}
         <View className="flex-row gap-2">
