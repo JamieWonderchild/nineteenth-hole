@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,8 +7,9 @@ import {
   Modal,
   Alert,
   Platform,
+  TextInput,
 } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
 import { useQuery, useMutation } from "convex/react";
 import { Ionicons } from "@expo/vector-icons";
@@ -104,19 +105,45 @@ function BookingModal({
   displayName: string;
 }) {
   const [playerCount, setPlayerCount] = useState(1);
+  const [extraNames, setExtraNames] = useState<string[]>([]);
   const [booking, setBooking] = useState(false);
 
   const bookSlot = useMutation(api.teeTimes.bookSlot);
+
+  // Resize extra names array when count changes
+  useEffect(() => {
+    setExtraNames(prev => {
+      const next = [...prev];
+      while (next.length < playerCount - 1) next.push("");
+      return next.slice(0, playerCount - 1);
+    });
+  }, [playerCount]);
+
+  // Reset when modal opens
+  useEffect(() => {
+    if (visible) {
+      setPlayerCount(1);
+      setExtraNames([]);
+    }
+  }, [visible]);
 
   async function handleConfirm() {
     if (!slot) return;
     setBooking(true);
     try {
+      const players =
+        playerCount > 1
+          ? [
+              { name: displayName, type: "member" },
+              ...extraNames.map(n => ({ name: n.trim() || "Guest", type: "guest" })),
+            ]
+          : undefined;
       await bookSlot({
         slotId: slot._id,
         clubId: clubId as any,
         playerCount,
         displayName,
+        players,
       });
       Alert.alert("Booked!", `Tee time at ${formatTime(slot.time)} confirmed.`);
       onClose();
@@ -134,15 +161,13 @@ function BookingModal({
       <View className="flex-1 bg-white">
         {/* header */}
         <View className="flex-row items-center justify-between px-4 pt-6 pb-4 border-b border-gray-100">
-          <Text className="text-lg font-bold text-gray-900">
-            Confirm Booking
-          </Text>
+          <Text className="text-lg font-bold text-gray-900">Confirm Booking</Text>
           <TouchableOpacity onPress={onClose}>
             <Ionicons name="close" size={24} color="#6b7280" />
           </TouchableOpacity>
         </View>
 
-        <View className="px-4 pt-6 flex-1">
+        <ScrollView className="flex-1 px-4 pt-6">
           {/* slot info */}
           <Card className="p-4 mb-6">
             <View className="flex-row items-center gap-3">
@@ -150,56 +175,70 @@ function BookingModal({
                 <Ionicons name="calendar-outline" size={24} color="#16a34a" />
               </View>
               <View>
-                <Text className="text-base font-bold text-gray-900">
-                  {formatTime(slot.time)}
-                </Text>
-                <Text className="text-sm text-gray-500">
-                  {formatDateLabel(slot.date)}
-                </Text>
+                <Text className="text-base font-bold text-gray-900">{formatTime(slot.time)}</Text>
+                <Text className="text-sm text-gray-500">{formatDateLabel(slot.date)}</Text>
               </View>
             </View>
           </Card>
 
           {/* player count */}
-          <Text className="text-sm font-semibold text-gray-700 mb-3">
-            How many players?
-          </Text>
-          <View className="flex-row items-center gap-5 mb-8">
+          <Text className="text-sm font-semibold text-gray-700 mb-3">How many players?</Text>
+          <View className="flex-row items-center gap-4 mb-2">
             {[1, 2, 3, 4].map((n) => (
               <TouchableOpacity
                 key={n}
                 onPress={() => setPlayerCount(n)}
                 className={`w-14 h-14 rounded-full items-center justify-center border-2 ${
-                  playerCount === n
-                    ? "bg-green-600 border-green-600"
-                    : "bg-white border-gray-200"
+                  playerCount === n ? "bg-green-600 border-green-600" : "bg-white border-gray-200"
                 }`}
               >
-                <Text
-                  className={`font-bold text-lg ${
-                    playerCount === n ? "text-white" : "text-gray-700"
-                  }`}
-                >
+                <Text className={`font-bold text-lg ${playerCount === n ? "text-white" : "text-gray-700"}`}>
                   {n}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
-
-          <Text className="text-xs text-gray-400 mb-8">
-            {slot.available} space{slot.available !== 1 ? "s" : ""} remaining in
-            this slot
+          <Text className="text-xs text-gray-400 mb-6">
+            {slot.available} space{slot.available !== 1 ? "s" : ""} remaining
           </Text>
-        </View>
+
+          {/* player names */}
+          {playerCount > 1 && (
+            <View className="mb-6">
+              <Text className="text-sm font-semibold text-gray-700 mb-3">Who's playing?</Text>
+              {/* booker */}
+              <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mb-2">
+                <Ionicons name="person-circle-outline" size={18} color="#16a34a" style={{ marginRight: 8 }} />
+                <Text className="text-base text-gray-700 flex-1">{displayName}</Text>
+                <Text className="text-xs text-gray-400">You</Text>
+              </View>
+              {/* additional players */}
+              {extraNames.map((name, i) => (
+                <View key={i} className="flex-row items-center bg-white border border-gray-200 rounded-xl px-4 py-3 mb-2">
+                  <Ionicons name="person-outline" size={18} color="#9ca3af" style={{ marginRight: 8 }} />
+                  <TextInput
+                    className="flex-1 text-base text-gray-900"
+                    placeholder={`Player ${i + 2} name`}
+                    placeholderTextColor="#9ca3af"
+                    value={name}
+                    onChangeText={(text) => {
+                      const next = [...extraNames];
+                      next[i] = text;
+                      setExtraNames(next);
+                    }}
+                  />
+                </View>
+              ))}
+            </View>
+          )}
+        </ScrollView>
 
         <View className="px-4 pb-12 pt-4 border-t border-gray-100">
           <TouchableOpacity
             onPress={handleConfirm}
             disabled={booking || playerCount > (slot.available ?? 0)}
             className={`rounded-full py-4 items-center ${
-              booking || playerCount > (slot.available ?? 0)
-                ? "bg-green-300"
-                : "bg-green-600"
+              booking || playerCount > (slot.available ?? 0) ? "bg-green-300" : "bg-green-600"
             }`}
           >
             <Text className="text-white font-semibold text-base">
@@ -219,8 +258,11 @@ export default function TeeTimesScreen() {
   const userId = user?.id ?? "";
   const displayName = user?.fullName ?? user?.firstName ?? "Member";
 
+  const { date: initialDate } = useLocalSearchParams<{ date?: string }>();
   const days = next14Days();
-  const [selectedDate, setSelectedDate] = useState(days[0]);
+  const [selectedDate, setSelectedDate] = useState(
+    initialDate && days.includes(initialDate) ? initialDate : days[0]
+  );
   const [bookingSlot, setBookingSlot] = useState<any | null>(null);
 
   const clubs = useQuery(api.clubMembers.myActiveClubs, {});
@@ -371,8 +413,8 @@ export default function TeeTimesScreen() {
                   >
                     <View className="flex-row items-center gap-3">
                       {/* time */}
-                      <View className="w-16 items-center">
-                        <Text className="font-bold text-lg text-gray-900">
+                      <View className="w-20 items-center">
+                        <Text className="font-bold text-base text-gray-900" numberOfLines={1}>
                           {formatTime(slot.time)}
                         </Text>
                       </View>

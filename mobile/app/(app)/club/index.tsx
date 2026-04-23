@@ -379,28 +379,43 @@ function ClubDashboard({
         {myBookings === undefined ? (
           <LoadingSpinner />
         ) : !nextBooking ? (
-          <Card className="p-4">
-            <Text className="text-gray-400 text-sm text-center">
-              No upcoming tee times
-            </Text>
-          </Card>
+          <TouchableOpacity onPress={() => router.push("/(app)/club/tee-times" as any)}>
+            <Card className="p-4">
+              <Text className="text-gray-400 text-sm text-center">
+                No upcoming tee times — tap to book
+              </Text>
+            </Card>
+          </TouchableOpacity>
         ) : (
-          <Card className="p-4 flex-row items-center gap-3">
-            <View className="w-10 h-10 rounded-full bg-green-50 items-center justify-center">
-              <Ionicons name="calendar-outline" size={20} color="#16a34a" />
-            </View>
-            <View className="flex-1">
-              <Text className="font-semibold text-gray-900">
-                {formatDate(nextBooking.date)}
-              </Text>
-              <Text className="text-xs text-gray-500 mt-0.5">
-                {formatTime(nextBooking.time)} ·{" "}
-                {nextBooking.playerCount}{" "}
-                {nextBooking.playerCount === 1 ? "player" : "players"}
-              </Text>
-            </View>
-            <Badge variant="success">Confirmed</Badge>
-          </Card>
+          <TouchableOpacity
+            onPress={() => router.push(`/(app)/club/tee-times?date=${nextBooking.date}` as any)}
+            activeOpacity={0.75}
+          >
+            <Card className="p-4 flex-row items-center gap-3">
+              <View className="w-10 h-10 rounded-full bg-green-50 items-center justify-center shrink-0">
+                <Ionicons name="calendar-outline" size={20} color="#16a34a" />
+              </View>
+              <View className="flex-1">
+                <Text className="font-semibold text-gray-900">
+                  {formatDate(nextBooking.date)} · {formatTime(nextBooking.time)}
+                </Text>
+                {nextBooking.players && nextBooking.players.length > 0 ? (
+                  <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+                    {nextBooking.players.map((p: any) => p.name).join(", ")}
+                  </Text>
+                ) : (
+                  <Text className="text-xs text-gray-500 mt-0.5">
+                    {nextBooking.playerCount}{" "}
+                    {nextBooking.playerCount === 1 ? "player" : "players"}
+                  </Text>
+                )}
+              </View>
+              <View className="items-end gap-1">
+                <Badge variant="success">Confirmed</Badge>
+                <Ionicons name="chevron-forward" size={14} color="#d1d5db" />
+              </View>
+            </Card>
+          </TouchableOpacity>
         )}
       </View>
     </ScrollView>

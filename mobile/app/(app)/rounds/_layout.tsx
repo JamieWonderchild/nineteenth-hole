@@ -7,6 +7,8 @@ export default function RoundsLayout() {
         headerStyle: { backgroundColor: "#fff" },
         headerTintColor: "#166534",
         headerTitleStyle: { fontWeight: "600" },
+        contentStyle: { backgroundColor: "#fff" },
+        headerShadowVisible: false,
       }}
     />
   );

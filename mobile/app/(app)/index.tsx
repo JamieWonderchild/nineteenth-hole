@@ -199,72 +199,71 @@ function ClubMemberHome({
             elevation: 5,
           }}
         >
+          {/* Club name bar */}
           <TouchableOpacity
             onPress={() => router.push("/(app)/club" as any)}
-            activeOpacity={0.9}
+            activeOpacity={0.85}
+            className="flex-row items-center px-4 pt-4 pb-3 border-b border-white/10"
           >
-            {/* Club name bar */}
-            <View className="flex-row items-center px-4 pt-4 pb-3 border-b border-white/10">
-              <View className="w-8 h-8 rounded-full bg-white/20 items-center justify-center mr-2.5">
-                <Ionicons name="golf-outline" size={17} color="#fff" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-white font-bold text-base">{club.name}</Text>
-                <Text className="text-green-300 text-xs capitalize">{membership.role}</Text>
-              </View>
-              <View className="flex-row items-center gap-1">
-                <Text className="text-green-300 text-xs">View club</Text>
-                <Ionicons name="chevron-forward" size={13} color="#86efac" />
-              </View>
+            <View className="w-8 h-8 rounded-full bg-white/20 items-center justify-center mr-2.5">
+              <Ionicons name="golf-outline" size={17} color="#fff" />
             </View>
-
-            {/* Stats row */}
-            <View className="flex-row">
-              <TouchableOpacity
-                onPress={() => router.push("/(app)/club/competitions" as any)}
-                className="flex-1 px-4 py-3.5"
-                activeOpacity={0.75}
-              >
-                <View className="flex-row items-center gap-1.5 mb-1.5">
-                  <Ionicons name="trophy-outline" size={14} color="#86efac" />
-                  <Text className="text-green-300 text-xs font-medium uppercase tracking-wide">Competition</Text>
-                </View>
-                <Text className="text-white font-semibold text-sm" numberOfLines={1}>
-                  {activeComps === undefined ? "Loading…" : nextComp ? nextComp.name : "None today"}
-                </Text>
-                {nextComp && (
-                  <View className="mt-1">
-                    <Badge variant="success">
-                      <Text className="text-green-800 text-xs">Live</Text>
-                    </Badge>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              <View className="w-px bg-white/10 my-3" />
-
-              <TouchableOpacity
-                onPress={() => router.push("/(app)/club/tee-times" as any)}
-                className="flex-1 px-4 py-3.5"
-                activeOpacity={0.75}
-              >
-                <View className="flex-row items-center gap-1.5 mb-1.5">
-                  <Ionicons name="calendar-outline" size={14} color="#86efac" />
-                  <Text className="text-green-300 text-xs font-medium uppercase tracking-wide">Tee Time</Text>
-                </View>
-                <Text className="text-white font-semibold text-sm" numberOfLines={1}>
-                  {myBookings === undefined
-                    ? "Loading…"
-                    : nextBooking
-                    ? formatTime(nextBooking.time)
-                    : "None booked"}
-                </Text>
-                {nextBooking && (
-                  <Text className="text-green-300 text-xs mt-0.5">{formatDate(nextBooking.date)}</Text>
-                )}
-              </TouchableOpacity>
+            <View className="flex-1">
+              <Text className="text-white font-bold text-base">{club.name}</Text>
+              <Text className="text-green-300 text-xs capitalize">{membership.role}</Text>
+            </View>
+            <View className="flex-row items-center gap-1">
+              <Text className="text-green-300 text-xs">View club</Text>
+              <Ionicons name="chevron-forward" size={13} color="#86efac" />
             </View>
           </TouchableOpacity>
+
+          {/* Stats row */}
+          <View className="flex-row">
+            <TouchableOpacity
+              onPress={() => router.push("/(app)/club/competitions" as any)}
+              className="flex-1 px-4 py-3.5"
+              activeOpacity={0.75}
+            >
+              <View className="flex-row items-center gap-1.5 mb-1.5">
+                <Ionicons name="trophy-outline" size={14} color="#86efac" />
+                <Text className="text-green-300 text-xs font-medium uppercase tracking-wide">Competition</Text>
+              </View>
+              <Text className="text-white font-semibold text-sm" numberOfLines={1}>
+                {activeComps === undefined ? "Loading…" : nextComp ? nextComp.name : "None today"}
+              </Text>
+              {nextComp && (
+                <View className="mt-1">
+                  <Badge variant="success">
+                    <Text className="text-green-800 text-xs">Live</Text>
+                  </Badge>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <View className="w-px bg-white/10 my-3" />
+
+            <TouchableOpacity
+              onPress={() => router.push("/(app)/club/tee-times" as any)}
+              className="flex-1 px-4 py-3.5"
+              activeOpacity={0.75}
+            >
+              <View className="flex-row items-center gap-1.5 mb-1.5">
+                <Ionicons name="calendar-outline" size={14} color="#86efac" />
+                <Text className="text-green-300 text-xs font-medium uppercase tracking-wide">Tee Time</Text>
+              </View>
+              <Text className="text-white font-semibold text-sm" numberOfLines={1}>
+                {myBookings === undefined
+                  ? "Loading…"
+                  : nextBooking
+                  ? formatTime(nextBooking.time)
+                  : "None booked"}
+              </Text>
+              {nextBooking && (
+                <Text className="text-green-300 text-xs mt-0.5">{formatDate(nextBooking.date)}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
