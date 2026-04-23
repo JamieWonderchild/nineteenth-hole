@@ -209,6 +209,8 @@ export const generateSlots = mutation({
 });
 
 // Member: book a slot
+const playerArg = v.object({ name: v.string(), type: v.string(), memberId: v.optional(v.string()) });
+
 export const bookSlot = mutation({
   args: {
     slotId: v.id("teeTimeSlots"),
@@ -216,6 +218,7 @@ export const bookSlot = mutation({
     playerCount: v.number(),
     notes: v.optional(v.string()),
     displayName: v.string(),
+    players: v.optional(v.array(playerArg)),
   },
   handler: async (ctx, args) => {
     const identity = await assertClubMember(ctx, args.clubId);
@@ -274,6 +277,7 @@ export const bookSlot = mutation({
     if (myBooking) throw new Error("You already have a booking in this slot");
 
     const now = new Date().toISOString();
+    const players = args.players ?? [];
     return ctx.db.insert("teeTimeBookings", {
       clubId: args.clubId,
       slotId: args.slotId,
@@ -281,7 +285,8 @@ export const bookSlot = mutation({
       time: slot.time,
       userId: identity.subject,
       displayName: args.displayName,
-      playerCount: args.playerCount,
+      playerCount: players.length > 0 ? players.length : args.playerCount,
+      players: players.length > 0 ? players : undefined,
       notes: args.notes,
       bookingType: "member",
       status: "confirmed",
@@ -299,6 +304,7 @@ export const bookForMember = mutation({
     displayName: v.string(),
     playerCount: v.number(),
     notes: v.optional(v.string()),
+    players: v.optional(v.array(playerArg)),
   },
   handler: async (ctx, args) => {
     await assertClubAdmin(ctx, args.clubId);
@@ -315,6 +321,7 @@ export const bookForMember = mutation({
       throw new Error(`Only ${slot.maxPlayers - takenPlayers} spot${slot.maxPlayers - takenPlayers === 1 ? "" : "s"} remaining`);
     }
 
+    const players = args.players ?? [];
     const now = new Date().toISOString();
     return ctx.db.insert("teeTimeBookings", {
       clubId: args.clubId,
@@ -322,7 +329,8 @@ export const bookForMember = mutation({
       date: slot.date,
       time: slot.time,
       displayName: args.displayName,
-      playerCount: args.playerCount,
+      playerCount: players.length > 0 ? players.length : args.playerCount,
+      players: players.length > 0 ? players : undefined,
       notes: args.notes,
       bookingType: "member",
       status: "confirmed",

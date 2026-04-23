@@ -48,20 +48,29 @@ function TeeCircle({ colour, size = 20 }: { colour: string; size?: number }) {
   );
 }
 
+function byYards(a: any, b: any) {
+  const ay = a.totalYards ?? (a.totalMeters ? Math.round(a.totalMeters / 0.9144) : -1);
+  const by = b.totalYards ?? (b.totalMeters ? Math.round(b.totalMeters / 0.9144) : -1);
+  return by - ay; // longest first
+}
+
 function sortTees(tees: any[]): any[] {
   const male = tees.filter((t) => t.gender === "male" || t.gender === "both");
   const female = tees.filter((t) => t.gender === "female");
-
-  function byYards(a: any, b: any) {
-    const ay = a.totalYards ?? (a.totalMeters ? Math.round(a.totalMeters / 0.9144) : -1);
-    const by = b.totalYards ?? (b.totalMeters ? Math.round(b.totalMeters / 0.9144) : -1);
-    return by - ay; // longest first
-  }
-
   male.sort(byYards);
   female.sort(byYards);
-
   return [...male, ...female];
+}
+
+// Default visible tees: all male tees + the shortest (front) ladies tee.
+// All other female tees are hidden behind "Show all tees".
+function getDefaultVisibleTeeIds(tees: any[]): Set<string> {
+  const male = tees.filter((t) => t.gender !== "female");
+  const female = tees.filter((t) => t.gender === "female").sort(byYards);
+  const ids = new Set(male.map((t) => t._id));
+  const frontLadies = female[female.length - 1]; // shortest = front ladies
+  if (frontLadies) ids.add(frontLadies._id);
+  return ids;
 }
 
 // ── Tee row ───────────────────────────────────────────────────────────────────
@@ -272,6 +281,7 @@ export default function CourseDetailScreen() {
   const userId = user?.id ?? "";
 
   const [expandedTeeId, setExpandedTeeId] = useState<string | null>(null);
+  const [showAllTees, setShowAllTees] = useState(false);
   const { fmt, fmtTotal } = useDistanceUnit();
 
   const courseWithTees = useQuery(
@@ -321,6 +331,9 @@ export default function CourseDetailScreen() {
   const course = courseWithTees;
   const tees = sortTees(course.tees ?? []);
   const defaultPar = tees[0]?.par ?? course.par;
+  const defaultVisibleIds = getDefaultVisibleTeeIds(course.tees ?? []);
+  const visibleTees = showAllTees ? tees : tees.filter((t) => defaultVisibleIds.has(t._id));
+  const hasHidden = tees.length > defaultVisibleIds.size;
 
   return (
     <>
@@ -394,18 +407,35 @@ export default function CourseDetailScreen() {
                 )}
               </View>
             ) : (
-              tees.map((tee) => (
-                <TeeRow
-                  key={tee._id}
-                  tee={tee}
-                  expanded={expandedTeeId === tee._id}
-                  onPress={() =>
-                    setExpandedTeeId(expandedTeeId === tee._id ? null : tee._id)
-                  }
-                  fmt={fmt}
-                  fmtTotal={fmtTotal}
-                />
-              ))
+              <>
+                {visibleTees.map((tee) => (
+                  <TeeRow
+                    key={tee._id}
+                    tee={tee}
+                    expanded={expandedTeeId === tee._id}
+                    onPress={() =>
+                      setExpandedTeeId(expandedTeeId === tee._id ? null : tee._id)
+                    }
+                    fmt={fmt}
+                    fmtTotal={fmtTotal}
+                  />
+                ))}
+                {hasHidden && (
+                  <TouchableOpacity
+                    onPress={() => setShowAllTees((v) => !v)}
+                    className="flex-row items-center justify-center py-3 gap-1.5"
+                  >
+                    <Text className="text-xs font-medium text-green-700">
+                      {showAllTees ? "Show fewer tees" : `More tees (${tees.length - defaultVisibleIds.size})`}
+                    </Text>
+                    <Ionicons
+                      name={showAllTees ? "chevron-up" : "chevron-down"}
+                      size={13}
+                      color="#15803d"
+                    />
+                  </TouchableOpacity>
+                )}
+              </>
             )}
           </View>
         </View>

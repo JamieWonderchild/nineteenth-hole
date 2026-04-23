@@ -533,6 +533,11 @@ export default defineSchema({
     userId: v.optional(v.string()),   // undefined for visitor bookings
     displayName: v.string(),
     playerCount: v.number(),    // 1–4
+    players: v.optional(v.array(v.object({
+      name: v.string(),
+      type: v.string(),           // "member" | "guest" | "custom"
+      memberId: v.optional(v.string()),
+    }))),
     notes: v.optional(v.string()),
     status: v.string(),         // "confirmed" | "cancelled"
     // Competition link

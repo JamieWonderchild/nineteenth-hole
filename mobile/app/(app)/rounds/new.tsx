@@ -156,6 +156,7 @@ function Step1Course({ onNext, initialCourseId }: {
   );
 
   const [showPicker, setShowPicker] = useState(false);
+  const [showMoreTees, setShowMoreTees] = useState(false);
   const [courseSelection, setCourseSelection] = useState<CourseSelection | null>(null);
   const [freetext, setFreetext] = useState("");
   const [useFreetext, setUseFreetext] = useState(false);
@@ -199,7 +200,7 @@ function Step1Course({ onNext, initialCourseId }: {
   // ── Pre-loaded course tee picker (when arriving from course detail) ──────
   if (initialCourseId && preloadedCourse !== null && !useFreetext) {
     const course = preloadedCourse;
-    const tees = course
+    const allTees = course
       ? [...(course.tees ?? [])].sort((a: any, b: any) => {
           const ga = a.gender === "female" ? 1 : 0;
           const gb = b.gender === "female" ? 1 : 0;
@@ -209,6 +210,15 @@ function Step1Course({ onNext, initialCourseId }: {
           return by - ay;
         })
       : [];
+    // Default: all male tees + shortest ladies tee
+    const femaleTees = allTees.filter(t => t.gender === "female");
+    const frontLadies = femaleTees[femaleTees.length - 1];
+    const defaultIds = new Set([
+      ...allTees.filter(t => t.gender !== "female").map(t => t._id),
+      ...(frontLadies ? [frontLadies._id] : []),
+    ]);
+    const tees = showMoreTees ? allTees : allTees.filter(t => defaultIds.has(t._id));
+    const hiddenTeeCount = allTees.length - defaultIds.size;
 
     return (
       <>
@@ -296,7 +306,19 @@ function Step1Course({ onNext, initialCourseId }: {
               </View>
             )}
 
-            {tees.length === 0 && course && (
+            {hiddenTeeCount > 0 && (
+              <TouchableOpacity
+                onPress={() => setShowMoreTees(v => !v)}
+                className="flex-row items-center justify-center py-2.5 gap-1.5"
+              >
+                <Text className="text-sm font-medium text-green-700">
+                  {showMoreTees ? "Show fewer tees" : `More tees (${hiddenTeeCount})`}
+                </Text>
+                <Ionicons name={showMoreTees ? "chevron-up" : "chevron-down"} size={14} color="#15803d" />
+              </TouchableOpacity>
+            )}
+
+            {allTees.length === 0 && course && (
               <View className="bg-gray-50 rounded-xl px-4 py-5 items-center">
                 <Text className="text-sm text-gray-400 text-center">
                   No tee data loaded yet — searching other courses instead
