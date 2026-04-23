@@ -286,7 +286,37 @@ export default function MeScreen() {
     : [];
 
   async function handlePickPhoto() {
-    Alert.alert("Coming soon", "Photo upload will be available in the next build.");
+    const ImagePicker = await import("expo-image-picker");
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Please allow access to your photo library.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!asset) return;
+    setUploadingPhoto(true);
+    try {
+      const uploadUrl = await generateUploadUrl();
+      const fileBlob = await (await fetch(asset.uri)).blob();
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": asset.mimeType ?? "image/jpeg" },
+        body: fileBlob,
+      });
+      const { storageId } = await response.json();
+      await saveAvatarUrl({ storageId });
+    } catch (err: any) {
+      Alert.alert("Upload failed", err?.message ?? "Could not upload photo.");
+    } finally {
+      setUploadingPhoto(false);
+    }
   }
 
   function handleSignOut() {
