@@ -63,7 +63,7 @@ function holePar(hole: number): number {
 
 function strokesReceived(handicap: number, hole: number): number {
   const si = HOLE_STROKE_INDEX[hole - 1] ?? 1;
-  return Math.floor((handicap * si) / 18);
+  return Math.floor(handicap / 18) + (si <= (handicap % 18) ? 1 : 0);
 }
 
 function calcStableford(gross: number, par: number, hcp: number, hole: number): number {
@@ -124,10 +124,13 @@ export default function LiveGameScreen() {
   }
 
   function setHoleScore(playerId: string, hole: number, score: number) {
-    setHoleScoreMap((prev) => ({
-      ...prev,
-      [playerId]: { ...(prev[playerId] ?? {}), [hole]: Math.max(0, score) },
-    }));
+    setHoleScoreMap((prev) => {
+      const wasUnset = prev[playerId]?.[hole] == null;
+      const actualScore = wasUnset
+        ? (score > 0 ? holePar(hole) : Math.max(1, holePar(hole) - 1))
+        : Math.max(1, score);
+      return { ...prev, [playerId]: { ...(prev[playerId] ?? {}), [hole]: actualScore } };
+    });
   }
 
   function runningTotal(playerId: string): number {
@@ -148,6 +151,58 @@ export default function LiveGameScreen() {
       }
       return total;
     }
+  }
+
+  // ── Matchplay helpers (nassau: 2 players head-to-head) ───────────────────────
+
+  const team1 = g.players.slice(0, Math.ceil(g.players.length / 2));
+  const team2 = g.players.slice(Math.ceil(g.players.length / 2));
+
+  function matchPlayScore(): string {
+    if (g.players.length !== 2) return "";
+    const [p0, p1] = g.players;
+    let score = 0; // +ve = p0 leads, -ve = p1 leads
+    for (let h = 1; h <= 18; h++) {
+      const s0 = holeScoreMap[p0.id]?.[h];
+      const s1 = holeScoreMap[p1.id]?.[h];
+      if (s0 == null || s1 == null) continue;
+      const net0 = s0 - strokesReceived(p0.handicap ?? 0, h);
+      const net1 = s1 - strokesReceived(p1.handicap ?? 0, h);
+      if (net0 < net1) score++;
+      else if (net1 < net0) score--;
+    }
+    if (score === 0) return "All Square";
+    const leader = score > 0 ? p0.name : p1.name;
+    return `${leader} ${Math.abs(score)} UP`;
+  }
+
+  function holeMatchResult(hole: number): string {
+    if (g.players.length !== 2) return "";
+    const [p0, p1] = g.players;
+    const s0 = holeScoreMap[p0.id]?.[hole];
+    const s1 = holeScoreMap[p1.id]?.[hole];
+    if (s0 == null || s1 == null) return "";
+    const net0 = s0 - strokesReceived(p0.handicap ?? 0, hole);
+    const net1 = s1 - strokesReceived(p1.handicap ?? 0, hole);
+    if (net0 < net1) return `${p0.name} wins hole`;
+    if (net1 < net0) return `${p1.name} wins hole`;
+    return "Halved";
+  }
+
+  // ── Better ball helpers (betterball: teams of 2, stableford best ball) ────────
+
+  function betterBallTeamScore(teamPlayers: Player[]): number {
+    let total = 0;
+    for (let h = 1; h <= 18; h++) {
+      const pts = teamPlayers
+        .map((p) => {
+          const s = holeScoreMap[p.id]?.[h];
+          return s != null ? calcStableford(s, holePar(h), p.handicap ?? 0, h) : null;
+        })
+        .filter((x): x is number => x != null);
+      if (pts.length > 0) total += Math.max(...pts);
+    }
+    return total;
   }
 
   // ── Save scores ──────────────────────────────────────────────────────────────
@@ -219,20 +274,44 @@ export default function LiveGameScreen() {
             )}
           </View>
 
-          {/* Player totals bar */}
-          <View className="flex-row flex-wrap gap-2 mt-2">
-            {game.players.map((p: Player) => {
-              const playerScore = game.scores?.find((s: PlayerScore) => s.playerId === p.id);
-              const total = isPerHole
-                ? runningTotal(p.id)
-                : playerScore?.points ?? playerScore?.gross ?? "—";
-              return (
-                <View key={p.id} className="flex-row items-center bg-gray-50 rounded-full px-3 py-1 gap-1.5">
-                  <Text className="text-xs font-semibold text-gray-700">{p.name}</Text>
-                  <Text className="text-xs text-green-700 font-bold">{total}</Text>
+          {/* Player totals / match score bar */}
+          <View className="mt-2">
+            {isPerHole && g.type === "nassau" && g.players.length === 2 ? (
+              <View className="flex-row items-center gap-2">
+                <View className="bg-gray-50 rounded-full px-3 py-1">
+                  <Text className="text-xs font-bold text-green-700">{matchPlayScore()}</Text>
                 </View>
-              );
-            })}
+                <Text className="text-xs text-gray-400">
+                  {g.players.map((p) => `${p.name.split(" ")[0]}${p.handicap != null ? ` (${p.handicap})` : ""}`).join(" vs ")}
+                </Text>
+              </View>
+            ) : isPerHole && g.type === "betterball" && g.players.length >= 2 ? (
+              <View className="flex-row gap-2">
+                {[team1, team2].map((team, idx) => (
+                  <View key={idx} className="flex-row items-center bg-gray-50 rounded-full px-3 py-1 gap-1.5">
+                    <Text className="text-xs font-semibold text-gray-700">
+                      {team.map((p) => p.name.split(" ")[0]).join("/")}
+                    </Text>
+                    <Text className="text-xs text-green-700 font-bold">{betterBallTeamScore(team)} pts</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View className="flex-row flex-wrap gap-2">
+                {game.players.map((p: Player) => {
+                  const playerScore = game.scores?.find((s: PlayerScore) => s.playerId === p.id);
+                  const total = isPerHole
+                    ? runningTotal(p.id)
+                    : playerScore?.points ?? playerScore?.gross ?? "—";
+                  return (
+                    <View key={p.id} className="flex-row items-center bg-gray-50 rounded-full px-3 py-1 gap-1.5">
+                      <Text className="text-xs font-semibold text-gray-700">{p.name}</Text>
+                      <Text className="text-xs text-green-700 font-bold">{total}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         </View>
 
@@ -253,6 +332,9 @@ export default function LiveGameScreen() {
                 getHoleScore={getHoleScore}
                 setHoleScore={setHoleScore}
                 runningTotal={runningTotal}
+                holeMatchResult={g.type === "nassau" ? holeMatchResult : undefined}
+                betterBallTeams={g.type === "betterball" && g.players.length >= 2 ? [team1, team2] : undefined}
+                betterBallTeamScore={g.type === "betterball" ? betterBallTeamScore : undefined}
                 onSave={handleSaveScores}
                 onFinish={() => setConfirmModalVisible(true)}
               />
@@ -446,6 +528,9 @@ function PerHoleScoringView({
   getHoleScore,
   setHoleScore,
   runningTotal,
+  holeMatchResult,
+  betterBallTeams,
+  betterBallTeamScore,
   onSave,
   onFinish,
 }: {
@@ -456,10 +541,41 @@ function PerHoleScoringView({
   getHoleScore: (playerId: string, hole: number) => number;
   setHoleScore: (playerId: string, hole: number, score: number) => void;
   runningTotal: (playerId: string) => number;
+  holeMatchResult?: (hole: number) => string;
+  betterBallTeams?: [Player[], Player[]];
+  betterBallTeamScore?: (team: Player[]) => number;
   onSave: () => void;
   onFinish: () => void;
 }) {
   const par = holePar(currentHole);
+  const si = HOLE_STROKE_INDEX[currentHole - 1];
+
+  // For betterball: map playerId → team index (0 or 1)
+  const playerTeamIndex = betterBallTeams
+    ? new Map<string, number>([
+        ...betterBallTeams[0].map((p): [string, number] => [p.id, 0]),
+        ...betterBallTeams[1].map((p): [string, number] => [p.id, 1]),
+      ])
+    : null;
+
+  // Subtotal label per player row
+  function rowSubtotal(p: Player): string {
+    if (game.type === "nassau") {
+      return p.handicap != null ? `HCP ${p.handicap}` : "";
+    }
+    if (game.type === "betterball") {
+      const teamIdx = playerTeamIndex?.get(p.id);
+      const teamLabel = teamIdx === 0 ? "A" : teamIdx === 1 ? "B" : "";
+      const teamScore = betterBallTeamScore && betterBallTeams
+        ? betterBallTeamScore(betterBallTeams[teamIdx ?? 0])
+        : 0;
+      return `Team ${teamLabel}: ${teamScore} pts`;
+    }
+    const total = runningTotal(p.id);
+    return `Total: ${total}${game.type === "stableford" ? " pts" : ""}`;
+  }
+
+  const matchResult = holeMatchResult ? holeMatchResult(currentHole) : "";
 
   return (
     <View className="gap-4">
@@ -479,7 +595,7 @@ function PerHoleScoringView({
 
         <View className="items-center">
           <Text className="text-2xl font-bold text-gray-900">Hole {currentHole}</Text>
-          <Text className="text-sm text-gray-400">Par {par} · SI {HOLE_STROKE_INDEX[currentHole - 1]}</Text>
+          <Text className="text-sm text-gray-400">Par {par} · SI {si}</Text>
         </View>
 
         <TouchableOpacity
@@ -499,6 +615,7 @@ function PerHoleScoringView({
       <Card className="overflow-hidden">
         {game.players.map((p: Player, i: number) => {
           const score = getHoleScore(p.id, currentHole);
+          const shots = strokesReceived(p.handicap ?? 0, currentHole);
           return (
             <View
               key={p.id}
@@ -508,11 +625,15 @@ function PerHoleScoringView({
             >
               {/* Player info */}
               <View className="flex-1">
-                <Text className="font-semibold text-gray-900 text-sm">{p.name}</Text>
-                <Text className="text-xs text-gray-400">
-                  Total: {runningTotal(p.id)}{" "}
-                  {game.type === "stableford" ? "pts" : ""}
-                </Text>
+                <View className="flex-row items-center gap-1.5">
+                  <Text className="font-semibold text-gray-900 text-sm">{p.name}</Text>
+                  {shots > 0 && (
+                    <View className="bg-green-100 rounded px-1">
+                      <Text className="text-green-700 text-xs font-semibold">+{shots}</Text>
+                    </View>
+                  )}
+                </View>
+                <Text className="text-xs text-gray-400">{rowSubtotal(p)}</Text>
               </View>
 
               {/* Score chip */}
@@ -543,6 +664,14 @@ function PerHoleScoringView({
             </View>
           );
         })}
+
+        {/* Hole result banner (matchplay) */}
+        {matchResult !== "" && (
+          <View className="flex-row items-center justify-center px-4 py-2.5 bg-green-50 border-t border-green-100">
+            <Ionicons name="flag" size={13} color="#16a34a" style={{ marginRight: 6 }} />
+            <Text className="text-xs font-semibold text-green-700">{matchResult}</Text>
+          </View>
+        )}
       </Card>
 
       {/* Save / finish */}
