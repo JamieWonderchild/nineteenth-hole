@@ -62,15 +62,17 @@ function sortTees(tees: any[]): any[] {
   return [...male, ...female];
 }
 
-// Default visible tees: all male tees + the shortest (front) ladies tee.
-// All other female tees are hidden behind "Show all tees".
-function getDefaultVisibleTeeIds(tees: any[]): Set<string> {
-  const male = tees.filter((t) => t.gender !== "female");
-  const female = tees.filter((t) => t.gender === "female").sort(byYards);
-  const ids = new Set(male.map((t) => t._id));
-  const frontLadies = female[female.length - 1]; // shortest = front ladies
-  if (frontLadies) ids.add(frontLadies._id);
-  return ids;
+// Deduplicate tees by colour — HNA registers the same physical markers twice
+// (men's rating + women's rating, same yardage). Since sortTees puts males first,
+// the first occurrence of each colour is always the men's version.
+function deduplicateByColour(sortedTees: any[]): any[] {
+  const seen = new Set<string>();
+  return sortedTees.filter((t) => {
+    const key = (t.colour ?? "").toLowerCase() || t.name.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // ── Tee row ───────────────────────────────────────────────────────────────────
@@ -331,9 +333,9 @@ export default function CourseDetailScreen() {
   const course = courseWithTees;
   const tees = sortTees(course.tees ?? []);
   const defaultPar = tees[0]?.par ?? course.par;
-  const defaultVisibleIds = getDefaultVisibleTeeIds(course.tees ?? []);
-  const visibleTees = showAllTees ? tees : tees.filter((t) => defaultVisibleIds.has(t._id));
-  const hasHidden = tees.length > defaultVisibleIds.size;
+  const deduped = deduplicateByColour(tees);   // one row per physical colour
+  const visibleTees = showAllTees ? tees : deduped;
+  const hasHidden = tees.length > deduped.length;
 
   return (
     <>
@@ -426,7 +428,7 @@ export default function CourseDetailScreen() {
                     className="flex-row items-center justify-center py-3 gap-1.5"
                   >
                     <Text className="text-xs font-medium text-green-700">
-                      {showAllTees ? "Show fewer tees" : `More tees (${tees.length - defaultVisibleIds.size})`}
+                      {showAllTees ? "Show fewer tees" : `All tees incl. women's ratings (${tees.length - deduped.length} more)`}
                     </Text>
                     <Ionicons
                       name={showAllTees ? "chevron-up" : "chevron-down"}

@@ -210,15 +210,17 @@ function Step1Course({ onNext, initialCourseId }: {
           return by - ay;
         })
       : [];
-    // Default: all male tees + shortest ladies tee
-    const femaleTees = allTees.filter(t => t.gender === "female");
-    const frontLadies = femaleTees[femaleTees.length - 1];
-    const defaultIds = new Set([
-      ...allTees.filter(t => t.gender !== "female").map(t => t._id),
-      ...(frontLadies ? [frontLadies._id] : []),
-    ]);
-    const tees = showMoreTees ? allTees : allTees.filter(t => defaultIds.has(t._id));
-    const hiddenTeeCount = allTees.length - defaultIds.size;
+    // Deduplicate by colour — HNA registers same physical tee twice (men's + women's rating).
+    // Males sort first so the first occurrence of each colour = men's version.
+    const seen = new Set<string>();
+    const dedupedTees = allTees.filter(t => {
+      const key = (t.colour ?? "").toLowerCase() || t.name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const tees = showMoreTees ? allTees : dedupedTees;
+    const hiddenTeeCount = allTees.length - dedupedTees.length;
 
     return (
       <>
@@ -286,9 +288,6 @@ function Step1Course({ onNext, initialCourseId }: {
                       <View className="flex-1">
                         <View className="flex-row items-center gap-2">
                           <Text className="text-sm font-semibold text-gray-900">{tee.name}</Text>
-                          <View className="bg-gray-100 rounded-full px-1.5 py-0.5">
-                            <Text className="text-xs text-gray-500 capitalize">{tee.gender}</Text>
-                          </View>
                         </View>
                         <Text className="text-xs text-gray-400 mt-0.5">
                           {[
@@ -312,7 +311,7 @@ function Step1Course({ onNext, initialCourseId }: {
                 className="flex-row items-center justify-center py-2.5 gap-1.5"
               >
                 <Text className="text-sm font-medium text-green-700">
-                  {showMoreTees ? "Show fewer tees" : `More tees (${hiddenTeeCount})`}
+                  {showMoreTees ? "Show fewer" : `Women's ratings (${hiddenTeeCount} more)`}
                 </Text>
                 <Ionicons name={showMoreTees ? "chevron-up" : "chevron-down"} size={14} color="#15803d" />
               </TouchableOpacity>
