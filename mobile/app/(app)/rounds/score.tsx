@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { api } from "../../../lib/convex";
 import { Button } from "../../../components/ui";
 import { PlayedWithPicker } from "../../../components/PlayedWithPicker";
+import { useDistanceUnit } from "../../../hooks/useDistanceUnit";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -99,10 +100,13 @@ export default function ResumeRoundScreen() {
 
   // Build pars & stroke indexes from course data or saved hole scores
   const clubCourseHoles = (courseData as any)?.clubCourseHoles;
-  const teeHoles = courseData?.tees?.[0]?.holes;
+  const matchedTee = courseData?.tees?.find((t: any) => t._id === round.teeId) ?? courseData?.tees?.[0];
+  const teeHoles = matchedTee?.holes;
   const courseHoles = clubCourseHoles ?? teeHoles;
   const pars = courseHoles?.length === 18 ? courseHoles.map((h: any) => h.par) : STANDARD_PARS;
   const strokeIndexes = courseHoles?.length === 18 ? courseHoles.map((h: any) => h.strokeIndex) : STANDARD_SI;
+  const holeYards: (number | null)[] | null = teeHoles?.length === 18 ? teeHoles.map((h: any) => h.yards ?? null) : null;
+  const holeMeters: (number | null)[] | null = teeHoles?.length === 18 ? teeHoles.map((h: any) => h.meters ?? null) : null;
 
   // Pre-populate scores from saved holeScores
   const savedScores: (number | null)[] = new Array(18).fill(null);
@@ -119,6 +123,8 @@ export default function ResumeRoundScreen() {
       round={round}
       pars={pars}
       strokeIndexes={strokeIndexes}
+      holeYards={holeYards}
+      holeMeters={holeMeters}
       initialScores={savedScores}
       startHole={resumeAtHole}
       playingHandicap={Math.round(handicap ?? 0)}
@@ -181,6 +187,8 @@ function ScoringUI({
   round,
   pars,
   strokeIndexes,
+  holeYards,
+  holeMeters,
   initialScores,
   startHole,
   playingHandicap,
@@ -201,6 +209,8 @@ function ScoringUI({
   round: any;
   pars: number[];
   strokeIndexes: number[];
+  holeYards?: (number | null)[] | null;
+  holeMeters?: (number | null)[] | null;
   initialScores: (number | null)[];
   startHole: number;
   playingHandicap: number;
@@ -218,6 +228,7 @@ function ScoringUI({
   submitting: boolean;
   router: ReturnType<typeof useRouter>;
 }) {
+  const { fmt } = useDistanceUnit();
   const [viewMode, setViewMode] = useState<"hole_by_hole" | "scorecard">("hole_by_hole");
   const [scores, setScores] = useState<(number | null)[]>(initialScores);
   const [currentHole, setCurrentHole] = useState(startHole);
@@ -383,6 +394,7 @@ function ScoringUI({
   const si = strokeIndexes[currentHole];
   const score = scores[currentHole];
   const shotsReceived = Math.floor(playingHandicap / 18) + (si <= (playingHandicap % 18) ? 1 : 0);
+  const distLabel = fmt(holeYards?.[currentHole] ?? undefined, holeMeters?.[currentHole] ?? undefined);
   const diff = score !== null ? score - par : null;
   const diffLabel = diff === null ? "" : diff === -2 ? "Eagle" : diff === -1 ? "Birdie" : diff === 0 ? "Par" : diff === 1 ? "Bogey" : diff === 2 ? "Double" : `+${diff}`;
   const diffColor = diff === null ? "#d1d5db" : diff < 0 ? "#16a34a" : diff === 0 ? "#6b7280" : diff === 1 ? "#3b82f6" : "#dc2626";
@@ -422,6 +434,7 @@ function ScoringUI({
             <Text className="text-5xl font-bold text-gray-900">Hole {currentHole + 1}</Text>
             <View className="flex-row gap-4 mt-1">
               <Text className="text-base text-gray-500">Par {par}</Text>
+              {distLabel && <Text className="text-base text-gray-500">{distLabel}</Text>}
               <Text className="text-base text-gray-400">SI {si}</Text>
               {shotsReceived > 0 && (
                 <Text className="text-base text-green-600 font-semibold">+{shotsReceived} shot{shotsReceived > 1 ? "s" : ""}</Text>

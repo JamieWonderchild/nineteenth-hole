@@ -329,11 +329,12 @@ export const internalUpsert = internalMutation({
         return existing._id;
       }
     }
-    // Deduplicate by hnaClubId if provided
+    // Deduplicate by hnaClubId + name (multi-course clubs share hnaClubId)
     if (fields.hnaClubId) {
       const existing = await ctx.db
         .query("golfCourses")
         .withIndex("by_hna_club_id", q => q.eq("hnaClubId", fields.hnaClubId!))
+        .filter(q => q.eq(q.field("name"), fields.name))
         .first();
       if (existing) {
         await ctx.db.patch(existing._id, { ...fields, updatedAt: now });
