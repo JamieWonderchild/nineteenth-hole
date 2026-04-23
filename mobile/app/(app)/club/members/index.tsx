@@ -6,7 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
 import { useQuery } from "convex/react";
 import { Ionicons } from "@expo/vector-icons";
@@ -61,9 +61,9 @@ function RoleBadge({ role }: { role: string }) {
   );
 }
 
-function MemberRow({ member }: { member: Member }) {
+function MemberRow({ member, onPress }: { member: Member; onPress: () => void }) {
   return (
-    <View className="flex-row items-center px-4 py-3.5 bg-white border-b border-gray-50">
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} className="flex-row items-center px-4 py-3.5 bg-white border-b border-gray-50">
       {/* Avatar */}
       <View className="w-11 h-11 rounded-full bg-green-600 items-center justify-center mr-3">
         <Text className="text-white text-sm font-bold">
@@ -81,16 +81,17 @@ function MemberRow({ member }: { member: Member }) {
 
       {/* Handicap */}
       {member.handicapIndex !== undefined && member.handicapIndex !== null ? (
-        <View className="items-end">
+        <View className="items-end mr-2">
           <Text className="text-xs text-gray-400 mb-0.5">HCP</Text>
           <Text className="text-base font-bold text-gray-900">
             {member.handicapIndex.toFixed(1)}
           </Text>
         </View>
       ) : (
-        <View className="w-10" />
+        <View className="w-4" />
       )}
-    </View>
+      <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+    </TouchableOpacity>
   );
 }
 
@@ -111,6 +112,7 @@ function SkeletonRow() {
 
 export default function MembersScreen() {
   const { user } = useUser();
+  const router = useRouter();
   const userId = user?.id ?? "";
 
   const [search, setSearch] = useState("");
@@ -178,7 +180,12 @@ export default function MembersScreen() {
           className="flex-1 bg-white"
           data={sortedMembers}
           keyExtractor={item => item._id}
-          renderItem={({ item }) => <MemberRow member={item as Member} />}
+          renderItem={({ item }) => (
+            <MemberRow
+              member={item as Member}
+              onPress={() => router.push(`/(app)/club/members/${item._id}` as any)}
+            />
+          )}
           ListEmptyComponent={
             search ? (
               <EmptyState

@@ -76,11 +76,29 @@ export default function ResumeRoundScreen() {
   const [conditions, setConditions] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Loading state
-  if (!round || round === null) {
+  // Still loading
+  if (round === undefined) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
+        <Stack.Screen options={{ title: "Loading…" }} />
         <ActivityIndicator color="#16a34a" />
+      </View>
+    );
+  }
+
+  // Round not found or was deleted
+  if (round === null) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white px-8">
+        <Stack.Screen options={{ title: "Round not found" }} />
+        <Ionicons name="alert-circle-outline" size={48} color="#9ca3af" />
+        <Text className="text-gray-900 font-bold text-xl mt-4 text-center">Round not found</Text>
+        <Text className="text-gray-500 text-sm text-center mt-2">
+          This round may have been completed or cancelled.
+        </Text>
+        <Button onPress={() => router.replace("/(app)/rounds")} className="mt-6">
+          View Rounds
+        </Button>
       </View>
     );
   }
@@ -330,6 +348,14 @@ function ScoringUI({
       <>
         <Stack.Screen options={{
           title: round.courseNameFreetext ?? "In Progress",
+          headerLeft: () => (
+            <TouchableOpacity
+              onPress={() => router.replace("/(app)" as any)}
+              style={{ paddingLeft: 4, paddingRight: 12 }}
+            >
+              <Ionicons name="arrow-back" size={22} color="#374151" />
+            </TouchableOpacity>
+          ),
           headerRight: () => (
             <TouchableOpacity onPress={onCancel} style={{ paddingRight: 4 }}>
               <Text style={{ color: "#dc2626", fontSize: 14, fontWeight: "600" }}>Cancel round</Text>
@@ -404,6 +430,14 @@ function ScoringUI({
     <>
       <Stack.Screen options={{
         title: round.courseNameFreetext ?? "In Progress",
+        headerLeft: () => (
+          <TouchableOpacity
+            onPress={() => router.replace("/(app)" as any)}
+            style={{ paddingLeft: 4, paddingRight: 12 }}
+          >
+            <Ionicons name="arrow-back" size={22} color="#374151" />
+          </TouchableOpacity>
+        ),
         headerRight: () => (
           <TouchableOpacity onPress={onCancel} style={{ paddingRight: 4 }}>
             <Text style={{ color: "#dc2626", fontSize: 14, fontWeight: "600" }}>Cancel round</Text>

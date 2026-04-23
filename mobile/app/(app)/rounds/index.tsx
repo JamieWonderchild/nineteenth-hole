@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   Pressable,
+  Alert,
 } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -168,6 +169,7 @@ export default function RoundsScreen() {
     api.rounds.getStats,
     userId ? { userId } : "skip"
   );
+  const inProgress = useQuery(api.rounds.getInProgress);
 
   const isLoading =
     handicap === undefined ||
@@ -208,10 +210,23 @@ export default function RoundsScreen() {
             title: "Rounds & Handicap",
             headerRight: () => (
               <Pressable
-                onPress={() => router.push("/(app)/rounds/new")}
+                onPress={() => {
+                  if (inProgress) {
+                    Alert.alert(
+                      "Round in progress",
+                      "Finish or cancel your current round before starting a new one.",
+                      [
+                        { text: "Resume", onPress: () => router.push(`/(app)/rounds/score?roundId=${inProgress._id}` as any) },
+                        { text: "OK", style: "cancel" },
+                      ]
+                    );
+                    return;
+                  }
+                  router.push("/(app)/rounds/new");
+                }}
                 className="mr-2"
               >
-                <Ionicons name="add" size={26} color="#166534" />
+                <Ionicons name="add" size={26} color="#166634" />
               </Pressable>
             ),
           }}
@@ -228,10 +243,23 @@ export default function RoundsScreen() {
           title: "Rounds & Handicap",
           headerRight: () => (
             <Pressable
-              onPress={() => router.push("/(app)/rounds/new")}
+              onPress={() => {
+                if (inProgress) {
+                  Alert.alert(
+                    "Round in progress",
+                    "Finish or cancel your current round before starting a new one.",
+                    [
+                      { text: "Resume", onPress: () => router.push(`/(app)/rounds/score?roundId=${inProgress._id}` as any) },
+                      { text: "OK", style: "cancel" },
+                    ]
+                  );
+                  return;
+                }
+                router.push("/(app)/rounds/new");
+              }}
               className="mr-2"
             >
-              <Ionicons name="add" size={26} color="#166534" />
+              <Ionicons name="add" size={26} color="#166634" />
             </Pressable>
           ),
         }}
@@ -242,6 +270,37 @@ export default function RoundsScreen() {
         keyExtractor={(item: Round) => item._id}
         ListHeaderComponent={
           <View>
+            {/* In-progress round banner */}
+            {inProgress && (
+              <View className="px-4 pt-4 pb-0">
+                <TouchableOpacity
+                  onPress={() => router.push(`/(app)/rounds/score?roundId=${inProgress._id}` as any)}
+                  activeOpacity={0.85}
+                  className="flex-row items-center gap-3 bg-green-600 rounded-2xl px-4 py-3.5 mb-1"
+                  style={{
+                    shadowColor: "#16a34a",
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 10,
+                    elevation: 4,
+                  }}
+                >
+                  <View className="w-9 h-9 rounded-full bg-white/20 items-center justify-center shrink-0">
+                    <Ionicons name="golf" size={18} color="#fff" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-white font-bold text-sm">Round in progress</Text>
+                    <Text className="text-green-200 text-xs mt-0.5" numberOfLines={1}>
+                      {inProgress.courseNameFreetext ?? "Golf course"} · {inProgress.holeScores?.length ?? 0}/18 holes
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center gap-1">
+                    <Text className="text-green-200 text-xs font-medium">Resume</Text>
+                    <Ionicons name="chevron-forward" size={14} color="#86efac" />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
             {/* Hero: Handicap card */}
             <View className="px-4 pt-5 pb-4">
               <View className="bg-green-600 rounded-2xl p-6">
@@ -292,7 +351,20 @@ export default function RoundsScreen() {
                 title="My Rounds"
                 action={{
                   label: "+ New",
-                  onPress: () => router.push("/(app)/rounds/new"),
+                  onPress: () => {
+                    if (inProgress) {
+                      Alert.alert(
+                        "Round in progress",
+                        "Finish or cancel your current round before starting a new one.",
+                        [
+                          { text: "Resume", onPress: () => router.push(`/(app)/rounds/score?roundId=${inProgress._id}` as any) },
+                          { text: "OK", style: "cancel" },
+                        ]
+                      );
+                      return;
+                    }
+                    router.push("/(app)/rounds/new");
+                  },
                 }}
               />
             </View>
