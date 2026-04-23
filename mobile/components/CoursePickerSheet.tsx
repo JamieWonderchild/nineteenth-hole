@@ -331,23 +331,26 @@ export function CoursePickerSheet({ visible, onClose, onSelect, country }: Props
                 )}
 
                 {courseWithTees.tees.length > 0 && (() => {
-                  const allTees: any[] = courseWithTees.tees;
-
-                  // Pick the "back" men's tee (highest CR among male/both)
-                  const mensTees = allTees.filter((t: any) => t.gender === "male" || t.gender === "both");
-                  const backTee = mensTees.sort((a: any, b: any) =>
-                    (b.courseRating ?? b.totalYards ?? 0) - (a.courseRating ?? a.totalYards ?? 0)
-                  )[0];
-
-                  // Pick the ladies' / forward tee (highest CR among female, fallback to lowest CR)
-                  const ladiesTees = allTees.filter((t: any) => t.gender === "female");
-                  const forwardTee = ladiesTees.length > 0
-                    ? ladiesTees.sort((a: any, b: any) => (b.courseRating ?? 0) - (a.courseRating ?? 0))[0]
-                    : allTees.sort((a: any, b: any) => (a.courseRating ?? a.totalYards ?? 99) - (b.courseRating ?? b.totalYards ?? 99))[0];
-
-                  const featuredIds = [backTee?._id, forwardTee?._id].filter(Boolean);
-                  const remainingCount = allTees.filter((t: any) => !featuredIds.includes(t._id)).length;
-                  const visibleTees = showAllTees ? allTees : allTees.filter((t: any) => featuredIds.includes(t._id));
+                  // Sort: males first (longest→shortest), then females
+                  const sorted = [...courseWithTees.tees].sort((a: any, b: any) => {
+                    const ga = a.gender === "female" ? 1 : 0;
+                    const gb = b.gender === "female" ? 1 : 0;
+                    if (ga !== gb) return ga - gb;
+                    const ay = a.totalYards ?? (a.totalMeters ? Math.round(a.totalMeters / 0.9144) : -1);
+                    const by = b.totalYards ?? (b.totalMeters ? Math.round(b.totalMeters / 0.9144) : -1);
+                    return by - ay;
+                  });
+                  // Deduplicate by colour — HNA registers same physical tee twice (men's + women's rating).
+                  // Males sort first, so first occurrence of each colour = men's version.
+                  const seen = new Set<string>();
+                  const dedupedTees = sorted.filter((t: any) => {
+                    const key = (t.colour ?? "").toLowerCase() || t.name.toLowerCase();
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                  });
+                  const remainingCount = sorted.length - dedupedTees.length;
+                  const visibleTees = showAllTees ? sorted : dedupedTees;
 
                   const TeeRow = ({ tee }: { tee: any }) => (
                     <TouchableOpacity
@@ -356,21 +359,9 @@ export function CoursePickerSheet({ visible, onClose, onSelect, country }: Props
                     >
                       <TeeCircle colour={tee.colour} />
                       <View style={{ flex: 1, marginLeft: 12 }}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                          <Text style={{ fontSize: 14, fontWeight: "600", color: "#111827" }}>
-                            {tee.name}
-                          </Text>
-                          {tee._id === backTee?._id && !showAllTees && (
-                            <View style={{ backgroundColor: "#dcfce7", borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 }}>
-                              <Text style={{ fontSize: 11, color: "#16a34a", fontWeight: "600" }}>Men's</Text>
-                            </View>
-                          )}
-                          {tee._id === forwardTee?._id && !showAllTees && (
-                            <View style={{ backgroundColor: "#fef9c3", borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 }}>
-                              <Text style={{ fontSize: 11, color: "#854d0e", fontWeight: "600" }}>Forward</Text>
-                            </View>
-                          )}
-                        </View>
+                        <Text style={{ fontSize: 14, fontWeight: "600", color: "#111827" }}>
+                          {tee.name}
+                        </Text>
                         <View style={{ flexDirection: "row", gap: 12, marginTop: 3 }}>
                           {tee.par && <Text style={{ fontSize: 12, color: "#6b7280" }}>Par {tee.par}</Text>}
                           {fmtTotal(tee.totalYards, tee.totalMeters) && (
@@ -397,7 +388,7 @@ export function CoursePickerSheet({ visible, onClose, onSelect, country }: Props
                           style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 14, gap: 6 }}
                         >
                           <Text style={{ fontSize: 13, color: "#16a34a", fontWeight: "600" }}>
-                            More tees ({remainingCount})
+                            Women's ratings ({remainingCount} more)
                           </Text>
                           <Ionicons name="chevron-down" size={14} color="#16a34a" />
                         </TouchableOpacity>
