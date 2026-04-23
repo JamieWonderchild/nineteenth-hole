@@ -16,6 +16,7 @@ export default defineSchema({
     handicapIndex: v.optional(v.number()),    // self-reported WHS index
     homeClub: v.optional(v.string()),         // "Finchley Golf Club" (plain text)
     goals: v.optional(v.string()),            // 'casual' | 'competitive' | 'social'
+    avatarUrl: v.optional(v.string()),        // Convex storage URL for profile photo
     createdAt: v.string(),
     updatedAt: v.string(),
   }).index("by_user", ["userId"]),

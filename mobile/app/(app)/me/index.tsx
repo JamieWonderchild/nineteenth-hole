@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { Image } from "expo-image";
 import { useRouter, Stack } from "expo-router";
 import { useUser, useClerk } from "@clerk/clerk-expo";
 import { useQuery, useMutation } from "convex/react";
@@ -231,6 +232,10 @@ export default function MeScreen() {
   const userId = user?.id ?? "";
 
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const generateUploadUrl = useMutation(api.golferProfiles.generateUploadUrl);
+  const saveAvatarUrl = useMutation(api.golferProfiles.saveAvatarUrl);
 
   const profile = useQuery(
     api.golferProfiles.get,
@@ -280,6 +285,10 @@ export default function MeScreen() {
       ]
     : [];
 
+  async function handlePickPhoto() {
+    Alert.alert("Coming soon", "Photo upload will be available in the next build.");
+  }
+
   function handleSignOut() {
     Alert.alert("Sign out?", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
@@ -312,9 +321,31 @@ export default function MeScreen() {
         <View className="bg-white border-b border-gray-100 px-4 pt-14 pb-6">
           <View className="flex-row items-center gap-4 mb-4">
             {/* avatar */}
-            <View className="w-20 h-20 rounded-full bg-green-600 items-center justify-center">
-              <Text className="text-white text-3xl font-bold">{initials}</Text>
-            </View>
+            <TouchableOpacity onPress={handlePickPhoto} disabled={uploadingPhoto} style={{ position: "relative" }}>
+              {profile?.avatarUrl ? (
+                <Image
+                  source={{ uri: profile.avatarUrl }}
+                  style={{ width: 80, height: 80, borderRadius: 40 }}
+                  contentFit="cover"
+                />
+              ) : (
+                <View className="w-20 h-20 rounded-full bg-green-600 items-center justify-center">
+                  <Text className="text-white text-3xl font-bold">{initials}</Text>
+                </View>
+              )}
+              <View style={{
+                position: "absolute", bottom: 0, right: 0,
+                width: 26, height: 26, borderRadius: 13,
+                backgroundColor: "#fff", borderWidth: 2, borderColor: "#e5e7eb",
+                alignItems: "center", justifyContent: "center",
+              }}>
+                {uploadingPhoto ? (
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#16a34a" }} />
+                ) : (
+                  <Ionicons name="camera" size={13} color="#374151" />
+                )}
+              </View>
+            </TouchableOpacity>
             {/* info */}
             <View className="flex-1">
               <Text className="text-xl font-bold text-gray-900">

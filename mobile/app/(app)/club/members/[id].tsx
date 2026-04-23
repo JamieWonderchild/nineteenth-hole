@@ -1,7 +1,9 @@
-import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
+import { useState } from "react";
+import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
+import { useUser } from "@clerk/clerk-expo";
 import { api } from "../../../../lib/convex";
 import { LoadingSpinner } from "../../../../components/ui";
 
@@ -36,6 +38,7 @@ function RoleBadge({ role }: { role: string }) {
 export default function MemberDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useUser();
 
   const member = useQuery(
     api.clubMembers.get,
@@ -45,6 +48,37 @@ export default function MemberDetailScreen() {
     api.golferProfiles.get,
     member?.userId ? { userId: member.userId } : "skip"
   );
+  const myProfile = useQuery(
+    api.golferProfiles.get,
+    user?.id ? { userId: user.id } : "skip"
+  );
+
+  const startConversation = useMutation(api.messaging.getOrCreateDirect);
+  const [starting, setStarting] = useState(false);
+
+  async function handleMessage() {
+    if (!member?.userId) {
+      Alert.alert("Not available", "This member hasn't set up their profile yet.");
+      return;
+    }
+    if (!user) return;
+    setStarting(true);
+    try {
+      const convId = await startConversation({
+        myUserId: user.id,
+        otherUserId: member.userId,
+        myDisplayName: myProfile?.displayName ?? user.fullName ?? "Unknown",
+        myAvatarUrl: (myProfile as any)?.avatarUrl ?? undefined,
+        otherDisplayName: member.displayName,
+        otherAvatarUrl: (member as any).avatarUrl ?? undefined,
+      });
+      router.push(`/(app)/club/messages/${convId}` as any);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not open conversation.");
+    } finally {
+      setStarting(false);
+    }
+  }
 
   if (member === undefined) {
     return (
@@ -74,6 +108,9 @@ export default function MemberDetailScreen() {
   const joinedYear = member.joinedAt
     ? new Date(member.joinedAt).getFullYear()
     : null;
+
+  // Don't show message button for yourself
+  const isSelf = member.userId && user?.id === member.userId;
 
   return (
     <>
@@ -167,30 +204,35 @@ export default function MemberDetailScreen() {
         )}
 
         {/* Actions */}
-        <View className="mx-4 mt-3 gap-2">
-          <TouchableOpacity
-            onPress={() =>
-              Alert.alert(
-                "Messaging coming soon",
-                "Direct messaging between members will be available in the next update."
-              )
-            }
-            className="flex-row items-center bg-green-600 rounded-2xl px-4 py-4 gap-3"
-            style={{
-              shadowColor: "#16a34a",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.25,
-              shadowRadius: 8,
-              elevation: 3,
-            }}
-          >
-            <View className="w-9 h-9 rounded-full bg-white/20 items-center justify-center">
-              <Ionicons name="chatbubble-outline" size={18} color="#fff" />
-            </View>
-            <Text className="text-white font-semibold flex-1">Message {member.displayName.split(" ")[0]}</Text>
-            <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.6)" />
-          </TouchableOpacity>
-        </View>
+        {!isSelf && (
+          <View className="mx-4 mt-3 gap-2">
+            <TouchableOpacity
+              onPress={handleMessage}
+              disabled={starting}
+              className="flex-row items-center bg-green-600 rounded-2xl px-4 py-4 gap-3"
+              style={{
+                shadowColor: "#16a34a",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.25,
+                shadowRadius: 8,
+                elevation: 3,
+                opacity: starting ? 0.7 : 1,
+              }}
+            >
+              <View className="w-9 h-9 rounded-full bg-white/20 items-center justify-center">
+                {starting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="chatbubble-outline" size={18} color="#fff" />
+                )}
+              </View>
+              <Text className="text-white font-semibold flex-1">
+                {starting ? "Opening…" : `Message ${member.displayName.split(" ")[0]}`}
+              </Text>
+              {!starting && <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.6)" />}
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </>
   );
