@@ -256,99 +256,103 @@ export default function LiveGameScreen() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
+  // Shared header (used in all states)
+  const header = (
+    <View className="px-4 pt-4 pb-3 bg-white border-b border-gray-100">
+      <View className="flex-row items-center gap-2 mb-1">
+        <Badge variant={formatTypeBadge(game.type)}>
+          {game.type.charAt(0).toUpperCase() + game.type.slice(1)}
+        </Badge>
+        <Text className="text-xs text-gray-400">{formatDate(game.date)}</Text>
+        {game.stakePerPlayer != null && game.stakePerPlayer > 0 && (
+          <Badge variant="warning">
+            £{(game.stakePerPlayer / 100).toFixed(2)}/player
+          </Badge>
+        )}
+      </View>
+
+      {/* Player totals / match score bar */}
+      <View className="mt-2">
+        {isPerHole && g.type === "nassau" && g.players.length === 2 ? (
+          <View className="flex-row items-center gap-2">
+            <View className="bg-gray-50 rounded-full px-3 py-1">
+              <Text className="text-xs font-bold text-green-700">{matchPlayScore()}</Text>
+            </View>
+            <Text className="text-xs text-gray-400">
+              {g.players.map((p) => `${p.name.split(" ")[0]}${p.handicap != null ? ` (${p.handicap})` : ""}`).join(" vs ")}
+            </Text>
+          </View>
+        ) : isPerHole && g.type === "betterball" && g.players.length >= 2 ? (
+          <View className="flex-row gap-2">
+            {[team1, team2].map((team, idx) => (
+              <View key={idx} className="flex-row items-center bg-gray-50 rounded-full px-3 py-1 gap-1.5">
+                <Text className="text-xs font-semibold text-gray-700">
+                  {team.map((p) => p.name.split(" ")[0]).join("/")}
+                </Text>
+                <Text className="text-xs text-green-700 font-bold">{betterBallTeamScore(team)} pts</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View className="flex-row flex-wrap gap-2">
+            {game.players.map((p: Player) => {
+              const playerScore = game.scores?.find((s: PlayerScore) => s.playerId === p.id);
+              const total = isPerHole
+                ? runningTotal(p.id)
+                : playerScore?.points ?? playerScore?.gross ?? "—";
+              return (
+                <View key={p.id} className="flex-row items-center bg-gray-50 rounded-full px-3 py-1 gap-1.5">
+                  <Text className="text-xs font-semibold text-gray-700">{p.name}</Text>
+                  <Text className="text-xs text-green-700 font-bold">{total}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+
   return (
     <>
       <Stack.Screen options={{ title: game.name }} />
-      <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Header */}
-        <View className="px-4 pt-4 pb-3 bg-white border-b border-gray-100">
-          <View className="flex-row items-center gap-2 mb-1">
-            <Badge variant={formatTypeBadge(game.type)}>
-              {game.type.charAt(0).toUpperCase() + game.type.slice(1)}
-            </Badge>
-            <Text className="text-xs text-gray-400">{formatDate(game.date)}</Text>
-            {game.stakePerPlayer != null && game.stakePerPlayer > 0 && (
-              <Badge variant="warning">
-                £{(game.stakePerPlayer / 100).toFixed(2)}/player
-              </Badge>
-            )}
-          </View>
 
-          {/* Player totals / match score bar */}
-          <View className="mt-2">
-            {isPerHole && g.type === "nassau" && g.players.length === 2 ? (
-              <View className="flex-row items-center gap-2">
-                <View className="bg-gray-50 rounded-full px-3 py-1">
-                  <Text className="text-xs font-bold text-green-700">{matchPlayScore()}</Text>
-                </View>
-                <Text className="text-xs text-gray-400">
-                  {g.players.map((p) => `${p.name.split(" ")[0]}${p.handicap != null ? ` (${p.handicap})` : ""}`).join(" vs ")}
-                </Text>
-              </View>
-            ) : isPerHole && g.type === "betterball" && g.players.length >= 2 ? (
-              <View className="flex-row gap-2">
-                {[team1, team2].map((team, idx) => (
-                  <View key={idx} className="flex-row items-center bg-gray-50 rounded-full px-3 py-1 gap-1.5">
-                    <Text className="text-xs font-semibold text-gray-700">
-                      {team.map((p) => p.name.split(" ")[0]).join("/")}
-                    </Text>
-                    <Text className="text-xs text-green-700 font-bold">{betterBallTeamScore(team)} pts</Text>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <View className="flex-row flex-wrap gap-2">
-                {game.players.map((p: Player) => {
-                  const playerScore = game.scores?.find((s: PlayerScore) => s.playerId === p.id);
-                  const total = isPerHole
-                    ? runningTotal(p.id)
-                    : playerScore?.points ?? playerScore?.gross ?? "—";
-                  return (
-                    <View key={p.id} className="flex-row items-center bg-gray-50 rounded-full px-3 py-1 gap-1.5">
-                      <Text className="text-xs font-semibold text-gray-700">{p.name}</Text>
-                      <Text className="text-xs text-green-700 font-bold">{total}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-            )}
-          </View>
+      {/* Per-hole active: full-screen layout, no scroll */}
+      {game.status === "active" && isPerHole ? (
+        <View className="flex-1 bg-gray-50">
+          {header}
+          <PerHoleScoringView
+            game={game}
+            currentHole={currentHole}
+            setCurrentHole={setCurrentHole}
+            holeScoreMap={holeScoreMap}
+            getHoleScore={getHoleScore}
+            setHoleScore={setHoleScore}
+            runningTotal={runningTotal}
+            holeMatchResult={g.type === "nassau" ? holeMatchResult : undefined}
+            betterBallTeams={g.type === "betterball" && g.players.length >= 2 ? [team1, team2] : undefined}
+            betterBallTeamScore={g.type === "betterball" ? betterBallTeamScore : undefined}
+            onSave={handleSaveScores}
+            onFinish={() => setConfirmModalVisible(true)}
+          />
         </View>
-
-        {/* Complete — winner banner */}
-        {game.status === "complete" && (
-          <CompleteView game={game} />
-        )}
-
-        {/* Active — scoring area */}
-        {game.status === "active" && (
-          <View className="px-4 pt-4">
-            {isPerHole ? (
-              <PerHoleScoringView
-                game={game}
-                currentHole={currentHole}
-                setCurrentHole={setCurrentHole}
-                holeScoreMap={holeScoreMap}
-                getHoleScore={getHoleScore}
-                setHoleScore={setHoleScore}
-                runningTotal={runningTotal}
-                holeMatchResult={g.type === "nassau" ? holeMatchResult : undefined}
-                betterBallTeams={g.type === "betterball" && g.players.length >= 2 ? [team1, team2] : undefined}
-                betterBallTeamScore={g.type === "betterball" ? betterBallTeamScore : undefined}
-                onSave={handleSaveScores}
-                onFinish={() => setConfirmModalVisible(true)}
-              />
-            ) : (
+      ) : (
+        /* Overall / complete: scrollable */
+        <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ paddingBottom: 40 }}>
+          {header}
+          {game.status === "complete" && <CompleteView game={game} />}
+          {game.status === "active" && !isPerHole && (
+            <View className="px-4 pt-4">
               <OverallScoringView
                 game={game}
                 overallScores={overallScores}
                 setOverallScores={setOverallScores}
                 onComplete={() => setConfirmModalVisible(true)}
               />
-            )}
-          </View>
-        )}
-      </ScrollView>
+            </View>
+          )}
+        </ScrollView>
+      )}
 
       {/* Confirm complete modal */}
       <Modal
@@ -578,87 +582,106 @@ function PerHoleScoringView({
   const matchResult = holeMatchResult ? holeMatchResult(currentHole) : "";
 
   return (
-    <View className="gap-4">
+    <View style={{ flex: 1, flexDirection: "column" }}>
       {/* Hole navigator */}
-      <View className="flex-row items-center justify-between bg-white rounded-xl px-4 py-3 border border-gray-100">
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "white", marginHorizontal: 16, marginTop: 16, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: "#f3f4f6" }}>
         <TouchableOpacity
           onPress={() => setCurrentHole((h) => Math.max(1, h - 1))}
           disabled={currentHole === 1}
-          className="w-10 h-10 items-center justify-center"
+          style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
         >
           <Ionicons
             name="chevron-back"
-            size={24}
+            size={28}
             color={currentHole === 1 ? "#d1d5db" : "#374151"}
           />
         </TouchableOpacity>
 
-        <View className="items-center">
-          <Text className="text-2xl font-bold text-gray-900">Hole {currentHole}</Text>
-          <Text className="text-sm text-gray-400">Par {par} · SI {si}</Text>
+        <View style={{ alignItems: "center" }}>
+          <Text style={{ fontSize: 28, fontWeight: "bold", color: "#111827" }}>Hole {currentHole}</Text>
+          <Text style={{ fontSize: 14, color: "#9ca3af", marginTop: 2 }}>Par {par} · SI {si}</Text>
         </View>
 
         <TouchableOpacity
           onPress={() => setCurrentHole((h) => Math.min(18, h + 1))}
           disabled={currentHole === 18}
-          className="w-10 h-10 items-center justify-center"
+          style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
         >
           <Ionicons
             name="chevron-forward"
-            size={24}
+            size={28}
             color={currentHole === 18 ? "#d1d5db" : "#374151"}
           />
         </TouchableOpacity>
       </View>
 
-      {/* Player rows */}
-      <Card className="overflow-hidden">
+      {/* Player rows — flex-1 to fill remaining space */}
+      <View style={{ flex: 1, marginHorizontal: 16, marginTop: 12, backgroundColor: "white", borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: "#f3f4f6" }}>
         {game.players.map((p: Player, i: number) => {
           const score = getHoleScore(p.id, currentHole);
           const shots = strokesReceived(p.handicap ?? 0, currentHole);
+          const netScore = score > 0 ? score - shots : null;
+          const holePoints = score > 0 ? calcStableford(score, par, p.handicap ?? 0, currentHole) : null;
+          const showNetPts = score > 0 && (shots > 0 || ["stableford", "betterball"].includes(game.type));
           return (
             <View
               key={p.id}
-              className={`flex-row items-center px-4 py-3 gap-3 ${
-                i < game.players.length - 1 ? "border-b border-gray-50" : ""
-              }`}
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                paddingHorizontal: 16,
+                gap: 12,
+                borderBottomWidth: i < game.players.length - 1 ? 1 : 0,
+                borderBottomColor: "#f3f4f6",
+              }}
             >
               {/* Player info */}
               <View className="flex-1">
                 <View className="flex-row items-center gap-1.5">
-                  <Text className="font-semibold text-gray-900 text-sm">{p.name}</Text>
+                  <Text className="font-semibold text-gray-900">{p.name}</Text>
                   {shots > 0 && (
                     <View className="bg-green-100 rounded px-1">
                       <Text className="text-green-700 text-xs font-semibold">+{shots}</Text>
                     </View>
                   )}
                 </View>
-                <Text className="text-xs text-gray-400">{rowSubtotal(p)}</Text>
+                <Text className="text-xs text-gray-400 mt-0.5">{rowSubtotal(p)}</Text>
               </View>
 
-              {/* Score chip */}
-              {score > 0 ? (
-                <ScoreChip score={score} par={par} size="sm" />
-              ) : (
-                <View className="w-7 h-7 rounded-sm border border-dashed border-gray-300 items-center justify-center">
-                  <Text className="text-gray-300 text-xs">—</Text>
-                </View>
-              )}
+              {/* Gross chip + net/pts annotation */}
+              <View className="items-center gap-0.5">
+                {score > 0 ? (
+                  <ScoreChip score={score} par={par} size="md" />
+                ) : (
+                  <View className="w-9 h-9 rounded-sm border border-dashed border-gray-300 items-center justify-center">
+                    <Text className="text-gray-300 text-sm">—</Text>
+                  </View>
+                )}
+                {showNetPts && (
+                  <Text style={{ fontSize: 10, color: "#6b7280", textAlign: "center" }}>
+                    {netScore !== null && shots > 0 ? `net ${netScore}` : ""}
+                    {holePoints !== null && ["stableford", "betterball"].includes(game.type)
+                      ? `${shots > 0 ? " · " : ""}${holePoints}pt`
+                      : ""}
+                  </Text>
+                )}
+              </View>
 
               {/* +/- buttons */}
-              <View className="flex-row items-center gap-1">
+              <View className="flex-row items-center gap-2">
                 <TouchableOpacity
                   onPress={() => setHoleScore(p.id, currentHole, score - 1)}
-                  className="w-9 h-9 rounded-lg bg-gray-100 items-center justify-center"
+                  className="w-11 h-11 rounded-xl bg-gray-100 items-center justify-center"
                 >
-                  <Ionicons name="remove" size={18} color="#374151" />
+                  <Ionicons name="remove" size={20} color="#374151" />
                 </TouchableOpacity>
-                <Text className="w-7 text-center font-bold text-gray-900">{score > 0 ? score : "—"}</Text>
+                <Text className="w-8 text-center font-bold text-gray-900 text-base">{score > 0 ? score : "—"}</Text>
                 <TouchableOpacity
                   onPress={() => setHoleScore(p.id, currentHole, score + 1)}
-                  className="w-9 h-9 rounded-lg bg-green-100 items-center justify-center"
+                  className="w-11 h-11 rounded-xl bg-green-100 items-center justify-center"
                 >
-                  <Ionicons name="add" size={18} color="#15803d" />
+                  <Ionicons name="add" size={20} color="#15803d" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -667,15 +690,15 @@ function PerHoleScoringView({
 
         {/* Hole result banner (matchplay) */}
         {matchResult !== "" && (
-          <View className="flex-row items-center justify-center px-4 py-2.5 bg-green-50 border-t border-green-100">
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#f0fdf4", borderTopWidth: 1, borderTopColor: "#bbf7d0" }}>
             <Ionicons name="flag" size={13} color="#16a34a" style={{ marginRight: 6 }} />
-            <Text className="text-xs font-semibold text-green-700">{matchResult}</Text>
+            <Text style={{ fontSize: 12, fontWeight: "600", color: "#15803d" }}>{matchResult}</Text>
           </View>
         )}
-      </Card>
+      </View>
 
-      {/* Save / finish */}
-      <View className="flex-row gap-3">
+      {/* Buttons — pinned to bottom */}
+      <View style={{ flexDirection: "row", gap: 12, marginHorizontal: 16, marginTop: 12, marginBottom: 24 }}>
         <Button variant="outline" onPress={onSave} className="flex-1">
           Save
         </Button>
@@ -688,7 +711,7 @@ function PerHoleScoringView({
             onPress={() => setCurrentHole((h) => Math.min(18, h + 1))}
             className="flex-1"
           >
-            Next Hole
+            Next Hole →
           </Button>
         )}
       </View>
