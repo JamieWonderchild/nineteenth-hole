@@ -199,6 +199,19 @@ export default function CompetitionManagePage({
   const clearClubDraw = useMutation(api.competitions.clearClubDraw);
   const bookCompetitionGroups = useMutation(api.teeTimes.bookCompetitionGroups);
   const cancelCompetitionBookings = useMutation(api.teeTimes.cancelCompetitionBookings);
+
+  // Grievance round
+  const setGrievanceCutoff = useMutation(api.drawGrievances.setCutoff);
+  const publishGrievanceDraft = useMutation(api.drawGrievances.publishDraft);
+  const discardGrievanceDraft = useMutation(api.drawGrievances.discardDraft);
+  const optimiseGrievancesAction = useAction(api.corti.optimiseDrawGrievances);
+  const grievanceCount = useQuery(
+    api.drawGrievances.getCount,
+    competition?.type === "club_comp"
+      ? { competitionId: competitionId as Id<"competitions"> }
+      : "skip"
+  );
+
   const compBookings = useQuery(
     api.teeTimes.listByCompetition,
     competition?.type === "club_comp" && competition?.clubId
@@ -234,6 +247,12 @@ export default function CompetitionManagePage({
   const [copied, setCopied] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Grievance round state
+  const [grievanceCutoffInput, setGrievanceCutoffInput] = useState("");
+  const [settingCutoff, setSettingCutoff] = useState(false);
+  const [runningOptimisation, setRunningOptimisation] = useState(false);
+  const [grievanceMsg, setGrievanceMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   void user;
 
@@ -401,6 +420,12 @@ export default function CompetitionManagePage({
   const currentStep = statusFlow.indexOf(competition.status as typeof statusFlow[number]);
   const nextStatus = statusFlow[currentStep + 1];
 
+  type GrievanceDiff = { displayName: string; fromGroup: number; fromTime: string; toGroup: number; toTime: string; reason: string };
+  type GrievanceDraft = { diffs: GrievanceDiff[]; summary: string; grievancesAddressed: number; grievancesTotal: number };
+  const grievanceDraftParsed: GrievanceDraft | null = competition.grievanceDraft
+    ? (() => { try { return JSON.parse(competition.grievanceDraft) as GrievanceDraft; } catch { return null; } })()
+    : null;
+
   return (
     <div className="px-6 py-8 space-y-6">
       {/* Header */}
@@ -466,11 +491,11 @@ export default function CompetitionManagePage({
           <CardTitle className="text-base">Actions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Entry link */}
-          {publicUrl && (
+          {/* Entry link — not shown for imported competitions */}
+          {publicUrl && competition.drawType !== "import" && (
             <div className="flex items-center gap-3 bg-muted rounded-lg px-4 py-2.5">
               <code className="text-xs text-muted-foreground flex-1 truncate">
-                {typeof window !== "undefined" ? window.location.origin : "playthepool.golf"}{publicUrl}
+                {typeof window !== "undefined" ? window.location.origin : "the19thhole.golf"}{publicUrl}
               </code>
               <button onClick={copyLink}
                 className="flex items-center gap-1.5 text-xs font-medium text-green-700 hover:text-green-600 shrink-0">
@@ -611,9 +636,9 @@ export default function CompetitionManagePage({
               <thead>
                 <tr className="border-b border-gray-100 text-left text-xs text-gray-500 uppercase tracking-wide">
                   <th className="px-5 py-3">Name</th>
-                  <th className="px-5 py-3">Payment</th>
+                  {competition.drawType !== "import" && <th className="px-5 py-3">Payment</th>}
                   <th className="px-5 py-3 hidden sm:table-cell">
-                    {isPickFormat ? "Picks" : "Players drawn"}
+                    {isPickFormat ? "Picks" : competition.drawType === "import" ? "Score" : "Players drawn"}
                   </th>
                   <th className="px-5 py-3 text-right">
                     {isPickFormat ? "Prize $" : "Position"}
@@ -628,24 +653,28 @@ export default function CompetitionManagePage({
                   return (
                     <tr key={entry._id} className="border-b border-gray-50 last:border-0">
                       <td className="px-5 py-3 font-medium text-gray-900">{entry.displayName}</td>
-                      <td className="px-5 py-3">
-                        {entry.paidAt ? (
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Paid</span>
-                        ) : isCash ? (
-                          <button
-                            onClick={() => markEntryPaid({ entryId: entry._id })}
-                            className="text-xs bg-amber-100 text-amber-700 hover:bg-amber-200 px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer"
-                          >
-                            Mark paid ✓
-                          </button>
-                        ) : (
-                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Unpaid</span>
-                        )}
-                      </td>
+                      {competition.drawType !== "import" && (
+                        <td className="px-5 py-3">
+                          {entry.paidAt ? (
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Paid</span>
+                          ) : isCash ? (
+                            <button
+                              onClick={() => markEntryPaid({ entryId: entry._id })}
+                              className="text-xs bg-amber-100 text-amber-700 hover:bg-amber-200 px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer"
+                            >
+                              Mark paid ✓
+                            </button>
+                          ) : (
+                            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Unpaid</span>
+                          )}
+                        </td>
+                      )}
                       <td className="px-5 py-3 text-xs text-gray-500 hidden sm:table-cell">
                         {isPickFormat
                           ? (pickedNames.length ? pickedNames.join(", ") : "—")
-                          : (entry.drawnPlayerIds?.length ? `${entry.drawnPlayerIds.length} drawn` : "—")}
+                          : competition.drawType === "import"
+                            ? ((entry as any).score ?? "—")
+                            : (entry.drawnPlayerIds?.length ? `${entry.drawnPlayerIds.length} drawn` : "—")}
                       </td>
                       <td className="px-5 py-3 text-right text-gray-600">
                         {isPickFormat
@@ -661,8 +690,8 @@ export default function CompetitionManagePage({
         </Card>
       )}
 
-      {/* Draw & Tee Times — club comps only */}
-      {competition.type === "club_comp" && (
+      {/* Draw & Tee Times — club comps only (not for imported/complete) */}
+      {competition.type === "club_comp" && competition.status !== "complete" && competition.drawType !== "import" && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
@@ -823,6 +852,202 @@ export default function CompetitionManagePage({
             {teeMsg && (
               <p className={`text-sm rounded-lg px-3 py-2 ${teeMsg.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
                 {teeMsg.ok ? "✓ " : "✗ "}{teeMsg.text}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Grievance Round */}
+      {competition.type === "club_comp" && drawGenerated && competition.drawType !== "import" && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Grievance Round</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+
+            {/* State: published */}
+            {competition.grievanceRoundPublishedAt ? (
+              <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-800">
+                ✓ Grievance round published{" "}
+                {new Date(competition.grievanceRoundPublishedAt).toLocaleString("en-GB", {
+                  day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+                })}
+                . Re-book tee times to reflect the updated draw.
+              </div>
+
+            ) : grievanceDraftParsed ? (
+              /* State: draft awaiting admin review */
+              <div className="space-y-3">
+                <div className="bg-violet-50 border border-violet-200 rounded-lg px-4 py-3 text-sm text-violet-900">
+                  Corti reviewed <strong>{grievanceDraftParsed.grievancesTotal}</strong> grievances and proposed{" "}
+                  <strong>{grievanceDraftParsed.diffs.length}</strong> change{grievanceDraftParsed.diffs.length !== 1 ? "s" : ""} to the draw.
+                </div>
+                {grievanceDraftParsed.diffs.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-3 py-2.5 text-left text-gray-600 font-medium">Player</th>
+                          <th className="px-3 py-2.5 text-left text-gray-600 font-medium">From</th>
+                          <th className="px-3 py-2.5 text-left text-gray-600 font-medium">To</th>
+                          <th className="px-3 py-2.5 text-left text-gray-600 font-medium">Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {grievanceDraftParsed.diffs.map((d, i) => (
+                          <tr key={i} className="border-b border-gray-100 last:border-0">
+                            <td className="px-3 py-2.5 font-medium text-gray-900">{d.displayName}</td>
+                            <td className="px-3 py-2.5 text-gray-500">Group {d.fromGroup} · {d.fromTime}</td>
+                            <td className="px-3 py-2.5 text-green-700 font-medium">Group {d.toGroup} · {d.toTime}</td>
+                            <td className="px-3 py-2.5 text-gray-600 italic">{d.reason}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      setRunningOptimisation(true);
+                      setGrievanceMsg(null);
+                      try {
+                        await publishGrievanceDraft({ competitionId: competitionId as Id<"competitions"> });
+                        setGrievanceMsg({ text: "Draw updated. Re-book tee times to reflect the changes.", ok: true });
+                      } catch (err) {
+                        setGrievanceMsg({ text: err instanceof Error ? err.message : "Failed", ok: false });
+                      }
+                      setRunningOptimisation(false);
+                    }}
+                    disabled={runningOptimisation}
+                  >
+                    Accept & Publish
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      await discardGrievanceDraft({ competitionId: competitionId as Id<"competitions"> });
+                      setGrievanceMsg(null);
+                    }}
+                  >
+                    Discard
+                  </Button>
+                </div>
+              </div>
+
+            ) : (
+              /* State: no draft — window setup / run optimisation */
+              <div className="space-y-4">
+                {!competition.grievanceCutoff ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-600">
+                      Open a feedback window so members can submit draw preferences before you run the AI optimisation.
+                    </p>
+                    <div className="flex items-end gap-3 flex-wrap">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Feedback closes at</label>
+                        <input
+                          type="datetime-local"
+                          value={grievanceCutoffInput}
+                          onChange={e => setGrievanceCutoffInput(e.target.value)}
+                          className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        disabled={!grievanceCutoffInput || settingCutoff}
+                        onClick={async () => {
+                          setSettingCutoff(true);
+                          try {
+                            await setGrievanceCutoff({
+                              competitionId: competitionId as Id<"competitions">,
+                              cutoff: new Date(grievanceCutoffInput).getTime(),
+                            });
+                            setGrievanceMsg({ text: "Feedback window opened.", ok: true });
+                          } catch (err) {
+                            setGrievanceMsg({ text: err instanceof Error ? err.message : "Failed", ok: false });
+                          }
+                          setSettingCutoff(false);
+                        }}
+                      >
+                        {settingCutoff ? "Opening…" : "Open window"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : Date.now() <= competition.grievanceCutoff ? (
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Feedback window open</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Closes{" "}
+                        {new Date(competition.grievanceCutoff).toLocaleString("en-GB", {
+                          weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+                        })}
+                        {" · "}
+                        <span className="font-semibold text-gray-800">{grievanceCount ?? 0}</span>{" "}
+                        submission{grievanceCount !== 1 ? "s" : ""} received
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 border-red-200 hover:bg-red-50 shrink-0"
+                      onClick={async () => {
+                        if (!confirm("Close the feedback window early?")) return;
+                        await setGrievanceCutoff({
+                          competitionId: competitionId as Id<"competitions">,
+                          cutoff: Date.now() - 1,
+                        });
+                      }}
+                    >
+                      Close early
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-700">
+                      Feedback window closed ·{" "}
+                      <span className="font-semibold">{grievanceCount ?? 0}</span>{" "}
+                      submission{grievanceCount !== 1 ? "s" : ""} received
+                    </p>
+                    {(grievanceCount ?? 0) === 0 ? (
+                      <p className="text-xs text-gray-400">No feedback was submitted — no optimisation needed.</p>
+                    ) : (
+                      <Button
+                        size="sm"
+                        disabled={runningOptimisation}
+                        onClick={async () => {
+                          setRunningOptimisation(true);
+                          setGrievanceMsg(null);
+                          try {
+                            const result = await optimiseGrievancesAction({
+                              competitionId: competitionId as Id<"competitions">,
+                            });
+                            setGrievanceMsg({
+                              text: `Optimisation complete — review ${result.grievancesAddressed} proposed change${result.grievancesAddressed !== 1 ? "s" : ""} above.`,
+                              ok: true,
+                            });
+                          } catch (err) {
+                            setGrievanceMsg({ text: err instanceof Error ? err.message : "Optimisation failed", ok: false });
+                          }
+                          setRunningOptimisation(false);
+                        }}
+                        className="bg-violet-700 hover:bg-violet-600 text-white"
+                      >
+                        {runningOptimisation ? "Optimising draw…" : "✨ Run AI optimisation"}
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {grievanceMsg && (
+              <p className={`text-sm rounded-lg px-3 py-2 ${grievanceMsg.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+                {grievanceMsg.ok ? "✓ " : "✗ "}{grievanceMsg.text}
               </p>
             )}
           </CardContent>

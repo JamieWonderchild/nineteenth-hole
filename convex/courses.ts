@@ -1,5 +1,23 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
+
+// Internal — link a club courses record to the global golfCourses entry.
+// Run via CLI: npx convex run courses:linkToGolfCourse '{...}'
+export const linkToGolfCourse = internalMutation({
+  args: {
+    courseId: v.id("courses"),
+    golfCourseId: v.id("golfCourses"),
+    defaultTeeId: v.id("courseTees"),
+  },
+  handler: async (ctx, { courseId, golfCourseId, defaultTeeId }) => {
+    await ctx.db.patch(courseId, {
+      golfCourseId,
+      defaultTeeId,
+      updatedAt: new Date().toISOString(),
+    });
+    return { ok: true };
+  },
+});
 
 export const listByClub = query({
   args: { clubId: v.id("clubs") },
@@ -21,6 +39,8 @@ export const upsert = mutation({
     courseId: v.optional(v.id("courses")),
     clubId: v.id("clubs"),
     name: v.string(),
+    golfCourseId: v.optional(v.id("golfCourses")),
+    defaultTeeId: v.optional(v.id("courseTees")),
     holes: v.array(v.object({
       number: v.number(),
       par: v.number(),
@@ -32,7 +52,7 @@ export const upsert = mutation({
       yardsRed: v.optional(v.number()),
     })),
   },
-  handler: async (ctx, { courseId, clubId, name, holes }) => {
+  handler: async (ctx, { courseId, clubId, name, golfCourseId, defaultTeeId, holes }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthenticated");
 
@@ -47,11 +67,17 @@ export const upsert = mutation({
     }
 
     const now = new Date().toISOString();
+    const fields = {
+      name, holes,
+      ...(golfCourseId !== undefined ? { golfCourseId } : {}),
+      ...(defaultTeeId !== undefined ? { defaultTeeId } : {}),
+      updatedAt: now,
+    };
     if (courseId) {
-      await ctx.db.patch(courseId, { name, holes, updatedAt: now });
+      await ctx.db.patch(courseId, fields);
       return courseId;
     }
-    return ctx.db.insert("courses", { clubId, name, holes, createdAt: now, updatedAt: now });
+    return ctx.db.insert("courses", { clubId, ...fields, createdAt: now });
   },
 });
 

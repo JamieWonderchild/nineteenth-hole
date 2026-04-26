@@ -13,8 +13,9 @@ export default function ClubPageClient({ params }: { params: Promise<{ clubSlug:
   const { openSignIn } = useClerk();
   const router = useRouter();
   const [joining, setJoining] = useState(false);
-  const [joined, setJoined] = useState(false);
+  const [result, setResult] = useState<{ matched: boolean; status: string; displayName: string } | null>(null);
 
+  const claimProvisionalMember = useMutation(api.clubMembers.claimProvisionalMember);
   const ensureMember = useMutation(api.clubMembers.ensureMember);
 
   const club = useQuery(api.clubs.getBySlug, { slug: clubSlug });
@@ -27,7 +28,7 @@ export default function ClubPageClient({ params }: { params: Promise<{ clubSlug:
     club ? { clubId: club._id } : "skip"
   );
 
-  // Active members get the full dashboard
+  // Active members go straight to dashboard
   useEffect(() => {
     if (membership?.status === "active") {
       router.replace("/manage");
@@ -39,13 +40,17 @@ export default function ClubPageClient({ params }: { params: Promise<{ clubSlug:
     if (!club) return;
     setJoining(true);
     try {
-      await ensureMember({
+      const displayName = user.fullName ?? user.username ?? user.primaryEmailAddress?.emailAddress ?? "Member";
+
+      // Try to claim a provisional member record first.
+      // On match → instant active membership (auto-redirected above via membership query).
+      // On no match → creates a pending membership and emails Jamie.
+      const res = await claimProvisionalMember({
         clubId: club._id,
-        userId: user.id,
-        displayName: user.fullName ?? user.username ?? user.primaryEmailAddress?.emailAddress ?? "Member",
-        avatarUrl: user.imageUrl ?? undefined,
+        displayName,
       });
-      setJoined(true);
+
+      setResult(res as { matched: boolean; status: string; displayName: string });
     } finally {
       setJoining(false);
     }
@@ -71,7 +76,7 @@ export default function ClubPageClient({ params }: { params: Promise<{ clubSlug:
     );
   }
 
-  // Pending state
+  // Pending state — either from a prior session or from a failed match
   if (membership?.status === "pending") {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -84,33 +89,38 @@ export default function ClubPageClient({ params }: { params: Promise<{ clubSlug:
     );
   }
 
-  // Non-member (or not signed in) — focused invite acceptance screen
+  // Non-member invite/join screen
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-950 to-green-900 flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm text-center">
-        {/* Club icon */}
         <div className="w-20 h-20 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mx-auto mb-6 text-4xl">
           ⛳
         </div>
 
-        {/* Invite label */}
         <p className="text-green-300 text-sm font-medium tracking-wide uppercase mb-2">You&apos;ve been invited</p>
-
-        {/* Club name */}
         <h1 className="text-3xl font-bold text-white mb-3">{club.name}</h1>
-
-        {/* Welcome message */}
         <p className="text-green-200 text-base leading-relaxed mb-8">
-          Join your club on The 19th Hole — access competitions, interclub results, tee time booking, and more.
+          Join your club on The 19th Hole — track your RTSF standing, competition history, tee time booking, and more.
         </p>
 
-        {/* CTA */}
-        {joined ? (
-          <div className="bg-white/10 border border-white/20 rounded-2xl px-6 py-4 text-center">
-            <div className="text-2xl mb-2">✓</div>
-            <p className="text-white font-semibold">Request sent!</p>
-            <p className="text-green-300 text-sm mt-1">An admin will approve you shortly.</p>
-          </div>
+        {result ? (
+          result.matched ? (
+            // Matched — show success (redirect will fire once membership query updates)
+            <div className="bg-white/10 border border-white/20 rounded-2xl px-6 py-5 text-center">
+              <div className="text-3xl mb-2">🎉</div>
+              <p className="text-white font-semibold text-lg">Welcome back, {result.displayName}!</p>
+              <p className="text-green-300 text-sm mt-1">Your competition history is linked. Loading your dashboard…</p>
+            </div>
+          ) : (
+            // No match — pending, admin notified
+            <div className="bg-white/10 border border-white/20 rounded-2xl px-6 py-4 text-center">
+              <div className="text-2xl mb-2">✓</div>
+              <p className="text-white font-semibold">Request sent!</p>
+              <p className="text-green-300 text-sm mt-1">
+                We couldn&apos;t automatically match your name. An admin will link your account shortly.
+              </p>
+            </div>
+          )
         ) : (
           <button
             onClick={handleJoin}
@@ -121,8 +131,7 @@ export default function ClubPageClient({ params }: { params: Promise<{ clubSlug:
           </button>
         )}
 
-        {/* Member count hint */}
-        {membersList && membersList.length > 0 && !joined && (
+        {membersList && membersList.length > 0 && !result && (
           <p className="text-green-400 text-sm mt-5">
             {membersList.length} member{membersList.length !== 1 ? "s" : ""} already on the platform
           </p>

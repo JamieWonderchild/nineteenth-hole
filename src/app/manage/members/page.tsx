@@ -708,6 +708,9 @@ export default function MembersPage() {
   const pending = useQuery(api.clubMembers.listPending, (club && isAdmin) ? { clubId: club._id } : "skip");
   const categories = (useQuery(api.membershipCategories.listByClub, club ? { clubId: club._id } : "skip") ?? []) as Category[];
 
+  const provisional = useQuery(api.clubMembers.listProvisional, (club && isAdmin) ? { clubId: club._id } : "skip");
+  const linkToClerk = useMutation(clubMembersApi.linkToClerk);
+
   const bulkPreRegister = useMutation(api.clubMembers.bulkPreRegister);
   const approveMember = useMutation(api.clubMembers.approveMember);
   const rejectMember = useMutation(api.clubMembers.rejectMember);
@@ -728,6 +731,8 @@ export default function MembersPage() {
   const [nonMembersLoading, setNonMembersLoading] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [navigating, setNavigating] = useState<string | null>(null);
+  const [linkingId, setLinkingId] = useState<string | null>(null);
+  const [linkClerkInput, setLinkClerkInput] = useState<{ id: Id<"clubMembers">; value: string } | null>(null);
 
   async function handleSaveHandicap(id: Id<"clubMembers">, value: string) {
     const hcp = parseFloat(value);
@@ -824,6 +829,75 @@ export default function MembersPage() {
                 <div className="flex gap-2">
                   <button onClick={() => approveMember({ memberId: m._id })} className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-500 transition-colors">Approve</button>
                   <button onClick={() => rejectMember({ memberId: m._id })} className="px-3 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors">Reject</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Provisional players — admin only */}
+      {isAdmin && provisional && provisional.length > 0 && (
+        <section>
+          <h2 className="text-base font-semibold text-gray-900 mb-1 flex items-center gap-2">
+            Provisional players
+            <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">{provisional.length}</span>
+          </h2>
+          <p className="text-xs text-gray-400 mb-3">
+            These players have competition history but haven&apos;t signed up yet. When they join via the invite link their account will auto-link by name. If it doesn&apos;t match, use &ldquo;Link&rdquo; to connect manually.
+          </p>
+          <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
+            {provisional.map(m => (
+              <div key={m._id} className="flex items-center justify-between px-5 py-3.5 gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900">{m.displayName}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {m.totalEntered > 0 ? `${m.totalEntered} competition${m.totalEntered !== 1 ? "s" : ""}` : "No entries yet"}
+                    {m.handicap != null ? ` · HCP ${m.handicap}` : ""}
+                  </p>
+                </div>
+                <div className="shrink-0">
+                  {linkClerkInput?.id === m._id ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={linkClerkInput.value}
+                        onChange={e => setLinkClerkInput({ id: m._id, value: e.target.value })}
+                        placeholder="user_2abc…"
+                        className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-mono w-44 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        autoFocus
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!linkClerkInput.value.trim()) return;
+                          setLinkingId(m._id);
+                          try {
+                            await linkToClerk({ memberId: m._id, clerkUserId: linkClerkInput.value.trim() });
+                            setLinkClerkInput(null);
+                          } finally {
+                            setLinkingId(null);
+                          }
+                        }}
+                        disabled={linkingId === m._id || !linkClerkInput.value.trim()}
+                        className="px-2.5 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-500 disabled:opacity-50"
+                      >
+                        {linkingId === m._id ? "…" : "Save"}
+                      </button>
+                      <button
+                        onClick={() => setLinkClerkInput(null)}
+                        className="px-2.5 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-200"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setLinkClerkInput({ id: m._id, value: "" })}
+                      className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                      Link account
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

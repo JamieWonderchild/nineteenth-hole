@@ -60,7 +60,8 @@ export const importResults = httpAction(async (ctx, request) => {
       competitionDate: string;
       category: string;
       isPairsEvent?: boolean;
-      results: Array<{ position: number; name: string; memberId?: string }>;
+      entryFee?: number;
+      results: Array<{ position: number; name: string; memberId?: string; score?: string; handicap?: number; holes?: Array<{ hole: number; par: number; si: number; gross: number; points: number }> }>;
     });
     return new Response(JSON.stringify(result), {
       status: 200,
@@ -84,10 +85,21 @@ export const processCompetition = mutation({
     competitionDate: v.string(),      // "YYYY-MM-DD"
     category: v.string(),             // 'major' | 'medal' | 'stableford' | 'knockout' | 'trophy'
     isPairsEvent: v.optional(v.boolean()),
+    fgcCompId: v.optional(v.string()),  // FGC compid for reliable deduplication
+    entryFee: v.optional(v.number()),   // pence — e.g. 300 for £3, 500 for £5
     results: v.array(v.object({
       position: v.number(),
       name: v.string(),
       memberId: v.optional(v.string()),
+      score: v.optional(v.string()),         // e.g. "38 pts", "72", "CB"
+      handicap: v.optional(v.number()),      // e.g. 14.2
+      holes: v.optional(v.array(v.object({
+        hole: v.number(),
+        par: v.number(),
+        si: v.number(),
+        gross: v.number(),
+        points: v.number(),
+      }))),
     })),
   },
   handler: async (ctx, args) => {
@@ -102,7 +114,7 @@ export const processCompetition = mutation({
     }
 
     // 2. Find or create competition
-    const compId = await findOrCreateCompetition(ctx, club._id, args.competitionName, args.competitionDate, club.currency);
+    const compId = await findOrCreateCompetition(ctx, club._id, args.competitionName, args.competitionDate, club.currency, args.fgcCompId, args.entryFee);
     const comp = await ctx.db.get(compId);
     if (!comp) throw new Error("Failed to resolve competition");
 
@@ -138,7 +150,7 @@ export const processCompetition = mutation({
     let created = 0, updated = 0;
 
     for (const result of args.results) {
-      const userId = await findOrCreateMember(ctx, club._id, result.name, result.memberId, now);
+      const userId = await findOrCreateMember(ctx, club._id, result.name, result.memberId, now, result.handicap);
 
       const existing = await ctx.db
         .query("entries")
@@ -150,6 +162,8 @@ export const processCompetition = mutation({
       if (existing.length > 0) {
         await ctx.db.patch(existing[0]._id, {
           leaderboardPosition: result.position,
+          ...(result.score !== undefined ? { score: result.score } : {}),
+          ...(result.holes !== undefined ? { holes: result.holes } : {}),
           updatedAt: now,
         });
         updated++;
@@ -161,6 +175,8 @@ export const processCompetition = mutation({
           displayName: result.name,
           paidAt: now,           // treated as paid so it counts in standings
           leaderboardPosition: result.position,
+          ...(result.score !== undefined ? { score: result.score } : {}),
+          ...(result.holes !== undefined ? { holes: result.holes } : {}),
           createdAt: now,
           updatedAt: now,
         });
@@ -168,10 +184,15 @@ export const processCompetition = mutation({
       }
     }
 
-    // 5. Mark competition as complete if not already
-    if (comp.status !== "complete") {
-      await ctx.db.patch(compId, { status: "complete", updatedAt: now });
-    }
+    // 5. Mark competition as complete and record the full field size.
+    //    participantCount is used by computeStandings to calculate the correct N
+    //    for RTSF points — it must reflect the entire field, not just RTSF members.
+    const fieldSize = args.results.length;
+    await ctx.db.patch(compId, {
+      status: "complete",
+      ...(fieldSize > 0 ? { participantCount: fieldSize } : {}),
+      updatedAt: now,
+    });
 
     return {
       ok: true,
@@ -185,6 +206,143 @@ export const processCompetition = mutation({
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// ── Fixtures import (upcoming competitions → status: "draft") ────────────────
+
+export const importFixtures = httpAction(async (ctx, request) => {
+  const token = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  if (!token) {
+    return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json() as Record<string, unknown>;
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  try {
+    const result = await ctx.runMutation(api.resultsImport.processFixtures, {
+      ...(body as object),
+      importToken: token,
+    } as {
+      clubSlug: string;
+      importToken: string;
+      fixtures: Array<{ name: string; date: string; category?: string; fgcCompId?: string }>;
+    });
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err: unknown) {
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+});
+
+export const processFixtures = mutation({
+  args: {
+    clubSlug: v.string(),
+    importToken: v.string(),
+    fixtures: v.array(v.object({
+      name: v.string(),
+      date: v.string(),                    // "YYYY-MM-DD"
+      category: v.optional(v.string()),
+      fgcCompId: v.optional(v.string()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    // 1. Find club and validate token
+    const club = await ctx.db
+      .query("clubs")
+      .withIndex("by_slug", q => q.eq("slug", args.clubSlug))
+      .unique();
+    if (!club) throw new Error(`Club not found: ${args.clubSlug}`);
+    if (!club.importToken || club.importToken !== args.importToken) {
+      throw new Error("Invalid import token");
+    }
+
+    const allComps = await ctx.db
+      .query("competitions")
+      .withIndex("by_club", q => q.eq("clubId", club._id))
+      .collect();
+
+    let created = 0;
+    let skipped = 0;
+    const now = new Date().toISOString();
+
+    for (const fixture of args.fixtures) {
+      // Try fgcCompId first, then normalised name+date
+      const byFgcId = fixture.fgcCompId
+        ? allComps.find(c => c.fgcCompId === fixture.fgcCompId)
+        : null;
+      const byNameDate = !byFgcId
+        ? allComps.find(c =>
+            normalizeName(c.name) === normalizeName(fixture.name) &&
+            c.startDate.startsWith(fixture.date)
+          )
+        : null;
+
+      const existing = byFgcId ?? byNameDate;
+
+      if (existing) {
+        // Backfill fgcCompId if we now have it
+        if (fixture.fgcCompId && !existing.fgcCompId) {
+          await ctx.db.patch(existing._id, { fgcCompId: fixture.fgcCompId, updatedAt: now });
+        }
+        skipped++;
+        continue;
+      }
+
+      // Create new competition as draft
+      const baseSlug = slugify(fixture.name) + "-" + fixture.date.replace(/-/g, "");
+      let slug = baseSlug;
+      let suffix = 2;
+      while (allComps.some(c => c.slug === slug)) {
+        slug = `${baseSlug}-${suffix++}`;
+      }
+
+      const newId = await ctx.db.insert("competitions", {
+        clubId: club._id,
+        scope: "club",
+        name: fixture.name,
+        slug,
+        type: "club_comp",
+        drawType: "import",
+        status: "draft",
+        startDate: fixture.date,
+        endDate: fixture.date,
+        entryDeadline: fixture.date,
+        fgcCompId: fixture.fgcCompId,
+        tierCount: 0,
+        playersPerTier: 0,
+        entryFee: 0,
+        currency: club.currency,
+        prizeStructure: [],
+        createdBy: "import",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // Push into local cache so slug dedup works for subsequent iterations
+      allComps.push({ _id: newId, slug, fgcCompId: fixture.fgcCompId, name: fixture.name, startDate: fixture.date } as never);
+      created++;
+    }
+
+    return { ok: true, created, skipped };
+  },
+});
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
 
 function normalizeName(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
@@ -200,17 +358,40 @@ async function findOrCreateCompetition(
   name: string,
   date: string,
   currency: string,
+  fgcCompId?: string,
+  entryFee?: number,
 ): Promise<Id<"competitions">> {
   const allComps = await ctx.db
     .query("competitions")
     .withIndex("by_club", q => q.eq("clubId", clubId))
     .collect();
 
+  const now = new Date().toISOString();
+
+  // Primary match: by fgcCompId (most reliable — survives name changes)
+  if (fgcCompId) {
+    const byFgcId = allComps.find(c => c.fgcCompId === fgcCompId);
+    if (byFgcId) {
+      const patch: Record<string, unknown> = {};
+      if (normalizeName(byFgcId.name) !== normalizeName(name)) patch.name = name;
+      if (entryFee !== undefined && (byFgcId.entryFee === 0 || byFgcId.entryFee === undefined)) patch.entryFee = entryFee;
+      if (Object.keys(patch).length > 0) await ctx.db.patch(byFgcId._id, { ...patch, updatedAt: now });
+      return byFgcId._id;
+    }
+  }
+
+  // Fallback match: normalised name + date
   const normName = normalizeName(name);
   const existing = allComps.find(
     c => normalizeName(c.name) === normName && c.startDate.startsWith(date)
   );
-  if (existing) return existing._id;
+  if (existing) {
+    const patch: Record<string, unknown> = {};
+    if (fgcCompId && !existing.fgcCompId) patch.fgcCompId = fgcCompId;
+    if (entryFee !== undefined && (existing.entryFee === 0 || existing.entryFee === undefined)) patch.entryFee = entryFee;
+    if (Object.keys(patch).length > 0) await ctx.db.patch(existing._id, { ...patch, updatedAt: now });
+    return existing._id;
+  }
 
   // Create a minimal competition record
   const baseSlug = slugify(name) + "-" + date.replace(/-/g, "");
@@ -220,7 +401,6 @@ async function findOrCreateCompetition(
     slug = `${baseSlug}-${suffix++}`;
   }
 
-  const now = new Date().toISOString();
   return ctx.db.insert("competitions", {
     clubId,
     scope: "club",
@@ -232,9 +412,10 @@ async function findOrCreateCompetition(
     startDate: date,
     endDate: date,
     entryDeadline: date,
+    fgcCompId,
     tierCount: 0,
     playersPerTier: 0,
-    entryFee: 0,
+    entryFee: entryFee ?? 0,
     currency,
     prizeStructure: [],
     createdBy: "import",
@@ -249,6 +430,7 @@ async function findOrCreateMember(
   name: string,
   memberId: string | undefined,
   now: string,
+  handicap?: number,
 ): Promise<string> {
   // 1. Try exact fgcMemberId match
   if (memberId) {
@@ -268,10 +450,10 @@ async function findOrCreateMember(
 
   const byName = allMembers.find(m => normalizeName(m.displayName) === normName);
   if (byName) {
-    // Backfill the fgcMemberId if we now have it
-    if (memberId && !byName.fgcMemberId) {
-      await ctx.db.patch(byName._id, { fgcMemberId: memberId });
-    }
+    const patch: Record<string, unknown> = {};
+    if (memberId && !byName.fgcMemberId) patch.fgcMemberId = memberId;
+    if (handicap !== undefined) patch.handicap = handicap;
+    if (Object.keys(patch).length > 0) await ctx.db.patch(byName._id, { ...patch, updatedAt: now });
     return byName.userId;
   }
 
@@ -288,6 +470,7 @@ async function findOrCreateMember(
     status: "active",
     displayName: name,
     fgcMemberId: memberId,
+    handicap,
     totalEntered: 0,
     totalSpent: 0,
     totalWon: 0,

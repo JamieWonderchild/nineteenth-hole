@@ -7,8 +7,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, LogOut,
-  Globe, ChevronRight, ChevronDown, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered, Clock, MapPin,
-  MessageSquare, Mail, Swords, UserCheck, ShoppingCart, Shield, CreditCard, UserCircle, BarChart2, Wallet, Check, Monitor, Map, Plane
+  Globe, ChevronDown, Menu, X, Flag, Trophy, Zap, Plus, ListOrdered, Clock,
+  MessageSquare, Mail, Swords, UserCheck, ShoppingCart, Shield, CreditCard, UserCircle, BarChart2, Wallet, Check, Map
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
@@ -55,7 +55,6 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
   const { activeMembership, club, myClubs, selectedClubId } = useActiveClub();
   const { setSelectedClubId } = useClubContext();
 
-  // Close dropdown on outside click
   useEffect(() => {
     if (!switcherOpen) return;
     function handleClick(e: MouseEvent) {
@@ -84,7 +83,6 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
   );
 
   const is = (path: string) => pathname === path;
-
   const multiClub = myClubs.length > 1;
 
   function selectClub(clubId: typeof myClubs[0]["club"]["_id"]) {
@@ -139,6 +137,8 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+
+        {/* ── Super-admin platform tools ── */}
         {superAdmin && (
           <>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-3 py-2">
@@ -154,23 +154,21 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               onClick={onNav}
             />
             <NavItem href="/games" icon={<Zap size={16} />} label="Quick Games" active={pathname.startsWith("/games")} onClick={onNav} />
-            <NavItem href="/trips" icon={<Plane size={16} />} label="Golf Trips" active={pathname.startsWith("/trips")} onClick={onNav} />
             <NavItem href="/courses" icon={<Map size={16} />} label="Golf Courses" active={pathname.startsWith("/courses")} onClick={onNav} />
             {club && <div className="my-2 border-t border-border" />}
           </>
         )}
 
-        {!superAdmin && (
+        {/* ── Personal nav — only for users with no club ── */}
+        {!superAdmin && !club && (
           <>
             <NavItem href="/rounds/new" icon={<Flag size={16} />} label="Log a Round" active={pathname.startsWith("/rounds")} onClick={onNav} />
-            <NavItem href="/trips" icon={<Plane size={16} />} label="Golf Trips" active={pathname.startsWith("/trips")} onClick={onNav} />
-            <NavItem href="/pools" icon={<Trophy size={16} />} label="Tour Pools" active={pathname.startsWith("/pools")} onClick={onNav} />
             <NavItem href="/games" icon={<Zap size={16} />} label="My Games" active={pathname.startsWith("/games")} onClick={onNav} />
             <NavItem href="/courses" icon={<Map size={16} />} label="Golf Courses" active={pathname.startsWith("/courses")} onClick={onNav} />
-            {club && <div className="my-2 border-t border-border" />}
           </>
         )}
 
+        {/* ── Club section ── */}
         {club && (
           <>
             {superAdmin && (
@@ -183,12 +181,18 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
 
             {/* Competitions */}
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-3 pt-4 pb-1">Competitions</p>
-            <NavItem href="/manage/results" icon={<Trophy size={16} />} label="Competitions" active={pathname.startsWith("/manage/results") || pathname.startsWith("/manage/competitions")} onClick={onNav} />
+            <NavItem
+              href="/manage/results"
+              icon={<Trophy size={16} />}
+              label="Competitions"
+              active={pathname.startsWith("/manage/results") || pathname.startsWith("/manage/competitions")}
+              onClick={onNav}
+            />
             <NavItem href="/manage/series" icon={<ListOrdered size={16} />} label="Season Series" active={pathname.startsWith("/manage/series")} onClick={onNav} />
-            <NavItem href="/manage/knockouts" icon={<Swords size={16} />} label="Knockouts" active={pathname.startsWith("/manage/knockouts")} onClick={onNav} />
             <NavItem href="/manage/interclub" icon={<Shield size={16} />} label="Interclub" active={pathname.startsWith("/manage/interclub")} onClick={onNav} />
+            <NavItem href="/manage/knockouts" icon={<Swords size={16} />} label="Knockouts" active={pathname.startsWith("/manage/knockouts")} onClick={onNav} />
 
-            {/* Club */}
+            {/* Club operations */}
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-3 pt-4 pb-1">Club</p>
             <NavItem
               href="/manage/members"
@@ -206,10 +210,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               <NavItem href="/manage/visitors" icon={<UserCheck size={16} />} label="Visitors" active={pathname.startsWith("/manage/visitors")} onClick={onNav} />
             )}
             {isStaff && (
-              <NavItem href="/manage/pos" icon={<ShoppingCart size={16} />} label="Point of Sale" active={pathname === "/manage/pos"} onClick={onNav} />
-            )}
-            {isStaff && (
-              <NavItem href="/manage/pos/shifts" icon={<Clock size={16} />} label="Shifts &amp; Reports" active={pathname.startsWith("/manage/pos/shifts")} onClick={onNav} />
+              <NavItem href="/manage/pos" icon={<ShoppingCart size={16} />} label="Point of Sale" active={pathname.startsWith("/manage/pos")} onClick={onNav} />
             )}
             {isStaff && (
               <NavItem href="/manage/accounts" icon={<Wallet size={16} />} label="Member Accounts" active={pathname.startsWith("/manage/accounts")} onClick={onNav} />
@@ -221,8 +222,7 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-3 pt-4 pb-1">Admin</p>
                 <NavItem href="/manage/analytics" icon={<BarChart2 size={16} />} label="Analytics" active={pathname.startsWith("/manage/analytics")} onClick={onNav} />
                 <NavItem href="/manage/comms" icon={<Mail size={16} />} label="Communications" active={pathname.startsWith("/manage/comms")} onClick={onNav} />
-                <NavItem href="/manage/courses" icon={<MapPin size={16} />} label="Course Card" active={pathname.startsWith("/manage/courses")} onClick={onNav} />
-                <NavItem href="/manage/pos/locations" icon={<Monitor size={16} />} label="Locations &amp; Kiosks" active={pathname.startsWith("/manage/pos/locations")} onClick={onNav} />
+                <NavItem href="/manage/billing" icon={<CreditCard size={16} />} label="Billing" active={is("/manage/billing")} onClick={onNav} />
               </>
             )}
 
@@ -236,15 +236,11 @@ function SidebarContent({ onNav }: { onNav?: () => void }) {
               onClick={onNav}
             />
             <NavItem href="/manage/profile" icon={<UserCircle size={16} />} label="My Profile" active={is("/manage/profile")} onClick={onNav} />
-            {isAdmin && (
-              <NavItem href="/manage/billing" icon={<CreditCard size={16} />} label="Billing" active={is("/manage/billing")} onClick={onNav} />
-            )}
-            <NavItem href={`/${club.slug}`} icon={<ChevronRight size={16} />} label="View public page" active={false} onClick={onNav} />
           </>
         )}
       </nav>
 
-      {/* User */}
+      {/* User footer */}
       <div className="border-t border-border p-3">
         <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-accent transition-colors">
           {user?.imageUrl ? (

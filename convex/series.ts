@@ -166,36 +166,60 @@ export const computeStandings = query({
       const isPairsEvent = link.isPairsEvent ?? false;
 
       if (comp.type === "club_comp") {
-        // ── Club competition: scores in competitionScores ──────────────────
+        // ── Club competition ───────────────────────────────────────────────
+        // Primary source: competitionScores (seeded / hole-by-hole entry)
         const scores = await ctx.db
           .query("competitionScores")
           .withIndex("by_competition", q => q.eq("competitionId", link.competitionId))
           .collect();
 
-        // Sort by stablefordPoints desc (or netScore asc for strokeplay) to derive positions
-        const format = comp.scoringFormat ?? "stableford";
-        const sorted = [...scores].sort((a, b) =>
-          format === "stableford"
-            ? (b.stablefordPoints ?? 0) - (a.stablefordPoints ?? 0)
-            : (a.netScore ?? a.grossScore ?? 999) - (b.netScore ?? b.grossScore ?? 999)
-        );
-        // Use the stored participantCount (set on imported events to include non-racers)
-        // so calcPoints uses the actual field size, not just the number of imported racer scores
-        const N = comp.participantCount ?? sorted.length;
+        if (scores.length > 0) {
+          const format = comp.scoringFormat ?? "stableford";
+          const sorted = [...scores].sort((a, b) =>
+            format === "stableford"
+              ? (b.stablefordPoints ?? 0) - (a.stablefordPoints ?? 0)
+              : (a.netScore ?? a.grossScore ?? 999) - (b.netScore ?? b.grossScore ?? 999)
+          );
+          // participantCount = full field size (may be larger than scored subset)
+          const N = comp.participantCount ?? sorted.length;
 
-        sorted.forEach((score, idx) => {
-          // Respect pre-stored position if present, else derive from sort order (1-based)
-          const pos = score.position ?? (idx + 1);
-          const pts = calcPoints(pos, N, category, isPairsEvent);
-          const key = score.userId ?? score.displayName;
-          const m = accum(key, score.userId, score.displayName);
-          m.competitionsPlayed++;
-          if (category === "major") m.majorScores.push(pts);
-          else if (category === "medal") m.medalScores.push(pts);
-          else if (category === "stableford") m.stablefordScores.push(pts);
-          else if (category === "knockout") m.knockoutTotal += pts;
-          else if (category === "trophy") m.trophyTotal += pts;
-        });
+          sorted.forEach((score, idx) => {
+            const pos = score.position ?? (idx + 1);
+            const pts = calcPoints(pos, N, category, isPairsEvent);
+            const key = score.userId ?? score.displayName;
+            const m = accum(key, score.userId, score.displayName);
+            m.competitionsPlayed++;
+            if (category === "major") m.majorScores.push(pts);
+            else if (category === "medal") m.medalScores.push(pts);
+            else if (category === "stableford") m.stablefordScores.push(pts);
+            else if (category === "knockout") m.knockoutTotal += pts;
+            else if (category === "trophy") m.trophyTotal += pts;
+          });
+
+        } else {
+          // Fallback: scraper-imported results live in the entries table
+          // (leaderboardPosition = finishing position in the full field)
+          const allEntries = await ctx.db
+            .query("entries")
+            .withIndex("by_competition", q => q.eq("competitionId", link.competitionId))
+            .collect();
+          const validEntries = allEntries.filter(e => e.leaderboardPosition != null);
+          // participantCount set by scraper; fall back to entry count (full field imported)
+          const N = comp.participantCount ?? validEntries.length;
+
+          for (const entry of validEntries) {
+            const pos = entry.leaderboardPosition!;
+            const pts = calcPoints(pos, N, category, isPairsEvent);
+            const key = entry.userId ?? entry.displayName;
+            const m = accum(key, entry.userId, entry.displayName);
+            m.competitionsPlayed++;
+            if (category === "major") m.majorScores.push(pts);
+            else if (category === "medal") m.medalScores.push(pts);
+            else if (category === "stableford") m.stablefordScores.push(pts);
+            else if (category === "knockout") m.knockoutTotal += pts;
+            else if (category === "trophy") m.trophyTotal += pts;
+          }
+        }
 
       } else {
         // ── Pool/sweep competition: entries table ──────────────────────────

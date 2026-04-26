@@ -181,6 +181,13 @@ export default defineSchema({
     paymentCollection: v.optional(v.string()),
     // Total participant count (including non-racers) — used for accurate race-points calculation
     participantCount: v.optional(v.number()),
+    // External source ID — set when competition is created via scraper import
+    fgcCompId: v.optional(v.string()),   // Finchley Golf Club compid (e.g. "5849")
+    // Grievance round — post-draw feedback window + Corti AI optimisation
+    grievanceCutoff: v.optional(v.number()),           // epoch ms — feedback window close time
+    grievanceDraft: v.optional(v.string()),            // JSON — Corti-proposed changes pending review
+    grievanceDraftSummary: v.optional(v.string()),     // plain-English summary for admin
+    grievanceRoundPublishedAt: v.optional(v.number()), // epoch ms — when round was published
     createdBy: v.string(),      // Clerk user ID
     createdAt: v.string(),
     updatedAt: v.string(),
@@ -245,6 +252,15 @@ export default defineSchema({
     bestPlayerScore: v.optional(v.number()), // scoreToPar of their best player
     bestPlayerPosition: v.optional(v.number()),
     leaderboardPosition: v.optional(v.number()),
+    score: v.optional(v.string()),           // display score e.g. "38 pts", "72", "CB"
+    // Hole-by-hole scorecard (populated from FGC scraper)
+    holes: v.optional(v.array(v.object({
+      hole: v.number(),    // 1–18
+      par: v.number(),     // 3 | 4 | 5
+      si: v.number(),      // stroke index 1–18
+      gross: v.number(),   // strokes taken on this hole
+      points: v.number(),  // stableford points scored
+    }))),
     // Prize money total (pick format — sum of picked players' prizeMoney)
     totalPrizeMoney: v.optional(v.number()), // pence/cents
     // Prize
@@ -556,6 +572,26 @@ export default defineSchema({
     .index("by_club_and_date", ["clubId", "date"])
     .index("by_user", ["userId"])
     .index("by_club_and_user", ["clubId", "userId"]),
+
+  // ============================================================================
+  // Draw Grievances (post-draw feedback for Corti AI optimisation)
+  // ============================================================================
+
+  drawGrievances: defineTable({
+    competitionId: v.id("competitions"),
+    memberId: v.id("clubMembers"),
+    userId: v.string(),           // Clerk ID — denormalised for lookup
+    clubId: v.id("clubs"),
+    type: v.union(v.literal("time"), v.literal("pairing"), v.literal("general")),
+    severity: v.number(),         // 1–5 (member-reported importance)
+    body: v.string(),
+    submittedAt: v.number(),      // epoch ms
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_competition", ["competitionId"])
+    .index("by_competition_and_member", ["competitionId", "memberId"])
+    .index("by_competition_and_user", ["competitionId", "userId"])
+    .index("by_club", ["clubId"]),
 
   // ============================================================================
   // Member account transactions (pre-paid bar/pro shop credit)

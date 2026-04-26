@@ -1,6 +1,10 @@
 import { v } from "convex/values";
-import { action, mutation, query } from "./_generated/server";
-import { api } from "./_generated/api";
+import { action, internalMutation, mutation, query } from "./_generated/server";
+import { api, internal } from "./_generated/api";
+
+function normalizeName(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+}
 
 export const get = query({
   args: { memberId: v.id("clubMembers") },
@@ -542,6 +546,166 @@ export const bulkPreRegister = mutation({
     }
 
     return { created, skipped };
+  },
+});
+
+// ── Provisional member matching ───────────────────────────────────────────────
+
+// Called on sign-up: tries to match the user's name to a provisional (fgc:) member.
+// On match → swaps the userId in-place, giving instant active membership.
+// On no match → creates a pending membership and fires an email to the admin.
+export const claimProvisionalMember = mutation({
+  args: {
+    clubId: v.id("clubs"),
+    displayName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const clerkUserId = identity.subject;
+
+    // Already a real member? Nothing to do.
+    const existing = await ctx.db
+      .query("clubMembers")
+      .withIndex("by_club_and_user", q => q.eq("clubId", args.clubId).eq("userId", clerkUserId))
+      .unique();
+    if (existing) return { matched: true, status: existing.status, displayName: existing.displayName };
+
+    const club = await ctx.db.get(args.clubId);
+    const clubName = club?.name ?? "your club";
+    const normName = normalizeName(args.displayName);
+    const now = new Date().toISOString();
+
+    // Search provisional members (fgc: prefix) for a name match
+    const allMembers = await ctx.db
+      .query("clubMembers")
+      .withIndex("by_club", q => q.eq("clubId", args.clubId))
+      .collect();
+
+    const provisional = allMembers.find(m =>
+      m.userId.startsWith("fgc:") &&
+      normalizeName(m.displayName) === normName
+    );
+
+    if (provisional) {
+      // Swap the synthetic userId for the real Clerk one — instant active membership
+      await ctx.db.patch(provisional._id, { userId: clerkUserId, updatedAt: now });
+      return { matched: true, status: "active", displayName: provisional.displayName };
+    }
+
+    // No match — notify admin and create a pending membership for manual review
+    await ctx.scheduler.runAfter(0, internal.notifications.notifyMatchFailed, {
+      name: args.displayName,
+      clerkUserId,
+      clubName,
+    });
+
+    await ctx.db.insert("clubMembers", {
+      clubId: args.clubId,
+      userId: clerkUserId,
+      role: "member",
+      status: "pending",
+      displayName: args.displayName,
+      totalEntered: 0,
+      totalSpent: 0,
+      totalWon: 0,
+      totalProfit: 0,
+      joinedAt: now,
+      updatedAt: now,
+    });
+
+    return { matched: false, status: "pending", displayName: args.displayName };
+  },
+});
+
+// Query used on /manage to show a "claim your profile" banner.
+// Searches all clubs for a provisional member matching the user's display name.
+export const findProvisionalMatch = query({
+  args: { displayName: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.displayName.trim()) return [];
+    const normName = normalizeName(args.displayName);
+
+    // Full scan — clubs are small, this is fine
+    const allMembers = await ctx.db.query("clubMembers").collect();
+    const matches = allMembers.filter(m =>
+      m.userId.startsWith("fgc:") &&
+      normalizeName(m.displayName) === normName
+    );
+    if (matches.length === 0) return [];
+
+    const results = await Promise.all(matches.map(async m => {
+      const club = await ctx.db.get(m.clubId);
+      return club
+        ? { memberId: m._id, memberName: m.displayName, clubId: m.clubId, clubName: club.name, clubSlug: club.slug }
+        : null;
+    }));
+    return results.filter((r): r is NonNullable<typeof r> => r !== null);
+  },
+});
+
+// Returns provisional (fgc:) members for the admin members page
+export const listProvisional = query({
+  args: { clubId: v.id("clubs") },
+  handler: async (ctx, { clubId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+    if (!isSuperAdmin) {
+      const caller = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", clubId).eq("userId", identity.subject))
+        .unique();
+      if (!caller || caller.role !== "admin") return [];
+    }
+    const members = await ctx.db
+      .query("clubMembers")
+      .withIndex("by_club", q => q.eq("clubId", clubId))
+      .collect();
+    return members.filter(m => m.userId.startsWith("fgc:"));
+  },
+});
+
+// Admin manually links a provisional member to a real Clerk account
+export const linkToClerk = mutation({
+  args: {
+    memberId: v.id("clubMembers"),
+    clerkUserId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const member = await ctx.db.get(args.memberId);
+    if (!member) throw new Error("Member not found");
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+    if (!isSuperAdmin) {
+      const caller = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", member.clubId).eq("userId", identity.subject))
+        .unique();
+      if (!caller || caller.role !== "admin") throw new Error("Not authorised");
+    }
+    await ctx.db.patch(args.memberId, {
+      userId: args.clerkUserId,
+      status: "active",
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+// Internal — patch handicap directly (CLI only, no auth required)
+// npx convex run clubMembers:patchHandicap '{"memberId":"<id>","handicap":9.5}'
+export const patchHandicap = internalMutation({
+  args: {
+    memberId: v.id("clubMembers"),
+    handicap: v.number(),
+  },
+  handler: async (ctx, { memberId, handicap }) => {
+    await ctx.db.patch(memberId, { handicap });
+    return { ok: true };
   },
 });
 

@@ -47,6 +47,10 @@ export default function ManagePage() {
     api.quickGames.listByUser,
     (!activeMembership && user) ? { userId: user.id } : "skip"
   );
+  const provisionalMatches = useQuery(
+    api.clubMembers.findProvisionalMatch,
+    (!activeMembership && !pendingMembership && user?.fullName) ? { displayName: user.fullName } : "skip"
+  );
   const approveMember = useMutation(api.clubMembers.approveMember);
   const rejectMember = useMutation(api.clubMembers.rejectMember);
   const generateImportToken = useMutation(api.clubs.generateImportToken);
@@ -78,18 +82,45 @@ export default function ManagePage() {
       );
     }
     return (
-      <GolferDashboard
-        user={user}
-        profile={golferProfile ?? null}
-        recentGames={recentGames ?? []}
-        onSaveProfile={(handicap, homeClub) =>
-          upsertGolferProfile({
-            displayName: user?.fullName ?? user?.username ?? "Golfer",
-            handicapIndex: handicap,
-            homeClub,
-          })
-        }
-      />
+      <div>
+        {provisionalMatches && provisionalMatches.length > 0 && (
+          <div className="px-4 pt-4 space-y-2 md:px-6">
+            {provisionalMatches.map(match => (
+              <div key={match.memberId} className="flex items-center justify-between gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
+                    <Trophy size={14} className="text-green-700" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      We found your golf history at <strong>{match.clubName}</strong>
+                    </p>
+                    <p className="text-xs text-gray-500">Claim your profile to access your competition results</p>
+                  </div>
+                </div>
+                <a
+                  href={`/${match.clubSlug}`}
+                  className="shrink-0 text-xs font-medium px-3 py-1.5 bg-green-700 text-white rounded-lg hover:bg-green-600 transition-colors"
+                >
+                  Claim profile →
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
+        <GolferDashboard
+          user={user}
+          profile={golferProfile ?? null}
+          recentGames={recentGames ?? []}
+          onSaveProfile={(handicap, homeClub) =>
+            upsertGolferProfile({
+              displayName: user?.fullName ?? user?.username ?? "Golfer",
+              handicapIndex: handicap,
+              homeClub,
+            })
+          }
+        />
+      </div>
     );
   }
 
@@ -411,7 +442,7 @@ function GolferDashboard({
 
 // ── Admin Dashboard ────────────────────────────────────────────────────────────
 
-type Competition = { _id: string; name: string; status: string; startDate: string; entryFee: number; currency: string; slug: string };
+type Competition = { _id: string; name: string; status: string; startDate: string; entryFee: number; currency: string; slug: string; drawType?: string };
 type Member = { _id: string; displayName: string; totalWon: number; totalEntered: number; totalProfit: number };
 type ClubMember = { _id: string; displayName: string };
 type Club = { _id: string; name: string; slug: string; currency: string; importToken?: string };
@@ -429,7 +460,12 @@ function AdminDashboard({
   onApprove: (id: string) => void; onReject: (id: string) => void;
 }) {
   const liveCount = competitions.filter(c => c.status === "live").length;
-  const activeComps = competitions.filter(c => c.status !== "complete" && c.status !== "draft");
+  const activeComps = competitions
+    .filter(c => c.status !== "complete" && c.status !== "draft")
+    .sort((a, b) => b.startDate.localeCompare(a.startDate));
+  const pastComps = competitions
+    .filter(c => c.status === "complete")
+    .sort((a, b) => b.startDate.localeCompare(a.startDate));
 
   return (
     <div className="px-6 py-8 space-y-8">
@@ -519,6 +555,34 @@ function AdminDashboard({
           </div>
         )}
       </section>
+
+      {/* Past competitions */}
+      {pastComps.length > 0 && (
+        <section>
+          <h2 className="text-base font-semibold text-gray-900 mb-3">Past competitions</h2>
+          <div className="space-y-2">
+            {pastComps.map(comp => (
+              <Link
+                key={comp._id}
+                href={`/manage/competitions/${comp._id}`}
+                className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-4 hover:border-green-400 transition-colors"
+              >
+                <div>
+                  <div className="font-medium text-gray-900">{comp.name}</div>
+                  <div className="text-sm text-gray-500 mt-0.5">
+                    {new Date(comp.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                    {comp.drawType !== "import" && <>{" · "}{formatCurrency(comp.entryFee, comp.currency)} entry</>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <StatusBadge status={comp.status} />
+                  <ArrowRight size={16} className="text-gray-400" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Quick links row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
