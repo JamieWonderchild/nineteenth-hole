@@ -74,7 +74,7 @@ export const listResultsForUser = query({
           // Parse score string: "39" → stableford, "72" → net
           const scoreStr = (e.score ?? "").replace(/[^0-9-]/g, "");
           const scoreNum = scoreStr ? parseInt(scoreStr, 10) : undefined;
-          const isStableford = comp.category === "stableford" || comp.category === "major";
+          const isStableford = comp.scoringFormat === "stableford" || (comp.scoringFormat == null);
 
           return {
             _id: e._id,
