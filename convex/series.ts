@@ -282,6 +282,91 @@ export const computeStandings = query({
   },
 });
 
+// Per-player competition breakdown for the detail panel
+export const getPlayerResults = query({
+  args: {
+    seriesId: v.id("series"),
+    playerKey: v.string(), // userId if the player has one, else displayName
+  },
+  handler: async (ctx, { seriesId, playerKey }) => {
+    const links = await ctx.db
+      .query("seriesCompetitions")
+      .withIndex("by_series", q => q.eq("seriesId", seriesId))
+      .collect();
+
+    type ResultItem = {
+      competitionId: string;
+      competitionName: string;
+      date: string;
+      category: string;
+      isPairsEvent: boolean;
+      position: number;
+      participantCount: number;
+      pts: number;
+    };
+
+    const results: ResultItem[] = [];
+
+    for (const link of links) {
+      const comp = await ctx.db.get(link.competitionId);
+      if (!comp || comp.status !== "complete") continue;
+
+      const category = link.category;
+      const isPairsEvent = link.isPairsEvent ?? false;
+      let position: number | null = null;
+      let N = 0;
+
+      if (comp.type === "club_comp") {
+        const scores = await ctx.db
+          .query("competitionScores")
+          .withIndex("by_competition", q => q.eq("competitionId", link.competitionId))
+          .collect();
+
+        if (scores.length > 0) {
+          N = comp.participantCount ?? scores.length;
+          const score = scores.find(s => (s.userId ?? s.displayName) === playerKey);
+          if (score) {
+            position = score.position ?? scores.findIndex(s => (s.userId ?? s.displayName) === playerKey) + 1;
+          }
+        } else {
+          const entries = await ctx.db
+            .query("entries")
+            .withIndex("by_competition", q => q.eq("competitionId", link.competitionId))
+            .collect();
+          const valid = entries.filter(e => e.leaderboardPosition != null);
+          N = comp.participantCount ?? valid.length;
+          const entry = valid.find(e => (e.userId ?? e.displayName) === playerKey);
+          if (entry) position = entry.leaderboardPosition!;
+        }
+      } else {
+        const entries = await ctx.db
+          .query("entries")
+          .withIndex("by_competition", q => q.eq("competitionId", link.competitionId))
+          .collect();
+        const paid = entries.filter(e => e.paidAt && e.leaderboardPosition != null);
+        N = paid.length;
+        const entry = paid.find(e => (e.userId ?? e.displayName) === playerKey);
+        if (entry) position = entry.leaderboardPosition!;
+      }
+
+      if (position !== null) {
+        results.push({
+          competitionId: link.competitionId,
+          competitionName: comp.name,
+          date: comp.startDate,
+          category,
+          isPairsEvent,
+          position,
+          participantCount: N,
+          pts: calcPoints(position, N, category, isPairsEvent),
+        });
+      }
+    }
+
+    return results.sort((a, b) => a.date.localeCompare(b.date));
+  },
+});
+
 // ── Mutations ────────────────────────────────────────────────────────────────
 
 export const create = mutation({
