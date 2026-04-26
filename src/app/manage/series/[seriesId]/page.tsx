@@ -215,6 +215,11 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
   const [isPairs, setIsPairs] = useState(false);
   const [editingCompId, setEditingCompId] = useState<string | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<{ standing: Standing; position: number } | null>(null);
+  const [playerSearch, setPlayerSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [compSearch, setCompSearch] = useState("");
+
+  const PAGE_SIZE = 25;
 
   if (!series) {
     return (
@@ -290,7 +295,18 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
       {/* ── Season standings ── */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Season standings</CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-base">Season standings</CardTitle>
+            {standings && standings.length > 0 && (
+              <input
+                type="text"
+                placeholder="Search players…"
+                value={playerSearch}
+                onChange={e => { setPlayerSearch(e.target.value); setCurrentPage(1); }}
+                className="h-8 px-3 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-green-500 w-48"
+              />
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {completedCount === 0 ? (
@@ -301,71 +317,108 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
             <div className="h-10 bg-gray-100 rounded animate-pulse" />
           ) : standings.length === 0 ? (
             <p className="text-sm text-muted-foreground">No entries recorded yet.</p>
-          ) : (
-            <div className="overflow-x-auto -mx-2">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 text-left text-xs text-gray-500 uppercase tracking-wide">
-                    <th className="px-2 py-2 w-8">#</th>
-                    <th className="px-2 py-2">Member</th>
-                    <th className="px-2 py-2 text-right text-amber-700">Majors</th>
-                    <th className="px-2 py-2 text-right text-blue-700">Medals</th>
-                    <th className="px-2 py-2 text-right text-green-700">Stablefords</th>
-                    <th className="px-2 py-2 text-right text-purple-700">Knockouts</th>
-                    <th className="px-2 py-2 text-right text-rose-700">Trophies</th>
-                    <th className="px-2 py-2 text-right font-semibold text-gray-900">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {standings.map((s, i) => (
-                    <tr
-                      key={s.userId ?? s.displayName}
-                      onClick={() => setSelectedPlayer({ standing: s as Standing, position: i + 1 })}
-                      className={`border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 transition-colors ${i === 0 ? "bg-amber-50/50 hover:bg-amber-50" : ""}`}
-                    >
-                      <td className="px-2 py-2.5 text-gray-400 text-center">
-                        {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}
-                      </td>
-                      <td className="px-2 py-2.5">
-                        <span className="font-medium text-gray-900">{s.displayName}</span>
-                        <span className="ml-1.5 text-xs text-gray-400">{s.competitionsPlayed} comps</span>
-                      </td>
-                      <td className="px-2 py-2.5 text-right text-amber-700 tabular-nums">
-                        {s.majorTotal > 0 ? s.majorTotal : <span className="text-gray-300">—</span>}
-                        {s.majorPlayed > 0 && (
-                          <span className="text-xs text-gray-400 ml-0.5">({s.majorCounted}/{s.majorQuota})</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2.5 text-right text-blue-700 tabular-nums">
-                        {s.medalTotal > 0 ? s.medalTotal : <span className="text-gray-300">—</span>}
-                        {s.medalPlayed > 0 && (
-                          <span className="text-xs text-gray-400 ml-0.5">({s.medalCounted}/{s.medalQuota})</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2.5 text-right text-green-700 tabular-nums">
-                        {s.stablefordTotal > 0 ? s.stablefordTotal : <span className="text-gray-300">—</span>}
-                        {s.stablefordPlayed > 0 && (
-                          <span className="text-xs text-gray-400 ml-0.5">({s.stablefordCounted}/{s.stablefordQuota})</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2.5 text-right text-purple-700 tabular-nums">
-                        {s.knockoutTotal > 0 ? s.knockoutTotal : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-2 py-2.5 text-right text-rose-700 tabular-nums">
-                        {s.trophyTotal > 0 ? s.trophyTotal : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-2 py-2.5 text-right font-bold text-gray-900 tabular-nums">
-                        {s.total}
-                      </td>
+          ) : (() => {
+            // Attach original rank, then filter, then page
+            const ranked = standings.map((s, i) => ({ ...s, rank: i + 1 }));
+            const filtered = playerSearch.trim()
+              ? ranked.filter(s => s.displayName.toLowerCase().includes(playerSearch.toLowerCase()))
+              : ranked;
+            const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+            const page = Math.min(currentPage, totalPages || 1);
+            const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+            return (
+              <div className="overflow-x-auto -mx-2">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-left text-xs text-gray-500 uppercase tracking-wide">
+                      <th className="px-2 py-2 w-8">#</th>
+                      <th className="px-2 py-2">Member</th>
+                      <th className="px-2 py-2 text-right text-amber-700">Majors</th>
+                      <th className="px-2 py-2 text-right text-blue-700">Medals</th>
+                      <th className="px-2 py-2 text-right text-green-700">Stablefords</th>
+                      <th className="px-2 py-2 text-right text-purple-700">Knockouts</th>
+                      <th className="px-2 py-2 text-right text-rose-700">Trophies</th>
+                      <th className="px-2 py-2 text-right font-semibold text-gray-900">Total</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="text-xs text-gray-400 mt-3 px-2">
-                Majors: best 3 · Medals &amp; Named Events: best 4 · Stablefords: best 4 · Knockouts &amp; Trophies: all count · brackets show quota used (counted/available) · click a row for full breakdown
-              </p>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {paged.map(s => (
+                      <tr
+                        key={s.userId ?? s.displayName}
+                        onClick={() => setSelectedPlayer({ standing: s as Standing, position: s.rank })}
+                        className={`border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 transition-colors ${s.rank === 1 ? "bg-amber-50/50 hover:bg-amber-50" : ""}`}
+                      >
+                        <td className="px-2 py-2.5 text-gray-400 text-center">
+                          {s.rank === 1 ? "🥇" : s.rank === 2 ? "🥈" : s.rank === 3 ? "🥉" : s.rank}
+                        </td>
+                        <td className="px-2 py-2.5">
+                          <span className="font-medium text-gray-900">{s.displayName}</span>
+                          <span className="ml-1.5 text-xs text-gray-400">{s.competitionsPlayed} comps</span>
+                        </td>
+                        <td className="px-2 py-2.5 text-right text-amber-700 tabular-nums">
+                          {s.majorTotal > 0 ? s.majorTotal : <span className="text-gray-300">—</span>}
+                          {s.majorPlayed > 0 && (
+                            <span className="text-xs text-gray-400 ml-0.5">({s.majorCounted}/{s.majorQuota})</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2.5 text-right text-blue-700 tabular-nums">
+                          {s.medalTotal > 0 ? s.medalTotal : <span className="text-gray-300">—</span>}
+                          {s.medalPlayed > 0 && (
+                            <span className="text-xs text-gray-400 ml-0.5">({s.medalCounted}/{s.medalQuota})</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2.5 text-right text-green-700 tabular-nums">
+                          {s.stablefordTotal > 0 ? s.stablefordTotal : <span className="text-gray-300">—</span>}
+                          {s.stablefordPlayed > 0 && (
+                            <span className="text-xs text-gray-400 ml-0.5">({s.stablefordCounted}/{s.stablefordQuota})</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2.5 text-right text-purple-700 tabular-nums">
+                          {s.knockoutTotal > 0 ? s.knockoutTotal : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-2 py-2.5 text-right text-rose-700 tabular-nums">
+                          {s.trophyTotal > 0 ? s.trophyTotal : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-2 py-2.5 text-right font-bold text-gray-900 tabular-nums">
+                          {s.total}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* Pagination + footer */}
+                <div className="flex items-center justify-between mt-3 px-2">
+                  <p className="text-xs text-gray-400">
+                    {playerSearch.trim()
+                      ? `${filtered.length} of ${standings.length} players`
+                      : `${standings.length} players`}
+                    {totalPages > 1 && ` · page ${page}/${totalPages}`}
+                    {!playerSearch.trim() && " · click a row for full breakdown"}
+                  </p>
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="px-2.5 py-1 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        ← Prev
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                        className="px-2.5 py-1 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
@@ -383,15 +436,22 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
         {showComps && (
           <Card className="mt-3">
             <CardContent className="pt-4 space-y-2">
-              {/* Add comp button + picker */}
-              <div className="flex justify-end mb-1">
+              {/* Search + add button */}
+              <div className="flex items-center gap-2 mb-1">
+                <input
+                  type="text"
+                  placeholder="Search competitions…"
+                  value={compSearch}
+                  onChange={e => setCompSearch(e.target.value)}
+                  className="flex-1 h-8 px-3 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-green-500"
+                />
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setAddingComp(v => !v)}
                 >
                   <Plus size={14} className="mr-1.5" />
-                  Add competition
+                  Add
                 </Button>
               </div>
 
@@ -469,7 +529,12 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
                   No competitions added yet.
                 </p>
               ) : (
-                sortedComps.filter(Boolean).map(({ link, competition }) => competition && (
+                sortedComps
+                  .filter(({ competition }) =>
+                    !compSearch.trim() ||
+                    competition?.name.toLowerCase().includes(compSearch.toLowerCase())
+                  )
+                  .filter(Boolean).map(({ link, competition }) => competition && (
                   <div key={competition._id} className="bg-white border border-gray-100 rounded-lg px-4 py-2.5 space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">

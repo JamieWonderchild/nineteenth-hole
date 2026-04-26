@@ -54,6 +54,15 @@ function calcPoints(
   return 0;
 }
 
+// Split a pairs display name like "Oliver Rawlings (4) & Sam Selhaoui" into
+// ["Oliver Rawlings", "Sam Selhaoui"]. Returns a single-element array for non-pairs.
+function splitPairsName(displayName: string): string[] {
+  if (!displayName.includes(" & ")) return [displayName];
+  return displayName.split(" & ").map(name =>
+    name.replace(/\s*\(\d+\)\s*$/, "").trim()
+  );
+}
+
 function sumBestN(scores: number[], n: number): number {
   return [...scores].sort((a, b) => b - a).slice(0, n).reduce((s, x) => s + x, 0);
 }
@@ -210,14 +219,19 @@ export const computeStandings = query({
           for (const entry of validEntries) {
             const pos = entry.leaderboardPosition!;
             const pts = calcPoints(pos, N, category, isPairsEvent);
-            const key = entry.userId ?? entry.displayName;
-            const m = accum(key, entry.userId, entry.displayName);
-            m.competitionsPlayed++;
-            if (category === "major") m.majorScores.push(pts);
-            else if (category === "medal") m.medalScores.push(pts);
-            else if (category === "stableford") m.stablefordScores.push(pts);
-            else if (category === "knockout") m.knockoutTotal += pts;
-            else if (category === "trophy") m.trophyTotal += pts;
+            const names = splitPairsName(entry.displayName);
+            for (const name of names) {
+              // Pairs entries have no meaningful userId — key by name
+              const key = names.length === 1 ? (entry.userId ?? name) : name;
+              const uid = names.length === 1 ? entry.userId : undefined;
+              const m = accum(key, uid, name);
+              m.competitionsPlayed++;
+              if (category === "major") m.majorScores.push(pts);
+              else if (category === "medal") m.medalScores.push(pts);
+              else if (category === "stableford") m.stablefordScores.push(pts);
+              else if (category === "knockout") m.knockoutTotal += pts;
+              else if (category === "trophy") m.trophyTotal += pts;
+            }
           }
         }
 
@@ -234,13 +248,18 @@ export const computeStandings = query({
         for (const entry of paidEntries) {
           const pos = entry.leaderboardPosition!;
           const pts = calcPoints(pos, N, category, isPairsEvent);
-          const m = accum(entry.userId, entry.userId, entry.displayName);
-          m.competitionsPlayed++;
-          if (category === "major") m.majorScores.push(pts);
-          else if (category === "medal") m.medalScores.push(pts);
-          else if (category === "stableford") m.stablefordScores.push(pts);
-          else if (category === "knockout") m.knockoutTotal += pts;
-          else if (category === "trophy") m.trophyTotal += pts;
+          const names = splitPairsName(entry.displayName);
+          for (const name of names) {
+            const key = names.length === 1 ? (entry.userId ?? name) : name;
+            const uid = names.length === 1 ? entry.userId : undefined;
+            const m = accum(key, uid, name);
+            m.competitionsPlayed++;
+            if (category === "major") m.majorScores.push(pts);
+            else if (category === "medal") m.medalScores.push(pts);
+            else if (category === "stableford") m.stablefordScores.push(pts);
+            else if (category === "knockout") m.knockoutTotal += pts;
+            else if (category === "trophy") m.trophyTotal += pts;
+          }
         }
       }
     }
@@ -335,7 +354,11 @@ export const getPlayerResults = query({
             .collect();
           const valid = entries.filter(e => e.leaderboardPosition != null);
           N = comp.participantCount ?? valid.length;
-          const entry = valid.find(e => (e.userId ?? e.displayName) === playerKey);
+          // Match direct userId/name OR as part of a pairs entry
+          const entry = valid.find(e =>
+            (e.userId ?? e.displayName) === playerKey ||
+            splitPairsName(e.displayName).includes(playerKey)
+          );
           if (entry) position = entry.leaderboardPosition!;
         }
       } else {
@@ -345,7 +368,10 @@ export const getPlayerResults = query({
           .collect();
         const paid = entries.filter(e => e.paidAt && e.leaderboardPosition != null);
         N = paid.length;
-        const entry = paid.find(e => (e.userId ?? e.displayName) === playerKey);
+        const entry = paid.find(e =>
+          (e.userId ?? e.displayName) === playerKey ||
+          splitPairsName(e.displayName).includes(playerKey)
+        );
         if (entry) position = entry.leaderboardPosition!;
       }
 
