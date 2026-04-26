@@ -10,7 +10,8 @@ const isPublicRoute = createRouteMatcher([
   // Platform tour pools — public leaderboard
   "/pools",
   "/pools/(.*)",
-  // Club pool pages — public leaderboard & entry
+  // Club invite page & competition pages — public
+  "/:clubSlug",
   "/:clubSlug/:competitionSlug",
   "/:clubSlug/:competitionSlug/enter",
   // Kiosk POS — accessed by staff on dedicated devices, no login required

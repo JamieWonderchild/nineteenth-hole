@@ -10,7 +10,7 @@ import { use } from "react";
 export default function ClubPageClient({ params }: { params: Promise<{ clubSlug: string }> }) {
   const { clubSlug } = use(params);
   const { user } = useUser();
-  const { openSignIn } = useClerk();
+  const { openSignIn, openSignUp } = useClerk();
   const router = useRouter();
   const [joining, setJoining] = useState(false);
   const [result, setResult] = useState<{ matched: boolean; status: string; displayName: string } | null>(null);
@@ -35,8 +35,16 @@ export default function ClubPageClient({ params }: { params: Promise<{ clubSlug:
     }
   }, [membership, router]);
 
+  // Auto-join once the user authenticates (handles post-modal sign-up without needing a second click)
+  useEffect(() => {
+    if (user && membership === null && club && !joining && !result) {
+      handleJoin();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, membership, club]);
+
   async function handleJoin() {
-    if (!user) { openSignIn(); return; }
+    if (!user) { openSignUp(); return; }
     if (!club) return;
     setJoining(true);
     try {
