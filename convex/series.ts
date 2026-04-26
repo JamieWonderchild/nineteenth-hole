@@ -54,13 +54,15 @@ function calcPoints(
   return 0;
 }
 
-// Split a pairs display name like "Oliver Rawlings (4) & Sam Selhaoui" into
-// ["Oliver Rawlings", "Sam Selhaoui"]. Returns a single-element array for non-pairs.
+// Split a multi-player display name into individual names.
+// Handles "Oliver Rawlings (4) & Sam Selhaoui" and
+// "Ben Coleman, Rebecca Ley, Jake Lipschitz, Sam Morley" formats.
 function splitPairsName(displayName: string): string[] {
-  if (!displayName.includes(" & ")) return [displayName];
-  return displayName.split(" & ").map(name =>
+  const sep = displayName.includes(" & ") ? " & " : displayName.includes(", ") ? ", " : null;
+  if (!sep) return [displayName];
+  return displayName.split(sep).map(name =>
     name.replace(/\s*\(\d+\)\s*$/, "").trim()
-  );
+  ).filter(Boolean);
 }
 
 function sumBestN(scores: number[], n: number): number {
