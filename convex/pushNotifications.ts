@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, internalQuery, internalAction } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 export const saveToken = mutation({
   args: {
@@ -80,5 +80,28 @@ export const sendToUser = internalAction({
     });
 
     return response.ok;
+  },
+});
+
+export const notifyCompetitionMembers = internalAction({
+  args: {
+    competitionId: v.id("competitions"),
+    title: v.string(),
+    body: v.string(),
+    data: v.optional(v.any()),
+  },
+  handler: async (ctx, { competitionId, title, body, data }) => {
+    const entries = await ctx.runQuery(api.entries.listByCompetition, { competitionId }) as any[];
+    const userIds = [...new Set(entries.map((e: any) => e.userId).filter(Boolean))] as string[];
+
+    await Promise.all(userIds.map(async (userId) => {
+      const tokenRow = await ctx.runQuery(internal.pushNotifications.getToken, { userId }) as { token: string } | null;
+      if (!tokenRow) return;
+      await fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ to: tokenRow.token, sound: "default", title, body, data: data ?? {} }),
+      });
+    }));
   },
 });

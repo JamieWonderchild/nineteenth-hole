@@ -9,7 +9,7 @@ import {
   Platform,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../lib/convex";
@@ -40,7 +40,15 @@ function rangeToIndex(range: string): number | undefined {
 export default function OnboardingScreen() {
   const { user } = useUser();
   const router = useRouter();
+  const { club: clubSlug } = useLocalSearchParams<{ club?: string }>();
   const upsert = useMutation(api.golferProfiles.upsert);
+  const claimProvisionalMember = useMutation(api.clubMembers.claimProvisionalMember);
+
+  // If we arrived via a club link, look up the club so we can auto-join
+  const clubBySlug = useQuery(
+    api.clubs.getBySlug,
+    clubSlug ? { slug: clubSlug } : "skip"
+  );
 
   const [step, setStep] = useState(1);
   const [displayName, setDisplayName] = useState(
@@ -64,6 +72,19 @@ export default function OnboardingScreen() {
         goals: goal,
         handicapIndex: handicapRange !== "none" ? rangeToIndex(handicapRange) : undefined,
       });
+
+      // If arrived via a club link, try to join and auto-match provisional member
+      if (clubSlug && clubBySlug) {
+        try {
+          await claimProvisionalMember({
+            clubId: clubBySlug._id,
+            displayName: displayName.trim(),
+          });
+        } catch {
+          // Non-fatal: admin will handle matching
+        }
+      }
+
       router.replace("/(app)");
     } catch (e) {
       Alert.alert("Error", "Something went wrong. Please try again.");

@@ -710,6 +710,7 @@ export default function MembersPage() {
 
   const provisional = useQuery(api.clubMembers.listProvisional, (club && isAdmin) ? { clubId: club._id } : "skip");
   const linkToClerk = useMutation(clubMembersApi.linkToClerk);
+  const linkPendingToProvisional = useMutation(clubMembersApi.linkPendingToProvisional);
 
   const bulkPreRegister = useMutation(api.clubMembers.bulkPreRegister);
   const approveMember = useMutation(api.clubMembers.approveMember);
@@ -733,6 +734,7 @@ export default function MembersPage() {
   const [navigating, setNavigating] = useState<string | null>(null);
   const [linkingId, setLinkingId] = useState<string | null>(null);
   const [linkClerkInput, setLinkClerkInput] = useState<{ id: Id<"clubMembers">; value: string } | null>(null);
+  const [matchingPendingId, setMatchingPendingId] = useState<Id<"clubMembers"> | null>(null);
 
   async function handleSaveHandicap(id: Id<"clubMembers">, value: string) {
     const hcp = parseFloat(value);
@@ -821,15 +823,64 @@ export default function MembersPage() {
           </h2>
           <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
             {pending.map(m => (
-              <div key={m._id} className="flex items-center justify-between px-5 py-3.5">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{m.displayName}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Requested {new Date(m.joinedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</p>
+              <div key={m._id} className="px-5 py-3.5">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{m.displayName}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Requested {new Date(m.joinedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => setMatchingPendingId(matchingPendingId === m._id ? null : m._id)}
+                      className="px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-100 transition-colors"
+                    >
+                      Match player
+                    </button>
+                    <button onClick={() => approveMember({ memberId: m._id })} className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-500 transition-colors">Approve</button>
+                    <button onClick={() => rejectMember({ memberId: m._id })} className="px-3 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors">Reject</button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => approveMember({ memberId: m._id })} className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-500 transition-colors">Approve</button>
-                  <button onClick={() => rejectMember({ memberId: m._id })} className="px-3 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors">Reject</button>
-                </div>
+                {matchingPendingId === m._id && (
+                  <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                    <p className="text-xs text-blue-700 font-medium mb-2">
+                      Link <strong>{m.displayName}</strong> to their existing competition history:
+                    </p>
+                    {provisional && provisional.length > 0 ? (
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {provisional.map(prov => (
+                          <button
+                            key={prov._id}
+                            onClick={async () => {
+                              setLinkingId(m._id);
+                              try {
+                                await linkPendingToProvisional({ pendingMemberId: m._id, provisionalMemberId: prov._id });
+                                setMatchingPendingId(null);
+                              } finally {
+                                setLinkingId(null);
+                              }
+                            }}
+                            disabled={linkingId === m._id}
+                            className="w-full text-left flex items-center justify-between px-3 py-2 bg-white rounded-lg border border-blue-100 hover:border-blue-400 hover:bg-blue-50 transition-colors text-sm disabled:opacity-50"
+                          >
+                            <span className="font-medium text-gray-900">{prov.displayName}</span>
+                            <span className="text-xs text-gray-400">
+                              {prov.totalEntered > 0 ? `${prov.totalEntered} comp${prov.totalEntered !== 1 ? "s" : ""}` : ""}
+                              {prov.handicap != null ? ` · HCP ${prov.handicap}` : ""}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500">No unmatched provisional players remaining.</p>
+                    )}
+                    <button
+                      onClick={() => setMatchingPendingId(null)}
+                      className="mt-2 text-xs text-blue-600 hover:underline"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

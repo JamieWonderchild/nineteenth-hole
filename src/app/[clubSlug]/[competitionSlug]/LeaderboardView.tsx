@@ -1,7 +1,8 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { useUser } from "@clerk/nextjs";
+import { useQuery, useMutation } from "convex/react";
+import { useUser, useClerk } from "@clerk/nextjs";
+import { useState, useEffect } from "react";
 import { api } from "convex/_generated/api";
 import type { Doc, Id } from "convex/_generated/dataModel";
 import { useClubCtx } from "@/app/providers/club-context-provider";
@@ -16,6 +17,7 @@ interface Props {
 export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
   const { club } = useClubCtx();
   const { user } = useUser();
+  const { openSignIn } = useClerk();
 
   const competition = useQuery(
     api.competitions.getBySlug,
@@ -33,6 +35,32 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
     api.entries.listByCompetitionAndUser,
     competition && user ? { competitionId: competition._id, userId: user.id } : "skip"
   );
+  const membership = useQuery(
+    api.clubMembers.getByClubAndUser,
+    club && user ? { clubId: club._id, userId: user.id } : "skip"
+  );
+
+  const claimProvisionalMember = useMutation(api.clubMembers.claimProvisionalMember);
+  const [joining, setJoining] = useState(false);
+  const [joinResult, setJoinResult] = useState<{ matched: boolean; status: string; displayName: string } | null>(null);
+
+  // Once membership goes active (auto-match), clear the join state
+  useEffect(() => {
+    if (membership?.status === "active") setJoinResult(null);
+  }, [membership?.status]);
+
+  async function handleJoin() {
+    if (!user) { openSignIn(); return; }
+    if (!club) return;
+    setJoining(true);
+    try {
+      const displayName = user.fullName ?? user.username ?? user.primaryEmailAddress?.emailAddress ?? "Member";
+      const res = await claimProvisionalMember({ clubId: club._id, displayName });
+      setJoinResult(res as { matched: boolean; status: string; displayName: string });
+    } finally {
+      setJoining(false);
+    }
+  }
 
   if (!club || !competition || !entries || !players || myEntries === undefined) {
     return (
@@ -42,6 +70,114 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
     );
   }
 
+  const isImported = competition.drawType === "import";
+  const isPickFormat = competition.drawType === "pick";
+  const isMember = membership?.status === "active";
+
+  // ── Club competition (FGC import) ──────────────────────────────────────────
+  if (isImported) {
+    const sorted = [...entries].sort(
+      (a, b) => (a.leaderboardPosition ?? 999) - (b.leaderboardPosition ?? 999)
+    );
+
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <header className="bg-green-900 text-white px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs text-green-400 mb-0.5">⛳ {club.name}</div>
+              <h1 className="font-bold text-xl">{competition.name}</h1>
+              <div className="text-green-300 text-sm mt-0.5">
+                {new Date(competition.startDate).toLocaleDateString("en-GB", {
+                  day: "numeric", month: "long", year: "numeric",
+                })}
+              </div>
+            </div>
+            <StatusBadge status={competition.status} />
+          </div>
+        </header>
+
+        {/* Join CTA */}
+        {!isMember && (
+          <div className="bg-green-800 px-4 sm:px-6 py-3">
+            {joinResult ? (
+              joinResult.matched ? (
+                <p className="text-green-200 text-sm text-center">
+                  Welcome back, <strong className="text-white">{joinResult.displayName}</strong>! Your competition history is linked.
+                </p>
+              ) : (
+                <p className="text-green-200 text-sm text-center">
+                  Request sent — an admin will link your account shortly.
+                </p>
+              )
+            ) : (
+              <div className="flex items-center justify-between gap-4 max-w-lg mx-auto">
+                <p className="text-green-200 text-sm">
+                  {user ? `Join ${club.name} to track your stats and history.` : `Sign in to join ${club.name} and view your history.`}
+                </p>
+                <button
+                  onClick={handleJoin}
+                  disabled={joining}
+                  className="shrink-0 bg-white text-green-900 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-green-50 transition-colors disabled:opacity-60"
+                >
+                  {joining ? "Joining…" : user ? `Join ${club.name}` : "Sign in"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="px-4 sm:px-6 py-6">
+          {sorted.length > 0 ? (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left text-xs text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-3 w-10">Pos</th>
+                    <th className="px-4 py-3">Player</th>
+                    <th className="px-4 py-3 text-right">Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((entry, i) => {
+                    const isMe = entry.userId === user?.id;
+                    const pos = entry.leaderboardPosition ?? i + 1;
+                    return (
+                      <tr
+                        key={entry._id}
+                        className={`border-b border-gray-50 last:border-0 ${isMe ? "bg-green-50" : ""}`}
+                      >
+                        <td className="px-4 py-3 text-gray-500 font-mono text-xs">
+                          {pos === 1 ? "🥇" : pos === 2 ? "🥈" : pos === 3 ? "🥉" : pos}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="font-medium text-gray-900">{entry.displayName}</span>
+                          {isMe && (
+                            <span className="ml-2 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">You</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                          {entry.score ?? "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-12 text-gray-400">
+              <p className="text-4xl mb-3">🏌️</p>
+              <p>No results yet.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Pool / sweep / standard competition ────────────────────────────────────
   const paidEntries = entries.filter(e => e.paidAt);
   const unpaidEntries = entries.filter(e => !e.paidAt);
   const pot = paidEntries.length * competition.entryFee;
@@ -49,12 +185,10 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
   const sortedEntries = [...paidEntries].sort((a, b) =>
     (a.leaderboardPosition ?? 999) - (b.leaderboardPosition ?? 999)
   );
-  const isPickFormat = competition.drawType === "pick";
   const isCash = competition.paymentCollection === "cash";
   const myPaidEntries = (myEntries ?? []).filter(e => e.paidAt);
   const myUnpaidEntry = (myEntries ?? []).find(e => !e.paidAt);
 
-  // Tote-style: group by position to split prizes among ties
   const positionCounts = new Map<number, number>();
   for (const e of paidEntries) {
     if (e.leaderboardPosition) {
@@ -65,14 +199,12 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
   const prizeAmounts = competition.prizeStructure.map(p => ({
     position: p.position,
     total: Math.floor(pot * p.percentage / 100),
-    // per-person amount (split among ties at this position)
     perPerson: Math.floor(pot * p.percentage / 100 / Math.max(1, positionCounts.get(p.position) ?? 1)),
     count: positionCounts.get(p.position) ?? 0,
   }));
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-green-900 text-white px-4 sm:px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
@@ -89,7 +221,6 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
       </header>
 
       <div className="px-4 sm:px-6 py-6 space-y-6">
-        {/* Pot + prize breakdown */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -135,7 +266,6 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
           </div>
         </div>
 
-        {/* My entries card */}
         {myPaidEntries.length > 0 && (
           <div className="space-y-3">
             {myPaidEntries.map((myEntry, teamIdx) => (
@@ -203,7 +333,6 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
           </div>
         )}
 
-        {/* Leaderboard */}
         {sortedEntries.length > 0 ? (
           <section>
             <h2 className="text-base font-semibold text-gray-900 mb-3">Pool leaderboard</h2>
@@ -211,7 +340,6 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
               {sortedEntries.map((entry, i) => {
                 const isMe = entry.userId === user?.id;
                 const entryPlayers = (entry.drawnPlayerIds ?? []).map(pid => playerMap.get(pid)).filter(Boolean);
-
                 return (
                   <div
                     key={entry._id}
@@ -275,7 +403,6 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
           </div>
         )}
 
-        {/* Unpaid registrants (cash competitions, before draw) */}
         {isCash && unpaidEntries.length > 0 && competition.status === "open" && (
           <section>
             <h2 className="text-base font-semibold text-gray-900 mb-3">Awaiting payment ({unpaidEntries.length})</h2>
@@ -291,7 +418,6 @@ export function LeaderboardView({ clubSlug, competitionSlug }: Props) {
           </section>
         )}
 
-        {/* Golf leaderboard (player scores, sweep format only) */}
         {!isPickFormat && players.some(p => p.scoreToPar !== undefined) && (
           <section>
             <h2 className="text-base font-semibold text-gray-900 mb-3">Tournament leaderboard</h2>

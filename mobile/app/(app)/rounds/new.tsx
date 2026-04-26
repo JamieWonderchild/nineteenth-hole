@@ -271,7 +271,7 @@ function Step1Course({ onNext, initialCourseId }: {
                           slopeRating: tee.slopeRating,
                           par: tee.par,
                           totalYards: tee.totalYards,
-                          holes: tee.holes ?? [],
+                          holes: (course as any).clubCourseHoles ?? tee.holes ?? [],
                         });
                       }}
                       className={`flex-row items-center px-4 py-3.5 border-b border-gray-50 ${isSelected ? "bg-green-50" : ""}`}

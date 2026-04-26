@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
 function isSuperAdmin(email?: string | null): boolean {
@@ -159,6 +160,18 @@ export const setCutoff = mutation({
     if (!competition?.clubId) throw new Error("Not a club competition");
     await assertAdmin(ctx, competition.clubId);
     await ctx.db.patch(competitionId, { grievanceCutoff: cutoff });
+
+    // Notify entrants when opening the window (not when clearing or closing early)
+    if (cutoff && cutoff > Date.now()) {
+      const comp = await ctx.db.get(competitionId);
+      const cutoffDate = new Date(cutoff).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+      await ctx.scheduler.runAfter(0, internal.pushNotifications.notifyCompetitionMembers, {
+        competitionId,
+        title: comp!.name,
+        body: `The draw is out. Share any preferences before ${cutoffDate}.`,
+        data: { screen: "competition", competitionId },
+      });
+    }
   },
 });
 
@@ -188,6 +201,14 @@ export const publishDraft = mutation({
       grievanceRoundPublishedAt: Date.now(),
       grievanceDraft: undefined,
       grievanceDraftSummary: undefined,
+    });
+
+    // Silent notification — members receive updated draw, no mention of grievances
+    await ctx.scheduler.runAfter(0, internal.pushNotifications.notifyCompetitionMembers, {
+      competitionId,
+      title: competition!.name,
+      body: "Your updated draw is now live.",
+      data: { screen: "competition", competitionId },
     });
   },
 });

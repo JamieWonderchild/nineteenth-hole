@@ -253,6 +253,14 @@ export default function CompetitionManagePage({
   const [settingCutoff, setSettingCutoff] = useState(false);
   const [runningOptimisation, setRunningOptimisation] = useState(false);
   const [grievanceMsg, setGrievanceMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [showGrievances, setShowGrievances] = useState(false);
+
+  const allGrievances = useQuery(
+    api.drawGrievances.getAll,
+    superAdmin === true && competition?.type === "club_comp" && competition?.grievanceCutoff
+      ? { competitionId: competitionId as Id<"competitions"> }
+      : "skip"
+  );
 
   void user;
 
@@ -1039,6 +1047,40 @@ export default function CompetitionManagePage({
                       >
                         {runningOptimisation ? "Optimising draw…" : "✨ Run AI optimisation"}
                       </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Super admin: full grievance content */}
+            {superAdmin && competition.grievanceCutoff && (
+              <div className="border-t border-gray-100 pt-3">
+                <button
+                  onClick={() => setShowGrievances(v => !v)}
+                  className="text-xs text-violet-600 hover:text-violet-800 hover:underline"
+                >
+                  {showGrievances ? "Hide" : "View"} all feedback ({grievanceCount ?? 0})
+                </button>
+                {showGrievances && (
+                  <div className="mt-3 space-y-2">
+                    {!allGrievances ? (
+                      <p className="text-xs text-gray-400">Loading…</p>
+                    ) : allGrievances.length === 0 ? (
+                      <p className="text-xs text-gray-400">No feedback submitted yet.</p>
+                    ) : (
+                      (allGrievances as any[]).map((g: any) => (
+                        <div key={g._id} className="bg-gray-50 rounded-lg px-3 py-2.5 text-xs">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-semibold text-gray-800">{g.memberName}</span>
+                            <div className="flex items-center gap-2 text-gray-400">
+                              <span className="capitalize">{g.type}</span>
+                              <span className="text-amber-500">{"★".repeat(g.severity)}{"☆".repeat(5 - g.severity)}</span>
+                            </div>
+                          </div>
+                          <p className="text-gray-600 italic">"{g.body}"</p>
+                        </div>
+                      ))
                     )}
                   </div>
                 )}

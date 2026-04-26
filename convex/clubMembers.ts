@@ -696,6 +696,43 @@ export const linkToClerk = mutation({
   },
 });
 
+// Admin: fuse a pending member record with a provisional (fgc:) record.
+// Patches the provisional record with the real Clerk userId (active), deletes the pending duplicate.
+export const linkPendingToProvisional = mutation({
+  args: {
+    pendingMemberId: v.id("clubMembers"),
+    provisionalMemberId: v.id("clubMembers"),
+  },
+  handler: async (ctx, { pendingMemberId, provisionalMemberId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const pending = await ctx.db.get(pendingMemberId);
+    if (!pending || pending.status !== "pending") throw new Error("Pending member not found");
+    const provisional = await ctx.db.get(provisionalMemberId);
+    if (!provisional || !provisional.userId.startsWith("fgc:")) throw new Error("Provisional member not found");
+    if (pending.clubId !== provisional.clubId) throw new Error("Members must be in the same club");
+
+    const superAdminEmails = (process.env.SUPERADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    const isSuperAdmin = identity.email && superAdminEmails.includes(identity.email);
+    if (!isSuperAdmin) {
+      const caller = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q => q.eq("clubId", pending.clubId).eq("userId", identity.subject))
+        .unique();
+      if (!caller || caller.role !== "admin") throw new Error("Not authorised");
+    }
+
+    await ctx.db.patch(provisionalMemberId, {
+      userId: pending.userId,
+      status: "active",
+      updatedAt: new Date().toISOString(),
+    });
+    await ctx.db.delete(pendingMemberId);
+    return { ok: true };
+  },
+});
+
 // Internal — patch handicap directly (CLI only, no auth required)
 // npx convex run clubMembers:patchHandicap '{"memberId":"<id>","handicap":9.5}'
 export const patchHandicap = internalMutation({
