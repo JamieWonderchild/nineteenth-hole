@@ -733,6 +733,37 @@ export const linkPendingToProvisional = mutation({
   },
 });
 
+// Internal — batch-update handicaps for provisional members by FGC member ID.
+// Called by scripts/compute-handicaps.py after WHS computation.
+// npx convex run clubMembers:batchPatchHandicaps '{"clubId":"...","updates":[{"fgcMemberId":"22412","handicap":9.5}]}'
+export const batchPatchHandicaps = internalMutation({
+  args: {
+    clubId: v.id("clubs"),
+    updates: v.array(v.object({
+      fgcMemberId: v.string(),   // FGC numeric member ID, e.g. "22412"
+      handicap: v.number(),
+    })),
+  },
+  handler: async (ctx, { clubId, updates }) => {
+    let patched = 0, notFound = 0;
+    for (const { fgcMemberId, handicap } of updates) {
+      const member = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club_and_user", q =>
+          q.eq("clubId", clubId).eq("userId", `fgc:${fgcMemberId}`)
+        )
+        .unique();
+      if (member) {
+        await ctx.db.patch(member._id, { handicap });
+        patched++;
+      } else {
+        notFound++;
+      }
+    }
+    return { patched, notFound };
+  },
+});
+
 // Internal — patch handicap directly (CLI only, no auth required)
 // npx convex run clubMembers:patchHandicap '{"memberId":"<id>","handicap":9.5}'
 export const patchHandicap = internalMutation({

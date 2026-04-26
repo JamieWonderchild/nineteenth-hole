@@ -33,25 +33,74 @@ async function assertSuperAdmin(ctx: MutationCtx) {
 // Competition results for a given user across all competitions they've entered
 export const listResultsForUser = query({
   args: { userId: v.string(), limit: v.optional(v.number()) },
-  handler: async (ctx, { userId, limit = 20 }) => {
-    // No by_user index on competitionScores — collect all scores for userId
-    // via by_club is too broad; instead scan by_competition_and_user isn't viable
-    // without a competition list. We filter across the table using .filter().
+  handler: async (ctx, { userId, limit = 50 }) => {
+    // 1. In-app scores (competitionScores table — kiosk / live scoring)
     const scores = await ctx.db
       .query("competitionScores")
       .filter(q => q.eq(q.field("userId"), userId))
       .order("desc")
       .take(limit);
 
-    return Promise.all(scores.map(async s => {
+    const fromScores = await Promise.all(scores.map(async s => {
       const comp = await ctx.db.get(s.competitionId);
       return {
-        ...s,
+        _id: s._id,
+        competitionId: s.competitionId,
         competitionName: comp?.name ?? "Competition",
         competitionDate: comp?.startDate,
         competitionStatus: comp?.status,
+        position: s.position,
+        stablefordPoints: s.stablefordPoints,
+        grossScore: s.grossScore,
+        netScore: s.netScore,
+        handicap: s.handicap,
       };
     }));
+
+    // 2. Imported competition entries (FGC scraper results)
+    const entries = await ctx.db
+      .query("entries")
+      .withIndex("by_user", q => q.eq("userId", userId))
+      .order("desc")
+      .take(limit);
+
+    const fromEntries = await Promise.all(
+      entries
+        .filter(e => e.paidAt) // only completed/paid entries (FGC results are marked paid)
+        .map(async e => {
+          const comp = await ctx.db.get(e.competitionId);
+          if (!comp || comp.drawType !== "import") return null; // skip pool/pick comps
+
+          // Parse score string: "39" → stableford, "72" → net
+          const scoreStr = (e.score ?? "").replace(/[^0-9-]/g, "");
+          const scoreNum = scoreStr ? parseInt(scoreStr, 10) : undefined;
+          const isStableford = comp.category === "stableford" || comp.category === "major";
+
+          return {
+            _id: e._id,
+            competitionId: e.competitionId,
+            competitionName: comp.name,
+            competitionDate: comp.startDate,
+            competitionStatus: comp.status,
+            position: e.leaderboardPosition,
+            stablefordPoints: isStableford && scoreNum !== undefined ? scoreNum : undefined,
+            grossScore: undefined as number | undefined,
+            netScore: !isStableford && scoreNum !== undefined ? scoreNum : undefined,
+            handicap: 0, // not stored per-entry in import; shown as 0 rather than missing
+          };
+        })
+    );
+
+    // Merge, deduplicate by competitionId (prefer competitionScores if both exist)
+    const usedCompIds = new Set(fromScores.map(r => r.competitionId));
+    const entryResults = fromEntries
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+      .filter(r => !usedCompIds.has(r.competitionId));
+
+    // Sort by competition date descending
+    return [...fromScores, ...entryResults]
+      .sort((a, b) => (b.competitionDate ?? "").localeCompare(a.competitionDate ?? ""))
+      .slice(0, limit);
   },
 });
 
