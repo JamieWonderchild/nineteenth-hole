@@ -207,6 +207,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
 
   const addCompetition = useMutation(api.series.addCompetition);
   const updateCategory = useMutation(api.series.updateCompetitionCategory);
+  const removeCompetition = useMutation(api.series.removeCompetition);
 
   const [showComps, setShowComps] = useState(false);
   const [addingComp, setAddingComp] = useState(false);
@@ -488,14 +489,29 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
                           <span className="text-xs text-purple-600 shrink-0">✓</span>
                         )}
                       </div>
-                      <Link
-                        href={competition.status === "complete"
-                          ? `/manage/competitions/${competition._id}/scores`
-                          : `/manage/competitions/${competition._id}`}
-                        className="text-xs text-green-700 hover:underline shrink-0 ml-3"
-                      >
-                        {competition.status === "complete" ? "Results →" : "Manage →"}
-                      </Link>
+                      <div className="flex items-center gap-3 shrink-0 ml-3">
+                        <Link
+                          href={competition.status === "complete"
+                            ? `/manage/competitions/${competition._id}/scores`
+                            : `/manage/competitions/${competition._id}`}
+                          className="text-xs text-green-700 hover:underline"
+                        >
+                          {competition.status === "complete" ? "Results →" : "Manage →"}
+                        </Link>
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Remove "${competition.name}" from this series?`)) return;
+                            await removeCompetition({
+                              seriesId: seriesId as Id<"series">,
+                              competitionId: competition._id,
+                            });
+                          }}
+                          className="text-xs text-red-400 hover:text-red-600"
+                          title="Remove from series"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
 
                     {editingCompId === competition._id && (
