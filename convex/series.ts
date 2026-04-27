@@ -433,10 +433,19 @@ export const getPlayerResults = query({
           .collect();
 
         if (scores.length > 0) {
-          N = comp.participantCount ?? scores.length;
-          const score = scores.find(s => matchesPlayer(s.userId, s.displayName));
-          if (score) {
-            position = score.position ?? scores.findIndex(s => matchesPlayer(s.userId, s.displayName)) + 1;
+          // Sort exactly the same way as computeStandings so the displayed
+          // position matches the position used to compute the player's total.
+          const format = comp.scoringFormat ?? "stableford";
+          const sortedScores = [...scores].sort((a, b) =>
+            format === "stableford"
+              ? (b.stablefordPoints ?? 0) - (a.stablefordPoints ?? 0)
+              : (a.netScore ?? a.grossScore ?? 999) - (b.netScore ?? b.grossScore ?? 999)
+          );
+          N = comp.participantCount ?? sortedScores.length;
+          const scoreIdx = sortedScores.findIndex(s => matchesPlayer(s.userId, s.displayName));
+          if (scoreIdx !== -1) {
+            const score = sortedScores[scoreIdx];
+            position = score.position ?? (scoreIdx + 1);
           }
         } else {
           const entries = await ctx.db
@@ -1036,5 +1045,20 @@ export const fixTrillGoblets = internalMutation({
     if (!comp) return "not found";
     await ctx.db.patch(comp._id, { name: "Trill Goblets", slug: "rtsf-trill-goblets-2026" });
     return "patched";
+  },
+});
+
+// One-time fix: set Masters Shootout category to medal (Named Event, BF×2)
+export const fixMastersShootoutCategory = internalMutation({
+  args: { seriesId: v.id("series"), competitionId: v.id("competitions") },
+  handler: async (ctx, { seriesId, competitionId }) => {
+    const links = await ctx.db
+      .query("seriesCompetitions")
+      .withIndex("by_series", q => q.eq("seriesId", seriesId))
+      .collect();
+    const link = links.find(l => l.competitionId === competitionId);
+    if (!link) return "link not found";
+    await ctx.db.patch(link._id, { category: "medal" });
+    return `updated: was ${link.category} → medal`;
   },
 });

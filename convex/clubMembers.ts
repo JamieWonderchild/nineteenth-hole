@@ -797,3 +797,11 @@ export const addMemberById = action({
     return memberId;
   },
 });
+
+export const internalDeleteMember = internalMutation({
+  args: { memberId: v.id("clubMembers") },
+  handler: async (ctx, { memberId }) => {
+    await ctx.db.delete(memberId);
+    return "deleted";
+  },
+});

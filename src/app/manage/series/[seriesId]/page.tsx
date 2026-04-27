@@ -120,12 +120,7 @@ function PlayerDetailModal({
               ].map(row => (
                 <div key={row.label} className={`flex items-center justify-between rounded-lg px-4 py-2.5 ${row.bg}`}>
                   <span className={`text-sm font-medium ${row.colour}`}>{row.label}</span>
-                  <div className="flex items-center gap-2">
-                    {row.counted !== null && (
-                      <span className="text-xs text-gray-400">({row.counted}/{row.quota} counted)</span>
-                    )}
-                    <span className={`font-bold tabular-nums ${row.colour}`}>{row.total}</span>
-                  </div>
+                  <span className={`font-bold tabular-nums ${row.colour}`}>{row.total}</span>
                 </div>
               ))}
               <div className="flex items-center justify-between rounded-lg px-4 py-2.5 bg-gray-900">
@@ -168,7 +163,7 @@ function PlayerDetailModal({
                         <p className="text-sm font-medium text-gray-900 truncate">{r.competitionName}</p>
                         <p className="text-xs text-gray-400">
                           {new Date(r.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                          {" · "}T{r.position}/{r.participantCount}
+                          {" · "}#{r.position} of {r.participantCount}
                         </p>
                       </div>
                       <div className="text-right shrink-0">
@@ -280,18 +275,6 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
         </p>
       )}
 
-      {/* Scoring formula explainer */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm">
-        <p className="font-semibold text-amber-900 mb-1.5">Race to Swinley Forest scoring</p>
-        <div className="text-amber-800 space-y-0.5 text-xs leading-relaxed">
-          <p><strong>Majors (BF=3):</strong> (50+N)·3 / (25+N)·3 / (10+N)·3 / (5+N)·3 / max(0,N+5−pos)·3 — best 3 count</p>
-          <p><strong>Medals &amp; Named Events (BF=2):</strong> same formula · BF=2 — best 4 count</p>
-          <p><strong>Stablefords (BF=1):</strong> same formula · BF=1 — best 4 count</p>
-          <p><strong>Knockouts:</strong> 300 / 150 / 75 (semi) / 50 (quarter) — all count</p>
-          <p><strong>Trophies:</strong> 100 / 50 — all count (÷2 for pairs events)</p>
-        </div>
-      </div>
-
       {/* ── Season standings ── */}
       <Card>
         <CardHeader className="pb-3">
@@ -358,21 +341,12 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
                         </td>
                         <td className="px-2 py-2.5 text-right text-amber-700 tabular-nums">
                           {s.majorTotal > 0 ? s.majorTotal : <span className="text-gray-300">—</span>}
-                          {s.majorPlayed > 0 && (
-                            <span className="text-xs text-gray-400 ml-0.5">({s.majorCounted}/{s.majorQuota})</span>
-                          )}
                         </td>
                         <td className="px-2 py-2.5 text-right text-blue-700 tabular-nums">
                           {s.medalTotal > 0 ? s.medalTotal : <span className="text-gray-300">—</span>}
-                          {s.medalPlayed > 0 && (
-                            <span className="text-xs text-gray-400 ml-0.5">({s.medalCounted}/{s.medalQuota})</span>
-                          )}
                         </td>
                         <td className="px-2 py-2.5 text-right text-green-700 tabular-nums">
                           {s.stablefordTotal > 0 ? s.stablefordTotal : <span className="text-gray-300">—</span>}
-                          {s.stablefordPlayed > 0 && (
-                            <span className="text-xs text-gray-400 ml-0.5">({s.stablefordCounted}/{s.stablefordQuota})</span>
-                          )}
                         </td>
                         <td className="px-2 py-2.5 text-right text-purple-700 tabular-nums">
                           {s.knockoutTotal > 0 ? s.knockoutTotal : <span className="text-gray-300">—</span>}
@@ -478,7 +452,6 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ seriesI
                           }`}
                         >
                           {cat.label}
-                          <span className="ml-1 opacity-60">{cat.description}</span>
                         </button>
                       ))}
                     </div>
