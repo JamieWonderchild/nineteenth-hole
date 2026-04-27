@@ -186,6 +186,10 @@ export const computeStandings = query({
       return { key: uid ?? displayName, uid };
     }
 
+    // RTSF officially started 2026-04-12; competitions before this date are excluded
+    const isRTSF = (series?.name ?? "").toLowerCase().includes("swinley");
+    const RTSF_START_DATE = "2026-04-12";
+
     const links = await ctx.db
       .query("seriesCompetitions")
       .withIndex("by_series", q => q.eq("seriesId", seriesId))
@@ -223,6 +227,7 @@ export const computeStandings = query({
     for (const link of links) {
       const comp = await ctx.db.get(link.competitionId);
       if (!comp || comp.status !== "complete") continue;
+      if (isRTSF && comp.startDate < RTSF_START_DATE) continue;
 
       const category = link.category;
       const isPairsEvent = link.isPairsEvent ?? false;
@@ -348,7 +353,6 @@ export const computeStandings = query({
     const sorted = standings.sort((a, b) => b.total - a.total);
 
     // For RTSF, restrict to registered participants only
-    const isRTSF = (series?.name ?? "").toLowerCase().includes("swinley");
     if (isRTSF) {
       return sorted.filter(s =>
         RTSF_PARTICIPANT_NAMES.has(s.displayName.toLowerCase())
@@ -409,9 +413,13 @@ export const getPlayerResults = query({
 
     const results: ResultItem[] = [];
 
+    const isRTSF = (series?.name ?? "").toLowerCase().includes("swinley");
+    const RTSF_START_DATE = "2026-04-12";
+
     for (const link of links) {
       const comp = await ctx.db.get(link.competitionId);
       if (!comp || comp.status !== "complete") continue;
+      if (isRTSF && comp.startDate < RTSF_START_DATE) continue;
 
       const category = link.category;
       const isPairsEvent = link.isPairsEvent ?? false;
@@ -938,7 +946,7 @@ const RTSF_CALENDAR_2026: CalendarEntry[] = [
   { date: "2026-07-01", name: "Scratch Trophy (Women)",          slug: "rtsf-scratch-trophy-women-2026",        category: "trophy",   scoringFormat: "strokeplay" },
   { date: "2026-08-01", name: "Keith Dalby Trophy",              slug: "rtsf-keith-dalby-trophy-2026",          category: "trophy",   scoringFormat: "strokeplay" },
   { date: "2026-08-01", name: "Womens Club Champs",              slug: "rtsf-womens-club-champs-2026",          category: "trophy",   scoringFormat: "strokeplay" },
-  { date: "2026-09-01", name: "Trill Gobblers",                  slug: "rtsf-trill-gobblers-2026",              category: "trophy",   scoringFormat: "strokeplay" },
+  { date: "2026-09-01", name: "Trill Goblets",                   slug: "rtsf-trill-goblets-2026",               category: "trophy",   scoringFormat: "strokeplay" },
   { date: "2026-09-01", name: "Lorne Wallet",                    slug: "rtsf-lorne-wallet-2026",                category: "trophy",   scoringFormat: "strokeplay" },
   { date: "2026-09-01", name: "Koch Cup",                        slug: "rtsf-koch-cup-2026",                    category: "trophy",   scoringFormat: "strokeplay" },
   { date: "2026-09-01", name: "Jackson Cup",                     slug: "rtsf-jackson-cup-2026",                 category: "trophy",   scoringFormat: "strokeplay" },
@@ -1014,5 +1022,19 @@ export const seedRTSFCalendar = internalMutation({
     }
 
     return results;
+  },
+});
+
+// One-time fix: rename Trill Gobblers → Trill Goblets
+export const fixTrillGoblets = internalMutation({
+  args: { clubId: v.id("clubs") },
+  handler: async (ctx, { clubId }) => {
+    const comp = await ctx.db
+      .query("competitions")
+      .withIndex("by_club_and_slug", q => q.eq("clubId", clubId).eq("slug", "rtsf-trill-gobblers-2026"))
+      .unique();
+    if (!comp) return "not found";
+    await ctx.db.patch(comp._id, { name: "Trill Goblets", slug: "rtsf-trill-goblets-2026" });
+    return "patched";
   },
 });
