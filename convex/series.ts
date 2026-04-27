@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, MutationCtx } from "./_generated/server";
+import { mutation, query, internalMutation, MutationCtx } from "./_generated/server";
 
 async function assertClubAdmin(
   ctx: MutationCtx,
@@ -64,6 +64,34 @@ function splitPairsName(displayName: string): string[] {
     name.replace(/\s*\(\d+\)\s*$/, "").trim()
   ).filter(Boolean);
 }
+
+// Official Race to Swinley Forest 2026 registered participants
+// (source: FGC official leaderboard CSV as of 2026-04-19)
+const RTSF_PARTICIPANT_NAMES = new Set([
+  "wingfield martin", "harley ashcroft", "rajiv punja", "will middleton",
+  "tim green", "james bliss", "claude chene", "paul blackburn",
+  "jonny bentwood", "steve davies", "haydn gush", "alex wills",
+  "jamie aronson", "ben plumridge", "carole golten", "gus ganduglia",
+  "howard bentwood", "james monk", "noel cunningham", "tom huntley",
+  "hilary springer", "sven hoffelner", "sanjeev gulati", "sam selhaoui",
+  "edward hikmet", "oliver peake", "william money", "tom walker",
+  "scott leaver", "ben benawra", "bobbie jethwa", "matthew horgan",
+  "gerry o'donohoe", "allan yarish", "ruari boyd", "vijay popat",
+  "andreas sommer", "samuel auld", "mundeep gill", "jp gorrie",
+  "richard bentwood", "lewis spencer", "richard land", "katie olewnik",
+  "helen tout", "steve morris", "jamie crocker", "oswald miller",
+  "anthony harris", "ben hodges", "oliver rawlings", "alex thomas",
+  "wayne mandic", "kevin redmond", "matthew hodkin", "john wainwright",
+  "nessan harpur", "alexandra o'donohoe", "nigel arbuthnot", "edward barrett",
+  "nigel edwards", "terry cordeiro", "peter bernstein", "justin hawkins",
+  "chris wright", "mudrek hossain", "ed sumner", "coraline martin",
+  "des quilty", "john gee-grant", "jessica haley", "klaus schreiner",
+  "andrew dyson", "william daunt", "andrew rose", "keith howlett",
+  "david motts", "jack keane", "richard tyler", "tom vale",
+  "lisa zaferakis", "david carman", "tanguy de fenoyl", "thomas geraghty",
+  "david hallgarten", "steve jayson", "scott johnston", "nicholas kilbey",
+  "alan o'donoghue",
+]);
 
 function sumBestN(scores: number[], n: number): number {
   return [...scores].sort((a, b) => b - a).slice(0, n).reduce((s, x) => s + x, 0);
@@ -134,13 +162,37 @@ export const getCompetitions = query({
 export const computeStandings = query({
   args: { seriesId: v.id("series") },
   handler: async (ctx, { seriesId }) => {
+    // Fetch series for RTSF filter and clubId
+    const series = await ctx.db.get(seriesId);
+
+    // Build displayName → userId map so seeded scores (display-name only) and
+    // scraper entries (userId-keyed for matched members) collapse into one row.
+    const nameToUserId = new Map<string, string>();
+    if (series?.clubId) {
+      const members = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club", q => q.eq("clubId", series.clubId))
+        .collect();
+      for (const cm of members) {
+        if (cm.displayName && cm.userId) {
+          nameToUserId.set(cm.displayName.toLowerCase(), cm.userId);
+        }
+      }
+    }
+
+    // Resolve a player to their canonical key (userId when known, else displayName)
+    function resolve(userId: string | undefined, displayName: string) {
+      const uid = userId ?? nameToUserId.get(displayName.toLowerCase());
+      return { key: uid ?? displayName, uid };
+    }
+
     const links = await ctx.db
       .query("seriesCompetitions")
       .withIndex("by_series", q => q.eq("seriesId", seriesId))
       .collect();
 
     type MemberAccum = {
-      userId?: string;         // undefined for guest/display-name-only entries
+      userId?: string;
       displayName: string;
       majorScores: number[];
       medalScores: number[];
@@ -150,7 +202,6 @@ export const computeStandings = query({
       competitionsPlayed: number;
     };
 
-    // Key: userId if present, else displayName
     const memberMap = new Map<string, MemberAccum>();
 
     function accum(key: string, userId: string | undefined, displayName: string) {
@@ -178,7 +229,6 @@ export const computeStandings = query({
 
       if (comp.type === "club_comp") {
         // ── Club competition ───────────────────────────────────────────────
-        // Primary source: competitionScores (seeded / hole-by-hole entry)
         const scores = await ctx.db
           .query("competitionScores")
           .withIndex("by_competition", q => q.eq("competitionId", link.competitionId))
@@ -191,14 +241,13 @@ export const computeStandings = query({
               ? (b.stablefordPoints ?? 0) - (a.stablefordPoints ?? 0)
               : (a.netScore ?? a.grossScore ?? 999) - (b.netScore ?? b.grossScore ?? 999)
           );
-          // participantCount = full field size (may be larger than scored subset)
           const N = comp.participantCount ?? sorted.length;
 
           sorted.forEach((score, idx) => {
             const pos = score.position ?? (idx + 1);
             const pts = calcPoints(pos, N, category, isPairsEvent);
-            const key = score.userId ?? score.displayName;
-            const m = accum(key, score.userId, score.displayName);
+            const { key, uid } = resolve(score.userId, score.displayName);
+            const m = accum(key, uid, score.displayName);
             m.competitionsPlayed++;
             if (category === "major") m.majorScores.push(pts);
             else if (category === "medal") m.medalScores.push(pts);
@@ -208,14 +257,12 @@ export const computeStandings = query({
           });
 
         } else {
-          // Fallback: scraper-imported results live in the entries table
-          // (leaderboardPosition = finishing position in the full field)
+          // Fallback: scraper-imported results in entries table
           const allEntries = await ctx.db
             .query("entries")
             .withIndex("by_competition", q => q.eq("competitionId", link.competitionId))
             .collect();
           const validEntries = allEntries.filter(e => e.leaderboardPosition != null);
-          // participantCount set by scraper; fall back to entry count (full field imported)
           const N = comp.participantCount ?? validEntries.length;
 
           for (const entry of validEntries) {
@@ -223,9 +270,8 @@ export const computeStandings = query({
             const pts = calcPoints(pos, N, category, isPairsEvent);
             const names = splitPairsName(entry.displayName);
             for (const name of names) {
-              // Pairs entries have no meaningful userId — key by name
-              const key = names.length === 1 ? (entry.userId ?? name) : name;
-              const uid = names.length === 1 ? entry.userId : undefined;
+              const rawUid = names.length === 1 ? entry.userId : undefined;
+              const { key, uid } = resolve(rawUid, name);
               const m = accum(key, uid, name);
               m.competitionsPlayed++;
               if (category === "major") m.majorScores.push(pts);
@@ -252,8 +298,8 @@ export const computeStandings = query({
           const pts = calcPoints(pos, N, category, isPairsEvent);
           const names = splitPairsName(entry.displayName);
           for (const name of names) {
-            const key = names.length === 1 ? (entry.userId ?? name) : name;
-            const uid = names.length === 1 ? entry.userId : undefined;
+            const rawUid = names.length === 1 ? entry.userId : undefined;
+            const { key, uid } = resolve(rawUid, name);
             const m = accum(key, uid, name);
             m.competitionsPlayed++;
             if (category === "major") m.majorScores.push(pts);
@@ -299,7 +345,17 @@ export const computeStandings = query({
       };
     });
 
-    return standings.sort((a, b) => b.total - a.total);
+    const sorted = standings.sort((a, b) => b.total - a.total);
+
+    // For RTSF, restrict to registered participants only
+    const isRTSF = (series?.name ?? "").toLowerCase().includes("swinley");
+    if (isRTSF) {
+      return sorted.filter(s =>
+        RTSF_PARTICIPANT_NAMES.has(s.displayName.toLowerCase())
+      );
+    }
+
+    return sorted;
   },
 });
 
@@ -310,6 +366,31 @@ export const getPlayerResults = query({
     playerKey: v.string(), // userId if the player has one, else displayName
   },
   handler: async (ctx, { seriesId, playerKey }) => {
+    // Build userId → displayName map so we can match userId-keyed playerKey
+    // against seeded scores that only have a displayName.
+    const series = await ctx.db.get(seriesId);
+    const userIdToName = new Map<string, string>();
+    if (series?.clubId) {
+      const members = await ctx.db
+        .query("clubMembers")
+        .withIndex("by_club", q => q.eq("clubId", series.clubId))
+        .collect();
+      for (const cm of members) {
+        if (cm.userId && cm.displayName) {
+          userIdToName.set(cm.userId, cm.displayName);
+        }
+      }
+    }
+    // The display name corresponding to playerKey (null if playerKey is already a name)
+    const playerDisplayName = userIdToName.get(playerKey) ?? null;
+
+    function matchesPlayer(entryUserId: string | undefined, entryDisplayName: string): boolean {
+      if (entryUserId === playerKey) return true;
+      if (entryDisplayName === playerKey) return true;
+      if (playerDisplayName && entryDisplayName === playerDisplayName) return true;
+      return false;
+    }
+
     const links = await ctx.db
       .query("seriesCompetitions")
       .withIndex("by_series", q => q.eq("seriesId", seriesId))
@@ -345,9 +426,9 @@ export const getPlayerResults = query({
 
         if (scores.length > 0) {
           N = comp.participantCount ?? scores.length;
-          const score = scores.find(s => (s.userId ?? s.displayName) === playerKey);
+          const score = scores.find(s => matchesPlayer(s.userId, s.displayName));
           if (score) {
-            position = score.position ?? scores.findIndex(s => (s.userId ?? s.displayName) === playerKey) + 1;
+            position = score.position ?? scores.findIndex(s => matchesPlayer(s.userId, s.displayName)) + 1;
           }
         } else {
           const entries = await ctx.db
@@ -356,10 +437,9 @@ export const getPlayerResults = query({
             .collect();
           const valid = entries.filter(e => e.leaderboardPosition != null);
           N = comp.participantCount ?? valid.length;
-          // Match direct userId/name OR as part of a pairs entry
           const entry = valid.find(e =>
-            (e.userId ?? e.displayName) === playerKey ||
-            splitPairsName(e.displayName).includes(playerKey)
+            matchesPlayer(e.userId, e.displayName) ||
+            splitPairsName(e.displayName).some(n => matchesPlayer(undefined, n))
           );
           if (entry) position = entry.leaderboardPosition!;
         }
@@ -371,8 +451,8 @@ export const getPlayerResults = query({
         const paid = entries.filter(e => e.paidAt && e.leaderboardPosition != null);
         N = paid.length;
         const entry = paid.find(e =>
-          (e.userId ?? e.displayName) === playerKey ||
-          splitPairsName(e.displayName).includes(playerKey)
+          matchesPlayer(e.userId, e.displayName) ||
+          splitPairsName(e.displayName).some(n => matchesPlayer(undefined, n))
         );
         if (entry) position = entry.leaderboardPosition!;
       }
@@ -797,3 +877,142 @@ export const seedRTSFData = mutation({
   },
 });
 
+// ── Race to Swinley Forest 2026: Full Competition Calendar ────────────────────
+// All scheduled RTSF competitions for the 2026 season.
+// Knockouts/trophies without fixed dates use approximate month-start placeholders.
+
+type CalendarEntry = {
+  date: string;
+  name: string;
+  slug: string;
+  category: string;
+  scoringFormat: string;
+  isPairsEvent?: boolean;
+};
+
+const RTSF_CALENDAR_2026: CalendarEntry[] = [
+  // ── Majors — Best 3 count, Bonus Factor ×3 ────────────────────────────────
+  { date: "2026-06-14", name: "Dibbens Overall (Women)",         slug: "rtsf-dibbens-overall-jun14",            category: "major",    scoringFormat: "stableford" },
+  { date: "2026-06-14", name: "Ward Trophy (Men)",               slug: "rtsf-ward-trophy-jun14",                category: "major",    scoringFormat: "stableford" },
+  { date: "2026-06-27", name: "Captain's Day",                   slug: "rtsf-captains-day-jun27",               category: "major",    scoringFormat: "stableford" },
+  { date: "2026-08-15", name: "President's Day",                 slug: "rtsf-presidents-day-aug15",             category: "major",    scoringFormat: "stableford" },
+  { date: "2026-09-19", name: "Tiger of the Year",               slug: "rtsf-tiger-of-year-sep19",              category: "major",    scoringFormat: "stableford" },
+  { date: "2026-10-03", name: "Fox of the Year",                 slug: "rtsf-fox-of-year-oct03",                category: "major",    scoringFormat: "stableford" },
+
+  // ── Medals & Named Events — Best 4 count, Bonus Factor ×2 ────────────────
+  { date: "2026-04-16", name: "Midweek Medal",                   slug: "rtsf-midweek-medal-apr16",              category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-04-19", name: "Men's Middlesex Coronation Bowl", slug: "rtsf-middlesex-coronation-bowl-apr19",  category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-05-02", name: "Steve Biggs Cup",                 slug: "rtsf-steve-biggs-cup-may02",            category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-05-03", name: "Monthly Medal",                   slug: "rtsf-monthly-medal-may03",              category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-05-14", name: "Midweek Medal",                   slug: "rtsf-midweek-medal-may14",              category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-06-07", name: "Monthly Medal",                   slug: "rtsf-monthly-medal-jun07",              category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-06-11", name: "Midweek Medal",                   slug: "rtsf-midweek-medal-jun11",              category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-07-05", name: "Monthly Medal",                   slug: "rtsf-monthly-medal-jul05",              category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-07-11", name: "Club Championships Guest Medal",  slug: "rtsf-club-champs-guest-medal-jul11",    category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-07-11", name: "Club Championships Overall",      slug: "rtsf-club-champs-overall-jul11",        category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-07-16", name: "Midweek Medal",                   slug: "rtsf-midweek-medal-jul16",              category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-07-19", name: "Open Pairs Mixed Medal",          slug: "rtsf-open-pairs-mixed-medal-jul19",     category: "medal",    scoringFormat: "strokeplay", isPairsEvent: true },
+  { date: "2026-08-02", name: "Monthly Medal",                   slug: "rtsf-monthly-medal-aug02",              category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-08-06", name: "Midweek Medal",                   slug: "rtsf-midweek-medal-aug06",              category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-08-08", name: "Singles Bogey Competition",       slug: "rtsf-singles-bogey-aug08",              category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-08-12", name: "Braat Trophy Qualifier",          slug: "rtsf-braat-trophy-qualifier-aug12",     category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-09-06", name: "Monthly Medal",                   slug: "rtsf-monthly-medal-sep06",              category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-09-10", name: "Midweek Medal",                   slug: "rtsf-midweek-medal-sep10",              category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-09-17", name: "Rabbit of the Year",              slug: "rtsf-rabbit-of-year-sep17",             category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-10-04", name: "Monthly Medal",                   slug: "rtsf-monthly-medal-oct04",              category: "medal",    scoringFormat: "strokeplay" },
+  { date: "2026-10-07", name: "Senior of the Year",              slug: "rtsf-senior-of-year-oct07",             category: "medal",    scoringFormat: "strokeplay" },
+
+  // ── Knockouts — QF+ points (300/150/75/50); dates are approx. ─────────────
+  { date: "2026-05-01", name: "Canick Cup",                      slug: "rtsf-canick-cup-2026",                  category: "knockout", scoringFormat: "strokeplay" },
+  { date: "2026-06-01", name: "Cronshaw Cup",                    slug: "rtsf-cronshaw-cup-2026",                category: "knockout", scoringFormat: "strokeplay" },
+  { date: "2026-07-01", name: "Holmes Cup",                      slug: "rtsf-holmes-cup-2026",                  category: "knockout", scoringFormat: "strokeplay" },
+
+  // ── Trophies — Winner 100pts, Runner-up 50pts (÷2 pairs); dates approx. ──
+  { date: "2026-05-01", name: "Davis Cup",                       slug: "rtsf-davis-cup-2026",                   category: "trophy",   scoringFormat: "strokeplay" },
+  { date: "2026-05-01", name: "Spring Foursomes",                slug: "rtsf-spring-foursomes-2026",            category: "trophy",   scoringFormat: "strokeplay", isPairsEvent: true },
+  { date: "2026-05-01", name: "Towle Cup",                       slug: "rtsf-towle-cup-2026",                   category: "trophy",   scoringFormat: "strokeplay" },
+  { date: "2026-06-01", name: "Syrett Cup",                      slug: "rtsf-syrett-cup-2026",                  category: "trophy",   scoringFormat: "strokeplay" },
+  { date: "2026-06-01", name: "Lambert Cup",                     slug: "rtsf-lambert-cup-2026",                 category: "trophy",   scoringFormat: "strokeplay" },
+  { date: "2026-07-01", name: "Abbey Cup",                       slug: "rtsf-abbey-cup-2026",                   category: "trophy",   scoringFormat: "strokeplay" },
+  { date: "2026-07-01", name: "Scratch Singles (Men)",           slug: "rtsf-scratch-singles-men-2026",         category: "trophy",   scoringFormat: "strokeplay" },
+  { date: "2026-07-01", name: "Scratch Trophy (Women)",          slug: "rtsf-scratch-trophy-women-2026",        category: "trophy",   scoringFormat: "strokeplay" },
+  { date: "2026-08-01", name: "Keith Dalby Trophy",              slug: "rtsf-keith-dalby-trophy-2026",          category: "trophy",   scoringFormat: "strokeplay" },
+  { date: "2026-08-01", name: "Womens Club Champs",              slug: "rtsf-womens-club-champs-2026",          category: "trophy",   scoringFormat: "strokeplay" },
+  { date: "2026-09-01", name: "Trill Gobblers",                  slug: "rtsf-trill-gobblers-2026",              category: "trophy",   scoringFormat: "strokeplay" },
+  { date: "2026-09-01", name: "Lorne Wallet",                    slug: "rtsf-lorne-wallet-2026",                category: "trophy",   scoringFormat: "strokeplay" },
+  { date: "2026-09-01", name: "Koch Cup",                        slug: "rtsf-koch-cup-2026",                    category: "trophy",   scoringFormat: "strokeplay" },
+  { date: "2026-09-01", name: "Jackson Cup",                     slug: "rtsf-jackson-cup-2026",                 category: "trophy",   scoringFormat: "strokeplay" },
+  { date: "2026-09-01", name: "Pairs Scramble",                  slug: "rtsf-pairs-scramble-2026",              category: "trophy",   scoringFormat: "strokeplay", isPairsEvent: true },
+  { date: "2026-09-01", name: "Parker Cup",                      slug: "rtsf-parker-cup-2026",                  category: "trophy",   scoringFormat: "strokeplay" },
+];
+
+export const seedRTSFCalendar = internalMutation({
+  args: { seriesId: v.id("series") },
+  handler: async (ctx, { seriesId }) => {
+    const adminId = "system";
+
+    const series = await ctx.db.get(seriesId);
+    if (!series) throw new Error("Series not found");
+    const { clubId } = series;
+    const now = new Date().toISOString();
+    const today = now.slice(0, 10);
+
+    const results: string[] = [];
+
+    for (const ev of RTSF_CALENDAR_2026) {
+      let compId: import("./_generated/dataModel").Id<"competitions"> | null = null;
+
+      const existing = await ctx.db
+        .query("competitions")
+        .withIndex("by_club_and_slug", q => q.eq("clubId", clubId).eq("slug", ev.slug))
+        .unique();
+
+      if (existing) {
+        compId = existing._id;
+        results.push(`exists: ${ev.name} (${ev.date})`);
+      } else {
+        const status = ev.date < today ? "complete" : "upcoming";
+        compId = await ctx.db.insert("competitions", {
+          clubId,
+          scope: "club",
+          name: ev.name,
+          slug: ev.slug,
+          status,
+          type: "club_comp",
+          startDate: ev.date,
+          endDate: ev.date,
+          entryDeadline: ev.date + "T12:00:00.000Z",
+          drawType: "random",
+          tierCount: 0,
+          playersPerTier: 0,
+          entryFee: 0,
+          currency: "GBP",
+          prizeStructure: [],
+          scoringFormat: ev.scoringFormat,
+          createdBy: adminId,
+          createdAt: now,
+          updatedAt: now,
+        });
+        results.push(`created (${status}): ${ev.name} (${ev.date})`);
+      }
+
+      // Link to series if not already linked
+      const existingLinks = await ctx.db
+        .query("seriesCompetitions")
+        .withIndex("by_series", q => q.eq("seriesId", seriesId))
+        .collect();
+      if (!existingLinks.some(l => l.competitionId === compId)) {
+        await ctx.db.insert("seriesCompetitions", {
+          seriesId,
+          competitionId: compId,
+          category: ev.category,
+          isPairsEvent: ev.isPairsEvent ?? false,
+          addedAt: now,
+        });
+        results.push(`linked: ${ev.name} → series`);
+      }
+    }
+
+    return results;
+  },
+});
