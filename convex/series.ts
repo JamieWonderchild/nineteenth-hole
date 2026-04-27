@@ -187,6 +187,8 @@ export const computeStandings = query({
     }
 
     const isRTSF = (series?.name ?? "").toLowerCase().includes("swinley");
+    // RTSF season opened with the April 5 Monthly Medal — exclude anything earlier
+    const RTSF_START_DATE = "2026-04-05";
 
     const links = await ctx.db
       .query("seriesCompetitions")
@@ -225,6 +227,7 @@ export const computeStandings = query({
     for (const link of links) {
       const comp = await ctx.db.get(link.competitionId);
       if (!comp || comp.status !== "complete") continue;
+      if (isRTSF && comp.startDate < RTSF_START_DATE) continue;
 
       const category = link.category;
       const isPairsEvent = link.isPairsEvent ?? false;
@@ -411,10 +414,12 @@ export const getPlayerResults = query({
     const results: ResultItem[] = [];
 
     const isRTSF = (series?.name ?? "").toLowerCase().includes("swinley");
+    const RTSF_START_DATE = "2026-04-05";
 
     for (const link of links) {
       const comp = await ctx.db.get(link.competitionId);
       if (!comp || comp.status !== "complete") continue;
+      if (isRTSF && comp.startDate < RTSF_START_DATE) continue;
 
       const category = link.category;
       const isPairsEvent = link.isPairsEvent ?? false;
