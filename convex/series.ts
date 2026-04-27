@@ -186,9 +186,7 @@ export const computeStandings = query({
       return { key: uid ?? displayName, uid };
     }
 
-    // RTSF officially started 2026-04-12; competitions before this date are excluded
     const isRTSF = (series?.name ?? "").toLowerCase().includes("swinley");
-    const RTSF_START_DATE = "2026-04-12";
 
     const links = await ctx.db
       .query("seriesCompetitions")
@@ -227,7 +225,6 @@ export const computeStandings = query({
     for (const link of links) {
       const comp = await ctx.db.get(link.competitionId);
       if (!comp || comp.status !== "complete") continue;
-      if (isRTSF && comp.startDate < RTSF_START_DATE) continue;
 
       const category = link.category;
       const isPairsEvent = link.isPairsEvent ?? false;
@@ -414,12 +411,10 @@ export const getPlayerResults = query({
     const results: ResultItem[] = [];
 
     const isRTSF = (series?.name ?? "").toLowerCase().includes("swinley");
-    const RTSF_START_DATE = "2026-04-12";
 
     for (const link of links) {
       const comp = await ctx.db.get(link.competitionId);
       if (!comp || comp.status !== "complete") continue;
-      if (isRTSF && comp.startDate < RTSF_START_DATE) continue;
 
       const category = link.category;
       const isPairsEvent = link.isPairsEvent ?? false;
