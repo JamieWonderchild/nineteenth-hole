@@ -1,3 +1,4 @@
+import React from "react";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useQuery, useMutation } from "convex/react";
 import { useUser } from "@clerk/clerk-expo";
@@ -132,7 +133,10 @@ export default function RoundDetailScreen() {
   const deleteRound = useMutation(api.rounds.deleteRound);
   const attestRound = useMutation(api.rounds.attest);
 
+  const [deleting, setDeleting] = React.useState(false);
+
   function handleDelete() {
+    if (deleting) return;
     Alert.alert(
       "Delete Round",
       "This round will be permanently removed and your handicap will recalculate. Are you sure?",
@@ -142,10 +146,13 @@ export default function RoundDetailScreen() {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
+            if (deleting) return;
+            setDeleting(true);
             try {
               await deleteRound({ roundId: id as any });
               router.replace("/(app)/rounds");
             } catch (e: any) {
+              setDeleting(false);
               Alert.alert(
                 "Error",
                 e?.message ?? "Failed to delete round."
@@ -187,6 +194,10 @@ export default function RoundDetailScreen() {
         <LoadingSpinner fullScreen />
       </>
     );
+  }
+
+  if (round === null && deleting) {
+    return null; // navigating away, don't flash error screen
   }
 
   if (round === null) {
