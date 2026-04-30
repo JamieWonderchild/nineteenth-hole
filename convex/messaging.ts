@@ -1,7 +1,8 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation, internalQuery, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { encrypt, decrypt, getVersion } from "./lib/encryption";
 
 // ============================================================================
 // Queries
@@ -49,13 +50,17 @@ export const listMyConversations = query({
 
       const otherMembers = members.filter(m => m.userId !== userId);
 
+      const decryptedLastMessage = lastMessage
+        ? { ...lastMessage, body: await decrypt(lastMessage.body) }
+        : null;
+
       return {
         _id: conversation._id,
         type: conversation.type,
         name: conversation.type === "group" ? conversation.name : otherMembers[0]?.displayName,
         avatarUrl: conversation.type === "direct" ? otherMembers[0]?.avatarUrl : undefined,
         members,
-        lastMessage: lastMessage ?? null,
+        lastMessage: decryptedLastMessage,
         unreadCount,
         lastMessageAt: conversation.lastMessageAt ?? conversation.createdAt,
       };
@@ -86,7 +91,10 @@ export const listMessages = query({
       .order("desc")
       .take(200);
 
-    return msgs.reverse(); // oldest first for display
+    const decrypted = await Promise.all(
+      msgs.map(async (m) => ({ ...m, body: await decrypt(m.body) }))
+    );
+    return decrypted.reverse(); // oldest first for display
   },
 });
 
@@ -275,13 +283,16 @@ export const sendMessage = mutation({
       .first();
     if (!membership) throw new Error("Not a member of this conversation");
 
+    const plainBody = args.body.trim();
+    const encryptedBody = await encrypt(plainBody);
     const now = new Date().toISOString();
+
     await ctx.db.insert("messages", {
       conversationId: args.conversationId,
       senderId: args.senderId,
       senderName: args.senderName,
       senderAvatar: args.senderAvatar,
-      body: args.body.trim(),
+      body: encryptedBody,  // stored encrypted
       createdAt: now,
     });
 
@@ -291,7 +302,8 @@ export const sendMessage = mutation({
     // Auto-mark as read for sender
     await ctx.db.patch(membership._id, { lastReadAt: now });
 
-    // Push notification to all other members
+    // Push notification uses plaintext — the push service sees it but it is
+    // never persisted in the DB
     const allMembers = await ctx.db
       .query("conversationMembers")
       .withIndex("by_conversation", q => q.eq("conversationId", args.conversationId))
@@ -302,9 +314,7 @@ export const sendMessage = mutation({
       await ctx.scheduler.runAfter(0, internal.pushNotifications.sendToUser, {
         userId: member.userId,
         title: args.senderName,
-        body: args.body.trim().length > 100
-          ? args.body.trim().slice(0, 97) + "…"
-          : args.body.trim(),
+        body: plainBody.length > 100 ? plainBody.slice(0, 97) + "…" : plainBody,
         data: { type: "message", conversationId: args.conversationId },
       });
     }
@@ -370,5 +380,89 @@ export const addMembersToGroup = mutation({
         joinedAt: now,
       });
     }
+  },
+});
+
+// ============================================================================
+// Key rotation
+// ============================================================================
+
+// Internal query — fetches a page of raw (encrypted) messages for the rotation
+// action. Never exposes ciphertext to clients.
+export const _getMessagePage = internalQuery({
+  args: {
+    cursor: v.union(v.string(), v.null()),
+    limit: v.number(),
+  },
+  handler: async (ctx, { cursor, limit }) => {
+    const result = await ctx.db
+      .query("messages")
+      .paginate({ numItems: limit, cursor: cursor as any });
+    return {
+      messages: result.page,
+      nextCursor: result.isDone ? null : result.continueCursor,
+    };
+  },
+});
+
+// Internal mutation — overwrites a single message body (ciphertext swap).
+export const _updateMessageBody = internalMutation({
+  args: {
+    messageId: v.id("messages"),
+    body: v.string(),
+  },
+  handler: async (ctx, { messageId, body }) => {
+    await ctx.db.patch(messageId, { body });
+  },
+});
+
+/**
+ * Re-encrypt all messages that are not on the current key version.
+ * Safe to run multiple times — skips messages already on the current version.
+ *
+ * Trigger from the Convex dashboard after:
+ *   1. Adding the new key to MESSAGING_ENCRYPTION_KEYS
+ *   2. Setting MESSAGING_ENCRYPTION_KEY_CURRENT to the new version
+ *   3. Deploying
+ *
+ * Once this completes and you verify no old-version rows remain,
+ * remove the old key from MESSAGING_ENCRYPTION_KEYS and redeploy.
+ */
+export const rotateEncryption = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const targetVersion = process.env.MESSAGING_ENCRYPTION_KEY_CURRENT;
+    if (!targetVersion) throw new Error("MESSAGING_ENCRYPTION_KEY_CURRENT not set");
+
+    let cursor: string | null = null;
+    let total = 0;
+    let rotated = 0;
+
+    do {
+      const page: any = await ctx.runQuery(internal.messaging._getMessagePage, {
+        cursor,
+        limit: 100,
+      });
+
+      for (const message of page.messages) {
+        total++;
+        if (getVersion(message.body) === targetVersion) continue; // already current
+
+        // Decrypt with whichever key it was encrypted with (or pass through if legacy)
+        const plaintext = await decrypt(message.body);
+        const reencrypted = await encrypt(plaintext);
+
+        await ctx.runMutation(internal.messaging._updateMessageBody, {
+          messageId: message._id,
+          body: reencrypted,
+        });
+        rotated++;
+      }
+
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+
+    console.log(`Key rotation complete — ${rotated}/${total} messages re-encrypted to v${targetVersion}`);
+    return { total, rotated, targetVersion };
   },
 });
