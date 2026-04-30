@@ -6,7 +6,7 @@ import { useQuery, useMutation } from "convex/react";
 import { useSearchParams } from "next/navigation";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
-import { MessageSquare, Plus, Send, Users, X, ChevronLeft, Check } from "lucide-react";
+import { MessageSquare, Plus, Send, Users, X, ChevronLeft, Check, Trash2 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -181,48 +181,59 @@ function ConversationRow({
   conv,
   active,
   onClick,
+  onHide,
 }: {
   conv: ConversationItem;
   active: boolean;
   onClick: () => void;
+  onHide: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors ${
-        active ? "bg-green-50" : "hover:bg-gray-50"
-      }`}
-    >
-      {conv.type === "group" ? (
-        <div className="w-9 h-9 rounded-full bg-green-700 flex items-center justify-center shrink-0">
-          <Users size={16} className="text-white" />
-        </div>
-      ) : (
-        <Avatar name={conv.name ?? "?"} url={conv.avatarUrl} size="sm" />
-      )}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className={`text-sm font-medium truncate ${active ? "text-green-900" : "text-gray-900"}`}>
-            {conv.name ?? "Unknown"}
-          </span>
-          {conv.lastMessage && (
-            <span className="text-xs text-gray-400 shrink-0">
-              {timeLabel(conv.lastMessage.createdAt)}
+    <div className={`group relative flex items-center transition-colors ${active ? "bg-green-50" : "hover:bg-gray-50"}`}>
+      <button
+        onClick={onClick}
+        className="flex-1 flex items-center gap-3 px-4 py-3.5 text-left min-w-0"
+      >
+        {conv.type === "group" ? (
+          <div className="w-9 h-9 rounded-full bg-green-700 flex items-center justify-center shrink-0">
+            <Users size={16} className="text-white" />
+          </div>
+        ) : (
+          <Avatar name={conv.name ?? "?"} url={conv.avatarUrl} size="sm" />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className={`text-sm font-medium truncate ${active ? "text-green-900" : "text-gray-900"}`}>
+              {conv.name ?? "Unknown"}
             </span>
+            {conv.lastMessage && (
+              <span className="text-xs text-gray-400 shrink-0">
+                {timeLabel(conv.lastMessage.createdAt)}
+              </span>
+            )}
+          </div>
+          {conv.lastMessage && (
+            <p className="text-xs text-gray-500 truncate mt-0.5">
+              {conv.lastMessage.body}
+            </p>
           )}
         </div>
-        {conv.lastMessage && (
-          <p className="text-xs text-gray-500 truncate mt-0.5">
-            {conv.lastMessage.body}
-          </p>
+        {conv.unreadCount > 0 && (
+          <span className="shrink-0 min-w-[20px] h-5 px-1.5 bg-green-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
+            {conv.unreadCount > 99 ? "99+" : conv.unreadCount}
+          </span>
         )}
-      </div>
-      {conv.unreadCount > 0 && (
-        <span className="shrink-0 min-w-[20px] h-5 px-1.5 bg-green-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
-          {conv.unreadCount > 99 ? "99+" : conv.unreadCount}
-        </span>
-      )}
-    </button>
+      </button>
+
+      {/* Delete button — revealed on row hover */}
+      <button
+        onClick={e => { e.stopPropagation(); onHide(); }}
+        title="Delete conversation"
+        className="opacity-0 group-hover:opacity-100 shrink-0 mr-3 p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
+      >
+        <Trash2 size={14} />
+      </button>
+    </div>
   );
 }
 
@@ -436,6 +447,8 @@ function MessagesInner() {
     user ? { userId: user.id } : "skip"
   ) as ConversationItem[] | undefined;
 
+  const hideConversation = useMutation(api.messaging.hideConversation);
+
   const [activeConvId, setActiveConvId] = useState<Id<"conversations"> | null>(initialConvId);
   const [showGroup, setShowGroup] = useState(false);
   const [mobileShowChat, setMobileShowChat] = useState(!!initialConvId);
@@ -453,6 +466,15 @@ function MessagesInner() {
   function selectConv(id: Id<"conversations">) {
     setActiveConvId(id);
     setMobileShowChat(true);
+  }
+
+  function handleHide(convId: Id<"conversations">) {
+    hideConversation({ conversationId: convId, userId: user!.id });
+    // Deselect if the hidden conversation was open
+    if (activeConvId === convId) {
+      setActiveConvId(null);
+      setMobileShowChat(false);
+    }
   }
 
   if (!user) return null;
@@ -506,6 +528,7 @@ function MessagesInner() {
               conv={conv}
               active={conv._id === activeConvId}
               onClick={() => selectConv(conv._id)}
+              onHide={() => handleHide(conv._id)}
             />
           ))}
         </div>
