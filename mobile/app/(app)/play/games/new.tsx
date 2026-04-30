@@ -8,7 +8,9 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter, useLocalSearchParams, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "convex/react";
@@ -49,23 +51,8 @@ function todayISO(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-function getThisWeekDates(): Date[] {
-  const today = new Date();
-  const result: Date[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    result.push(d);
-  }
-  return result;
-}
-
 function toDateString(d: Date): string {
   return d.toISOString().split("T")[0];
-}
-
-function fmtShortDate(d: Date): string {
-  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric" });
 }
 
 function stepTitle(step: number): string {
@@ -297,6 +284,77 @@ function Step1GameType({
   );
 }
 
+// ── Date picker field ─────────────────────────────────────────────────────────
+
+function DatePickerField({ date, onChange }: { date: Date; onChange: (d: Date) => void }) {
+  const [show, setShow] = useState(false);
+
+  const label = date.toLocaleDateString("en-GB", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
+
+  if (Platform.OS === "ios") {
+    return (
+      <View className="gap-1.5">
+        <Text className="text-sm font-medium text-gray-700">Date</Text>
+        <TouchableOpacity
+          onPress={() => setShow(true)}
+          className="flex-row items-center bg-white border border-gray-200 rounded-xl px-4 py-3 gap-2"
+        >
+          <Ionicons name="calendar-outline" size={18} color="#6b7280" />
+          <Text className="flex-1 text-gray-900">{label}</Text>
+          <Ionicons name="chevron-down" size={16} color="#9ca3af" />
+        </TouchableOpacity>
+
+        <Modal visible={show} transparent animationType="slide">
+          <View className="flex-1 justify-end">
+            <View className="bg-white rounded-t-2xl">
+              <View className="flex-row justify-between items-center px-4 pt-4 pb-2 border-b border-gray-100">
+                <TouchableOpacity onPress={() => setShow(false)}>
+                  <Text className="text-gray-500 text-base">Cancel</Text>
+                </TouchableOpacity>
+                <Text className="font-semibold text-gray-900">Select date</Text>
+                <TouchableOpacity onPress={() => setShow(false)}>
+                  <Text className="text-green-600 font-semibold text-base">Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={date}
+                mode="date"
+                display="spinner"
+                onChange={(_, d) => { if (d) onChange(d); }}
+              />
+            </View>
+          </View>
+        </Modal>
+      </View>
+    );
+  }
+
+  // Android — native inline picker
+  return (
+    <View className="gap-1.5">
+      <Text className="text-sm font-medium text-gray-700">Date</Text>
+      <TouchableOpacity
+        onPress={() => setShow(true)}
+        className="flex-row items-center bg-white border border-gray-200 rounded-xl px-4 py-3 gap-2"
+      >
+        <Ionicons name="calendar-outline" size={18} color="#6b7280" />
+        <Text className="flex-1 text-gray-900">{label}</Text>
+        <Ionicons name="chevron-down" size={16} color="#9ca3af" />
+      </TouchableOpacity>
+      {show && (
+        <DateTimePicker
+          value={date}
+          mode="date"
+          display="default"
+          onChange={(_, d) => { setShow(false); if (d) onChange(d); }}
+        />
+      )}
+    </View>
+  );
+}
+
 // ── Step 2 ────────────────────────────────────────────────────────────────────
 
 function Step2Players({
@@ -372,32 +430,7 @@ function Step2Players({
         />
       </View>
 
-      <View className="gap-1.5">
-        <Text className="text-sm font-medium text-gray-700">Date</Text>
-        <View className="flex-row gap-1.5">
-          {getThisWeekDates().map((d) => {
-            const isSelected = toDateString(d) === toDateString(date);
-            return (
-              <TouchableOpacity
-                key={toDateString(d)}
-                onPress={() => setDate(d)}
-                className={`flex-1 py-2 rounded-xl items-center border ${
-                  isSelected
-                    ? "bg-green-600 border-green-600"
-                    : "bg-white border-gray-200"
-                }`}
-              >
-                <Text className={`text-xs font-semibold ${isSelected ? "text-white" : "text-gray-500"}`}>
-                  {fmtShortDate(d).split(" ")[0]}
-                </Text>
-                <Text className={`text-sm font-bold mt-0.5 ${isSelected ? "text-white" : "text-gray-900"}`}>
-                  {fmtShortDate(d).split(" ")[1]}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
+      <DatePickerField date={date} onChange={setDate} />
 
       <View className="gap-3">
         <Text className="text-sm font-medium text-gray-700">
