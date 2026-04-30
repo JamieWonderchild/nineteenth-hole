@@ -180,7 +180,13 @@ export const getOrCreateDirect = mutation({
         )
         .first();
 
-      if (otherMembership) return conv._id;
+      if (otherMembership) {
+        // Un-hide if the user previously deleted this conversation
+        if (membership.hiddenAt) {
+          await ctx.db.patch(membership._id, { hiddenAt: undefined });
+        }
+        return conv._id;
+      }
     }
 
     // Create new direct conversation
