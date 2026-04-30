@@ -12,10 +12,11 @@ import { encrypt, decrypt, getVersion } from "./lib/encryption";
 export const listMyConversations = query({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
-    const memberships = await ctx.db
+    const memberships = (await ctx.db
       .query("conversationMembers")
       .withIndex("by_user", q => q.eq("userId", userId))
-      .collect();
+      .collect()
+    ).filter(m => !m.hiddenAt);
 
     const results = await Promise.all(memberships.map(async (membership) => {
       const conversation = await ctx.db.get(membership.conversationId);
@@ -309,6 +310,14 @@ export const sendMessage = mutation({
       .withIndex("by_conversation", q => q.eq("conversationId", args.conversationId))
       .collect();
 
+    // Restore hidden conversations for all members — a new message should
+    // make the chat reappear for anyone who previously hid it
+    for (const member of allMembers) {
+      if (member.hiddenAt) {
+        await ctx.db.patch(member._id, { hiddenAt: undefined });
+      }
+    }
+
     for (const member of allMembers) {
       if (member.userId === args.senderId) continue;
       await ctx.scheduler.runAfter(0, internal.pushNotifications.sendToUser, {
@@ -380,6 +389,26 @@ export const addMembersToGroup = mutation({
         joinedAt: now,
       });
     }
+  },
+});
+
+// Hide a conversation for one participant only (soft delete).
+// The other participant's membership and all messages are untouched.
+// The conversation reappears automatically when a new message is received.
+export const hideConversation = mutation({
+  args: { conversationId: v.id("conversations"), userId: v.string() },
+  handler: async (ctx, { conversationId, userId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
+    const membership = await ctx.db
+      .query("conversationMembers")
+      .withIndex("by_conversation_and_user", q =>
+        q.eq("conversationId", conversationId).eq("userId", userId)
+      )
+      .first();
+    if (!membership) return;
+    await ctx.db.patch(membership._id, { hiddenAt: new Date().toISOString() });
   },
 });
 

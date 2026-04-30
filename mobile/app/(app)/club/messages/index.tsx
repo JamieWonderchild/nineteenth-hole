@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import {
   View,
   Text,
@@ -7,8 +8,9 @@ import {
 } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { Ionicons } from "@expo/vector-icons";
+import { Swipeable } from "react-native-gesture-handler";
 import { api } from "../../../../lib/convex";
 import { EmptyState, LoadingSpinner } from "../../../../components/ui";
 
@@ -34,7 +36,7 @@ function getInitials(name?: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-// ── conversation row ──────────────────────────────────────────────────────────
+// ── types ─────────────────────────────────────────────────────────────────────
 
 type Conversation = {
   _id: string;
@@ -50,6 +52,20 @@ type Conversation = {
   lastMessageAt: string;
 };
 
+// ── sub-components ─────────────────────────────────────────────────────────────
+
+function DeleteAction({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={{ width: 80, backgroundColor: "#ef4444", alignItems: "center", justifyContent: "center" }}
+    >
+      <Ionicons name="trash-outline" size={22} color="#fff" />
+      <Text style={{ color: "#fff", fontSize: 11, fontWeight: "600", marginTop: 3 }}>Delete</Text>
+    </TouchableOpacity>
+  );
+}
+
 function ConversationRow({
   conversation,
   userId,
@@ -61,7 +77,6 @@ function ConversationRow({
 }) {
   const isGroup = conversation.type === "group";
   const name = conversation.name ?? "Unknown";
-  const initials = getInitials(name);
   const lastMsg = conversation.lastMessage;
   const isMine = lastMsg?.senderId === userId;
 
@@ -70,7 +85,6 @@ function ConversationRow({
       onPress={onPress}
       className="bg-white border-b border-gray-50 px-4 py-4 flex-row items-center gap-3"
     >
-      {/* avatar */}
       <View
         className={`w-12 h-12 rounded-full items-center justify-center ${
           isGroup ? "bg-purple-100" : "bg-green-100"
@@ -79,23 +93,17 @@ function ConversationRow({
         {isGroup ? (
           <Ionicons name="people" size={22} color="#7c3aed" />
         ) : (
-          <Text className="text-green-700 font-bold text-base">{initials}</Text>
+          <Text className="text-green-700 font-bold text-base">{getInitials(name)}</Text>
         )}
       </View>
 
-      {/* content */}
       <View className="flex-1 gap-0.5">
         <View className="flex-row items-center justify-between">
-          <Text
-            className="font-semibold text-gray-900 text-base flex-1 mr-2"
-            numberOfLines={1}
-          >
+          <Text className="font-semibold text-gray-900 text-base flex-1 mr-2" numberOfLines={1}>
             {name}
           </Text>
           {lastMsg && (
-            <Text className="text-xs text-gray-400">
-              {formatRelativeTime(lastMsg.createdAt)}
-            </Text>
+            <Text className="text-xs text-gray-400">{formatRelativeTime(lastMsg.createdAt)}</Text>
           )}
         </View>
         {lastMsg ? (
@@ -112,7 +120,6 @@ function ConversationRow({
         )}
       </View>
 
-      {/* unread badge */}
       {conversation.unreadCount > 0 && (
         <View className="bg-green-600 rounded-full w-5 h-5 items-center justify-center">
           <Text className="text-white text-xs font-bold">
@@ -131,29 +138,35 @@ export default function MessagesScreen() {
   const router = useRouter();
   const userId = user?.id ?? "";
 
+  // Ref to the currently open swipeable so we can close it when another opens
+  const openSwipeable = useRef<Swipeable | null>(null);
+
   const conversations = useQuery(
     api.messaging.listMyConversations,
     userId ? { userId } : "skip"
   );
 
-  const isLoading = conversations === undefined;
+  const hideConversation = useMutation(api.messaging.hideConversation);
 
-  if (isLoading) {
+  function handleHide(conversationId: string) {
+    openSwipeable.current?.close();
+    openSwipeable.current = null;
+    hideConversation({ conversationId: conversationId as any, userId }).catch(() => {});
+  }
+
+  const headerRight = () => (
+    <TouchableOpacity
+      onPress={() => router.push("/(app)/club/messages/new" as any)}
+      className="mr-2"
+    >
+      <Ionicons name="create-outline" size={24} color="#166534" />
+    </TouchableOpacity>
+  );
+
+  if (conversations === undefined) {
     return (
       <>
-        <Stack.Screen
-          options={{
-            title: "Messages",
-            headerRight: () => (
-              <TouchableOpacity
-                onPress={() => router.push("/(app)/club/messages/new" as any)}
-                className="mr-2"
-              >
-                <Ionicons name="create-outline" size={24} color="#166534" />
-              </TouchableOpacity>
-            ),
-          }}
-        />
+        <Stack.Screen options={{ title: "Messages", headerRight }} />
         <LoadingSpinner fullScreen />
       </>
     );
@@ -161,19 +174,7 @@ export default function MessagesScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: "Messages",
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={() => router.push("/(app)/club/messages/new" as any)}
-              className="mr-2"
-            >
-              <Ionicons name="create-outline" size={24} color="#166534" />
-            </TouchableOpacity>
-          ),
-        }}
-      />
+      <Stack.Screen options={{ title: "Messages", headerRight }} />
 
       {conversations.length === 0 ? (
         <EmptyState
@@ -186,21 +187,38 @@ export default function MessagesScreen() {
           className="flex-1 bg-white"
           data={conversations as Conversation[]}
           keyExtractor={(item) => item._id}
-          renderItem={({ item }) => (
-            <ConversationRow
-              conversation={item}
-              userId={userId}
-              onPress={() =>
-                router.push(`/(app)/club/messages/${item._id}` as any)
-              }
-            />
-          )}
-          refreshControl={
-            <RefreshControl refreshing={false} tintColor="#16a34a" />
-          }
-          contentContainerStyle={
-            conversations.length === 0 ? { flexGrow: 1 } : { paddingBottom: 32 }
-          }
+          renderItem={({ item }) => {
+            let rowRef: Swipeable | null = null;
+            return (
+              <Swipeable
+                ref={(r) => { rowRef = r; }}
+                renderRightActions={() => (
+                  <DeleteAction onPress={() => handleHide(item._id)} />
+                )}
+                onSwipeableOpen={() => {
+                  // Close any previously open row
+                  if (openSwipeable.current && openSwipeable.current !== rowRef) {
+                    openSwipeable.current.close();
+                  }
+                  openSwipeable.current = rowRef;
+                }}
+                friction={2}
+                rightThreshold={40}
+              >
+                <ConversationRow
+                  conversation={item}
+                  userId={userId}
+                  onPress={() => {
+                    openSwipeable.current?.close();
+                    openSwipeable.current = null;
+                    router.push(`/(app)/club/messages/${item._id}` as any);
+                  }}
+                />
+              </Swipeable>
+            );
+          }}
+          refreshControl={<RefreshControl refreshing={false} tintColor="#16a34a" />}
+          contentContainerStyle={{ paddingBottom: 32 }}
         />
       )}
     </>

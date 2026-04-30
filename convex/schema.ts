@@ -740,6 +740,7 @@ export default defineSchema({
     displayName: v.string(),               // denormalised for display
     avatarUrl: v.optional(v.string()),
     lastReadAt: v.optional(v.string()),    // ISO — for unread count
+    hiddenAt: v.optional(v.string()),      // ISO — set when user hides the chat
     joinedAt: v.string(),
   })
     .index("by_conversation", ["conversationId"])
