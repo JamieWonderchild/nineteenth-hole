@@ -196,9 +196,12 @@ export default function RoundDetailScreen() {
     );
   }
 
-  if (round === null && deleting) {
-    return null; // navigating away, don't flash error screen
-  }
+  // Auto-navigate back if round doesn't exist (e.g. tab restored stale route)
+  React.useEffect(() => {
+    if (round === null && !deleting) {
+      router.replace("/(app)/rounds");
+    }
+  }, [round, deleting]);
 
   if (round === null) {
     return (
