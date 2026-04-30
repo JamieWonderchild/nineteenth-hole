@@ -77,9 +77,9 @@
 
 // ── Byte / base64 helpers ─────────────────────────────────────────────────────
 
-function hexToBytes(hex: string): Uint8Array {
+function hexToBytes(hex: string): Uint8Array<ArrayBuffer> {
   if (hex.length % 2 !== 0) throw new Error("Hex string has odd length");
-  const out = new Uint8Array(hex.length / 2);
+  const out = new Uint8Array(new ArrayBuffer(hex.length / 2));
   for (let i = 0; i < hex.length; i += 2) {
     out[i / 2] = parseInt(hex.slice(i, i + 2), 16);
   }
@@ -92,16 +92,16 @@ function toBase64(buf: Uint8Array): string {
   return btoa(s);
 }
 
-function fromBase64(b64: string): Uint8Array {
+function fromBase64(b64: string): Uint8Array<ArrayBuffer> {
   const s = atob(b64);
-  const out = new Uint8Array(s.length);
+  const out = new Uint8Array(new ArrayBuffer(s.length));
   for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
   return out;
 }
 
 // ── Key management ────────────────────────────────────────────────────────────
 
-function getKeyMaterial(version: string): Uint8Array {
+function getKeyMaterial(version: string): Uint8Array<ArrayBuffer> {
   const raw = process.env.MESSAGING_ENCRYPTION_KEYS;
   if (!raw) throw new Error("MESSAGING_ENCRYPTION_KEYS env var is not set");
   const map = JSON.parse(raw) as Record<string, string>;
@@ -132,7 +132,7 @@ export async function encrypt(plaintext: string): Promise<string> {
   if (!version) throw new Error("MESSAGING_ENCRYPTION_KEY_CURRENT env var is not set");
 
   const key = await importKey(version);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const iv = crypto.getRandomValues(new Uint8Array(new ArrayBuffer(12)));
   const encoded = new TextEncoder().encode(plaintext);
 
   // Web Crypto AES-GCM output: ciphertext || 16-byte auth tag
@@ -141,7 +141,7 @@ export async function encrypt(plaintext: string): Promise<string> {
   );
 
   // Pack: iv (12 bytes) + ciphertext+tag
-  const combined = new Uint8Array(12 + cipherWithTag.length);
+  const combined = new Uint8Array(new ArrayBuffer(12 + cipherWithTag.length));
   combined.set(iv, 0);
   combined.set(cipherWithTag, 12);
 
