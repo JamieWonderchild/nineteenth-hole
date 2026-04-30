@@ -155,12 +155,14 @@ export default function MessagesScreen() {
   }
 
   const headerRight = () => (
-    <TouchableOpacity
-      onPress={() => router.push("/(app)/club/messages/new" as any)}
-      className="mr-2"
-    >
-      <Ionicons name="create-outline" size={24} color="#166534" />
-    </TouchableOpacity>
+    <View className="flex-row items-center gap-3 mr-2">
+      <TouchableOpacity onPress={() => router.push("/(app)/club/messages/new-group" as any)}>
+        <Ionicons name="people-outline" size={23} color="#166534" />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => router.push("/(app)/club/messages/new" as any)}>
+        <Ionicons name="create-outline" size={23} color="#166534" />
+      </TouchableOpacity>
+    </View>
   );
 
   if (conversations === undefined) {
