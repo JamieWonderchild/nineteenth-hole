@@ -48,9 +48,7 @@ export function PlayedWithPicker({ players, onChange }: Props) {
 
   return (
     <View style={{ gap: 8 }}>
-      <Text style={{ fontSize: 14, fontWeight: "500", color: "#374151" }}>
-        Playing with (optional)
-      </Text>
+      <Text style={{ fontSize: 14, fontWeight: "500", color: "#374151" }}>Playing with (optional)</Text>
 
       {/* Selected player chips */}
       {players.length > 0 && (
