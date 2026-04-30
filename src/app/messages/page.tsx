@@ -103,7 +103,9 @@ function NewGroupModal({
     if (!name.trim() || selected.size === 0) return;
     setCreating(true);
     try {
-      const members = others.filter(m => selected.has(m.userId));
+      const members = others
+        .filter(m => selected.has(m.userId))
+        .map(m => ({ userId: m.userId, displayName: m.displayName, avatarUrl: m.avatarUrl }));
       const id = await createGroup({
         name: name.trim(),
         clubId,
