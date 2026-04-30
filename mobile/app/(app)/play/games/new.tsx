@@ -49,6 +49,25 @@ function todayISO(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+function getThisWeekDates(): Date[] {
+  const today = new Date();
+  const result: Date[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    result.push(d);
+  }
+  return result;
+}
+
+function toDateString(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
+
+function fmtShortDate(d: Date): string {
+  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric" });
+}
+
 function stepTitle(step: number): string {
   return ["Game Type", "Players", "Stakes", "Review"][step - 1] ?? "";
 }
@@ -70,7 +89,7 @@ export default function NewGameScreen() {
 
   // Step 2
   const [gameName, setGameName] = useState("Saturday game");
-  const [date, setDate] = useState(todayISO());
+  const [date, setDate] = useState<Date>(new Date());
   const [players, setPlayers] = useState<Player[]>([]);
 
   // Step 3
@@ -139,7 +158,7 @@ export default function NewGameScreen() {
           userId: p.userId,
           handicap: p.handicap,
         })),
-        date: new Date(date).toISOString(),
+        date: date.toISOString(),
       });
 
       router.replace(`/play/games/${gameId}` as any);
@@ -180,7 +199,7 @@ export default function NewGameScreen() {
               gameName={gameName}
               setGameName={setGameName}
               date={date}
-              setDate={setDate}
+              setDate={setDate as (d: Date) => void}
               players={players}
               onAddPlayer={addPlayer}
               onRemovePlayer={removePlayer}
@@ -206,7 +225,7 @@ export default function NewGameScreen() {
             <Step4Review
               gameType={gameType}
               gameName={gameName}
-              date={date}
+              date={toDateString(date)}
               players={players}
               withStakes={withStakes}
               stakeInput={stakeInput}
@@ -291,8 +310,8 @@ function Step2Players({
 }: {
   gameName: string;
   setGameName: (v: string) => void;
-  date: string;
-  setDate: (v: string) => void;
+  date: Date;
+  setDate: (v: Date) => void;
   players: Player[];
   onAddPlayer: (name: string, handicap?: number, userId?: string) => void;
   onRemovePlayer: (id: string) => void;
@@ -353,14 +372,31 @@ function Step2Players({
         />
       </View>
 
-      <View className="gap-1">
+      <View className="gap-1.5">
         <Text className="text-sm font-medium text-gray-700">Date</Text>
-        <TextInput
-          value={date}
-          onChangeText={setDate}
-          placeholder="YYYY-MM-DD"
-          className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900"
-        />
+        <View className="flex-row gap-1.5">
+          {getThisWeekDates().map((d) => {
+            const isSelected = toDateString(d) === toDateString(date);
+            return (
+              <TouchableOpacity
+                key={toDateString(d)}
+                onPress={() => setDate(d)}
+                className={`flex-1 py-2 rounded-xl items-center border ${
+                  isSelected
+                    ? "bg-green-600 border-green-600"
+                    : "bg-white border-gray-200"
+                }`}
+              >
+                <Text className={`text-xs font-semibold ${isSelected ? "text-white" : "text-gray-500"}`}>
+                  {fmtShortDate(d).split(" ")[0]}
+                </Text>
+                <Text className={`text-sm font-bold mt-0.5 ${isSelected ? "text-white" : "text-gray-900"}`}>
+                  {fmtShortDate(d).split(" ")[1]}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
       <View className="gap-3">
