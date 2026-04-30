@@ -204,24 +204,11 @@ export default function RoundDetailScreen() {
   }, [round, deleting]);
 
   if (round === null) {
+    // Show spinner while useEffect redirect fires — don't flash error screen
     return (
       <>
         <Stack.Screen options={{ title: "Round Detail" }} />
-        <View className="flex-1 items-center justify-center bg-gray-50 px-8">
-          <Ionicons name="alert-circle-outline" size={48} color="#9ca3af" />
-          <Text className="text-lg font-semibold text-gray-700 mt-3 text-center">
-            Round not found
-          </Text>
-          <Text className="text-gray-400 text-sm text-center mt-1">
-            This round may have been deleted.
-          </Text>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="mt-5 bg-green-600 rounded-full px-6 py-3"
-          >
-            <Text className="text-white font-semibold">Go Back</Text>
-          </TouchableOpacity>
-        </View>
+        <LoadingSpinner fullScreen />
       </>
     );
   }
