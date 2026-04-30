@@ -7,6 +7,7 @@ import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { ConvexReactClient } from "convex/react";
 import { Slot } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!);
 
@@ -24,14 +25,16 @@ const tokenCache = {
 
 export default function RootLayout() {
   return (
-    <ClerkProvider
-      publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!}
-      tokenCache={tokenCache}
-    >
-      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-        <StatusBar style="auto" />
-        <Slot />
-      </ConvexProviderWithClerk>
-    </ClerkProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ClerkProvider
+        publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!}
+        tokenCache={tokenCache}
+      >
+        <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+          <StatusBar style="auto" />
+          <Slot />
+        </ConvexProviderWithClerk>
+      </ClerkProvider>
+    </GestureHandlerRootView>
   );
 }
