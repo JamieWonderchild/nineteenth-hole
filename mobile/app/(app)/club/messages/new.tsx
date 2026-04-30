@@ -1,5 +1,9 @@
 /**
  * New message — pick a club member to start or resume a direct conversation.
+ *
+ * If a conversation with the selected member already exists, navigates straight
+ * to it. Otherwise navigates to compose.tsx where the conversation is only
+ * created when the first message is actually sent.
  */
 import { useState, useMemo } from "react";
 import {
@@ -12,7 +16,7 @@ import {
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../../../../lib/convex";
 import { EmptyState, LoadingSpinner } from "../../../../components/ui";
@@ -31,19 +35,10 @@ type Member = {
   handicapIndex?: number;
 };
 
-function MemberRow({
-  member,
-  onPress,
-  loading,
-}: {
-  member: Member;
-  onPress: () => void;
-  loading: boolean;
-}) {
+function MemberRow({ member, onPress }: { member: Member; onPress: () => void }) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      disabled={loading}
       activeOpacity={0.7}
       className="flex-row items-center px-4 py-3.5 bg-white border-b border-gray-50"
     >
@@ -69,10 +64,8 @@ export default function NewMessageScreen() {
   const { user } = useUser();
   const router = useRouter();
   const userId = user?.id ?? "";
-  const myDisplayName = user?.fullName ?? user?.username ?? "Me";
 
   const [search, setSearch] = useState("");
-  const [loadingMemberId, setLoadingMemberId] = useState<string | null>(null);
 
   const clubs = useQuery(api.clubMembers.myActiveClubs, {});
   const clubId = clubs?.[0]?.club._id;
@@ -82,11 +75,14 @@ export default function NewMessageScreen() {
     clubId ? { clubId: clubId as any } : "skip"
   );
 
-  const getOrCreate = useMutation(api.messaging.getOrCreateDirect);
+  // Load existing conversations so we can detect ones already started
+  const conversations = useQuery(
+    api.messaging.listMyConversations,
+    userId ? { userId } : "skip"
+  );
 
   const members = useMemo(() => {
     if (!rawMembers) return [];
-    // Exclude self
     const others = rawMembers.filter((m: any) => m.userId !== userId);
     const q = search.trim().toLowerCase();
     const filtered = q
@@ -97,25 +93,32 @@ export default function NewMessageScreen() {
     );
   }, [rawMembers, search, userId]);
 
-  const isLoading = clubs === undefined || (clubId && rawMembers === undefined);
+  const isLoading =
+    clubs === undefined ||
+    conversations === undefined ||
+    (clubId && rawMembers === undefined);
 
-  async function handleSelect(member: Member) {
+  function handleSelect(member: Member) {
     if (!member.userId) {
       Alert.alert("Can't message this member", "They haven't set up their account yet.");
       return;
     }
-    setLoadingMemberId(member._id);
-    try {
-      const conversationId = await getOrCreate({
-        myUserId: userId,
-        otherUserId: member.userId,
-        myDisplayName,
-        otherDisplayName: member.displayName,
-      });
-      router.replace(`/(app)/club/messages/${conversationId}` as any);
-    } catch (e: any) {
-      Alert.alert("Error", e?.message ?? "Could not start conversation.");
-      setLoadingMemberId(null);
+
+    // If a conversation already exists with this person, go straight to it
+    const existing = (conversations as any[])?.find(
+      (c: any) =>
+        c.type === "direct" &&
+        c.members?.some((m: any) => m.userId === member.userId)
+    );
+
+    if (existing) {
+      router.replace(`/(app)/club/messages/${existing._id}` as any);
+    } else {
+      // No conversation yet — go to compose screen, which only creates it on
+      // first send
+      router.push(
+        `/(app)/club/messages/compose?recipientId=${encodeURIComponent(member.userId)}&recipientName=${encodeURIComponent(member.displayName)}` as any
+      );
     }
   }
 
@@ -153,11 +156,7 @@ export default function NewMessageScreen() {
           data={members as Member[]}
           keyExtractor={(item) => item._id}
           renderItem={({ item }) => (
-            <MemberRow
-              member={item}
-              onPress={() => handleSelect(item)}
-              loading={loadingMemberId === item._id}
-            />
+            <MemberRow member={item} onPress={() => handleSelect(item)} />
           )}
           ListHeaderComponent={
             members.length > 0 ? (
