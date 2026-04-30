@@ -17,7 +17,9 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "The 19th Hole uses your location to find nearby golf courses."
       },
       "entitlements": {
-        "com.apple.developer.applesignin": ["Default"]
+        "com.apple.developer.applesignin": [
+          "Default"
+        ]
       }
     },
     "android": {
@@ -57,7 +59,8 @@
           "sounds": [],
           "enableAndroidFirebaseMessaging": false
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

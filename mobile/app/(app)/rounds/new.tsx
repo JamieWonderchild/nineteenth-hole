@@ -1047,8 +1047,10 @@ interface MarkerProfile {
 
 function Step4Marker({
   onNext,
+  required = false,
 }: {
   onNext: (data: { markerId?: string; markerName?: string }) => void;
+  required?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<MarkerProfile | null>(null);
@@ -1068,7 +1070,9 @@ function Step4Marker({
           <View>
             <Text className="text-xl font-bold text-gray-900">Add a Marker</Text>
             <Text className="text-sm text-gray-500 mt-1">
-              Ask a playing partner to confirm your score. Attested rounds count toward your handicap index.
+              {required
+                ? "This round counts toward your handicap. A marker must confirm your score."
+                : "Ask a playing partner to confirm your score. Attested rounds count toward your handicap index."}
             </Text>
           </View>
 
@@ -1133,17 +1137,20 @@ function Step4Marker({
             onPress={() =>
               onNext(selected ? { markerId: selected.userId, markerName: selected.displayName } : {})
             }
+            disabled={required && !selected}
             size="lg"
             className="mt-2"
           >
-            {selected ? "Continue" : "Skip — submit without marker"}
+            {selected ? "Continue" : required ? "Select a marker to continue" : "Skip — submit without marker"}
           </Button>
 
-          <View className="items-center pb-8">
-            <Text className="text-xs text-gray-400 text-center">
-              Without a marker, this round is logged but won't update your handicap index.
-            </Text>
-          </View>
+          {!required && (
+            <View className="items-center pb-8">
+              <Text className="text-xs text-gray-400 text-center">
+                Without a marker, this round is logged but won't update your handicap index.
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -1336,7 +1343,8 @@ export default function NewRoundScreen() {
 
   function handleStep3(data: NonNullable<typeof step3Data>) {
     setStep3Data(data);
-    setStep(4);
+    // Skip marker step entirely if round doesn't count toward handicap
+    setStep(step1Data?.skipRatings ? 5 : 4);
   }
 
   function handleStep4(data: { markerId?: string; markerName?: string }) {
@@ -1417,8 +1425,13 @@ export default function NewRoundScreen() {
   }
 
   function goBack() {
-    if (step > 1) setStep((s) => (s - 1) as Step);
-    else router.back();
+    if (step === 5 && step1Data?.skipRatings) {
+      setStep(3);
+    } else if (step > 1) {
+      setStep((s) => (s - 1) as Step);
+    } else {
+      router.back();
+    }
   }
 
   const totalSteps = 5;
@@ -1458,7 +1471,7 @@ export default function NewRoundScreen() {
             fmtDist={fmtDist}
           />
         )}
-        {step === 4 && <Step4Marker onNext={handleStep4} />}
+        {step === 4 && <Step4Marker onNext={handleStep4} required={!step1Data?.skipRatings} />}
         {step === 5 && step1Data && step2Data && step3Data && (
           <Step4Review
             summary={{

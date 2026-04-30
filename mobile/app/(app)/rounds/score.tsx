@@ -174,7 +174,7 @@ export default function ResumeRoundScreen() {
           ]
         );
       }}
-      onComplete={async (holeScores) => {
+      onComplete={async (holeScores, marker) => {
         setSubmitting(true);
         try {
           await completeRound({
@@ -183,10 +183,15 @@ export default function ResumeRoundScreen() {
             ...(playedWith.length > 0 ? { playedWith } : {}),
             ...(conditions ? { conditions } : {}),
             ...(notes ? { notes } : {}),
+            ...(marker ? { markerId: marker.id, markerName: marker.name } : {}),
           });
-          Alert.alert("Round Complete!", "Your round has been saved.", [
-            { text: "View Rounds", onPress: () => router.replace("/(app)/rounds") },
-          ]);
+          Alert.alert(
+            "Round Complete!",
+            marker
+              ? `${marker.name} has been notified to attest your score.`
+              : "Your round has been saved.",
+            [{ text: "View Rounds", onPress: () => router.replace("/(app)/rounds") }]
+          );
         } catch (e: any) {
           Alert.alert("Error", e?.message ?? "Failed to save round");
         } finally {
@@ -242,7 +247,7 @@ function ScoringUI({
   setNotes: (v: string) => void;
   onSaveHole: (hole: number, par: number, si: number, score: number) => void;
   onCancel: () => void;
-  onComplete: (holeScores: { hole: number; par: number; strokeIndex: number; score: number }[]) => void;
+  onComplete: (holeScores: { hole: number; par: number; strokeIndex: number; score: number }[], marker?: { id: string; name: string }) => void;
   submitting: boolean;
   router: ReturnType<typeof useRouter>;
 }) {
@@ -250,6 +255,13 @@ function ScoringUI({
   const [viewMode, setViewMode] = useState<"hole_by_hole" | "scorecard">("hole_by_hole");
   const [scores, setScores] = useState<(number | null)[]>(initialScores);
   const [currentHole, setCurrentHole] = useState(startHole);
+  const [markerSearch, setMarkerSearch] = useState("");
+  const [selectedMarker, setSelectedMarker] = useState<{ id: string; name: string } | null>(null);
+  const markerResults = useQuery(
+    api.golferProfiles.search,
+    markerSearch.trim().length >= 2 ? { term: markerSearch.trim() } : "skip"
+  );
+  const requiresMarker = !!(round.courseRating && round.slopeRating);
 
   function updateScore(i: number, delta: number) {
     setScores(prev => {
@@ -298,6 +310,65 @@ function ScoringUI({
               </View>
             </View>
             <PlayedWithPicker players={playedWith} onChange={setPlayedWith} />
+            {/* Marker — required for rounds counting toward handicap */}
+            {requiresMarker && (
+              <View className="gap-2">
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-sm font-medium text-gray-700">Marker</Text>
+                  <Text className="text-xs font-semibold text-red-500">Required</Text>
+                </View>
+                <Text className="text-xs text-gray-400">
+                  A playing partner must confirm your score for it to count toward your handicap.
+                </Text>
+                {selectedMarker ? (
+                  <View className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex-row items-center gap-3">
+                    <View className="w-9 h-9 rounded-full bg-green-600 items-center justify-center">
+                      <Text className="text-white font-bold">{selectedMarker.name[0]?.toUpperCase()}</Text>
+                    </View>
+                    <Text className="flex-1 text-green-900 font-semibold">{selectedMarker.name}</Text>
+                    <TouchableOpacity onPress={() => setSelectedMarker(null)}>
+                      <Ionicons name="close-circle" size={20} color="#16a34a" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View className="gap-2">
+                    <TextInput
+                      className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-base text-gray-900"
+                      value={markerSearch}
+                      onChangeText={setMarkerSearch}
+                      placeholder="Search by name…"
+                      placeholderTextColor="#9ca3af"
+                      returnKeyType="search"
+                    />
+                    {markerResults && (markerResults as any[]).length > 0 && (
+                      <View className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                        {(markerResults as any[]).slice(0, 5).map((p: any, i: number) => (
+                          <TouchableOpacity
+                            key={p._id}
+                            onPress={() => { setSelectedMarker({ id: p.userId, name: p.displayName }); setMarkerSearch(""); }}
+                            className={`flex-row items-center px-4 py-3 gap-3 ${i > 0 ? "border-t border-gray-100" : ""}`}
+                          >
+                            <View className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center">
+                              <Text className="text-gray-600 font-bold text-sm">{p.displayName[0]?.toUpperCase()}</Text>
+                            </View>
+                            <View className="flex-1">
+                              <Text className="text-gray-900 font-medium text-sm">{p.displayName}</Text>
+                              {p.handicapIndex != null && (
+                                <Text className="text-gray-400 text-xs">HCP {p.handicapIndex.toFixed(1)}</Text>
+                              )}
+                            </View>
+                            <Ionicons name="add-circle-outline" size={20} color="#16a34a" />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                    {markerSearch.trim().length >= 2 && markerResults !== undefined && (markerResults as any[]).length === 0 && (
+                      <Text className="text-gray-400 text-sm text-center">No players found</Text>
+                    )}
+                  </View>
+                )}
+              </View>
+            )}
             <View className="gap-2">
               <Text className="text-sm font-medium text-gray-700">Conditions</Text>
               <View className="flex-row gap-2">
@@ -319,7 +390,13 @@ function ScoringUI({
                 multiline numberOfLines={3} textAlignVertical="top"
               />
             </View>
-            <Button onPress={() => onComplete(buildHoleScores())} loading={submitting} size="lg" className="mb-8">
+            <Button
+              onPress={() => onComplete(buildHoleScores(), selectedMarker ?? undefined)}
+              loading={submitting}
+              disabled={requiresMarker && !selectedMarker}
+              size="lg"
+              className="mb-8"
+            >
               Submit Round
             </Button>
           </View>
