@@ -4,7 +4,6 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  Alert,
 } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
@@ -147,7 +146,7 @@ export default function MessagesScreen() {
             title: "Messages",
             headerRight: () => (
               <TouchableOpacity
-                onPress={() => Alert.alert("Coming soon", "New message coming soon.")}
+                onPress={() => router.push("/(app)/club/messages/new" as any)}
                 className="mr-2"
               >
                 <Ionicons name="create-outline" size={24} color="#166534" />
@@ -167,9 +166,7 @@ export default function MessagesScreen() {
           title: "Messages",
           headerRight: () => (
             <TouchableOpacity
-              onPress={() =>
-                Alert.alert("Coming soon", "New message coming soon.")
-              }
+              onPress={() => router.push("/(app)/club/messages/new" as any)}
               className="mr-2"
             >
               <Ionicons name="create-outline" size={24} color="#166534" />
