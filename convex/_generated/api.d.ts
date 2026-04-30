@@ -28,6 +28,7 @@ import type * as http from "../http.js";
 import type * as interclub from "../interclub.js";
 import type * as invites from "../invites.js";
 import type * as knockouts from "../knockouts.js";
+import type * as lib_encryption from "../lib/encryption.js";
 import type * as memberAccounts from "../memberAccounts.js";
 import type * as membershipCategories from "../membershipCategories.js";
 import type * as messaging from "../messaging.js";
@@ -80,6 +81,7 @@ declare const fullApi: ApiFromModules<{
   interclub: typeof interclub;
   invites: typeof invites;
   knockouts: typeof knockouts;
+  "lib/encryption": typeof lib_encryption;
   memberAccounts: typeof memberAccounts;
   membershipCategories: typeof membershipCategories;
   messaging: typeof messaging;

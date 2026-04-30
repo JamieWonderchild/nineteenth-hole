@@ -6,7 +6,7 @@ import { useQuery, useMutation } from "convex/react";
 import { useSearchParams } from "next/navigation";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
-import { MessageSquare, Plus, Send, Users, X, ChevronLeft, Check, Trash2 } from "lucide-react";
+import { MessageSquare, Plus, Send, Users, X, ChevronLeft, Check, Trash2, Search, PenSquare } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -85,10 +85,14 @@ function NewGroupModal({
 }) {
   const createGroup = useMutation(api.messaging.createGroup);
   const [name, setName] = useState("");
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
 
   const others = clubMembers.filter(m => m.userId !== myUserId);
+  const filtered = search.trim()
+    ? others.filter(m => m.displayName.toLowerCase().includes(search.toLowerCase()))
+    : others;
 
   function toggle(userId: string) {
     setSelected(s => {
@@ -130,7 +134,7 @@ function NewGroupModal({
           </button>
         </div>
 
-        <div className="px-6 py-4 shrink-0">
+        <div className="px-6 pt-4 pb-3 shrink-0 space-y-3">
           <input
             autoFocus
             type="text"
@@ -139,13 +143,26 @@ function NewGroupModal({
             placeholder="Group name…"
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search members…"
+              className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-1">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Add members
+            {filtered.length} {filtered.length === 1 ? "member" : "members"}
           </p>
-          {others.map(m => (
+          {filtered.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-4">No members found</p>
+          )}
+          {filtered.map(m => (
             <button
               key={m.userId}
               onClick={() => toggle(m.userId)}
@@ -171,6 +188,109 @@ function NewGroupModal({
           >
             {creating ? "Creating…" : `Create group (${selected.size + 1})`}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── New Direct Message Modal ─────────────────────────────────────────────────
+
+function NewDirectModal({
+  clubMembers,
+  myUserId,
+  myDisplayName,
+  myAvatarUrl,
+  conversations,
+  onClose,
+  onCreated,
+}: {
+  clubMembers: Array<{ userId: string; displayName: string; avatarUrl?: string }>;
+  myUserId: string;
+  myDisplayName: string;
+  myAvatarUrl?: string;
+  conversations: ConversationItem[];
+  onClose: () => void;
+  onCreated: (id: Id<"conversations">) => void;
+}) {
+  const getOrCreate = useMutation(api.messaging.getOrCreateDirect);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState<string | null>(null);
+
+  const others = clubMembers
+    .filter(m => m.userId !== myUserId)
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+  const filtered = search.trim()
+    ? others.filter(m => m.displayName.toLowerCase().includes(search.toLowerCase()))
+    : others;
+
+  async function handleSelect(member: { userId: string; displayName: string; avatarUrl?: string }) {
+    // If a direct conversation already exists with this person, go straight to it
+    const existing = conversations.find(
+      c => c.type === "direct" && c.members.some(m => m.userId === member.userId)
+    );
+    if (existing) { onCreated(existing._id); return; }
+
+    setLoading(member.userId);
+    try {
+      const id = await getOrCreate({
+        myUserId,
+        otherUserId: member.userId,
+        myDisplayName,
+        myAvatarUrl,
+        otherDisplayName: member.displayName,
+        otherAvatarUrl: member.avatarUrl,
+      });
+      onCreated(id);
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <h2 className="font-semibold text-gray-900">New message</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="px-6 py-3 shrink-0">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              autoFocus
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search members…"
+              className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto pb-4">
+          {filtered.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-8">No members found</p>
+          )}
+          {filtered.map(m => (
+            <button
+              key={m.userId}
+              onClick={() => handleSelect(m)}
+              disabled={loading === m.userId}
+              className="w-full flex items-center gap-3 px-6 py-3 hover:bg-gray-50 transition-colors text-left"
+            >
+              <Avatar name={m.displayName} url={m.avatarUrl} size="sm" />
+              <span className="flex-1 text-sm font-medium text-gray-900">{m.displayName}</span>
+              {loading === m.userId
+                ? <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                : <ChevronLeft size={14} className="text-gray-300 rotate-180" />
+              }
+            </button>
+          ))}
         </div>
       </div>
     </div>
@@ -453,6 +573,7 @@ function MessagesInner() {
 
   const [activeConvId, setActiveConvId] = useState<Id<"conversations"> | null>(initialConvId);
   const [showGroup, setShowGroup] = useState(false);
+  const [showDirect, setShowDirect] = useState(false);
   const [mobileShowChat, setMobileShowChat] = useState(!!initialConvId);
 
   // When URL param arrives (e.g. from directory), select that conversation
@@ -499,13 +620,22 @@ function MessagesInner() {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 shrink-0">
           <h1 className="font-semibold text-gray-900">Messages</h1>
-          <button
-            onClick={() => setShowGroup(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded-lg transition-colors"
-          >
-            <Plus size={13} />
-            New group
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowDirect(true)}
+              title="New message"
+              className="p-1.5 text-gray-500 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+            >
+              <PenSquare size={16} />
+            </button>
+            <button
+              onClick={() => setShowGroup(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-medium rounded-lg transition-colors"
+            >
+              <Plus size={13} />
+              New group
+            </button>
+          </div>
         </div>
 
         {/* Conversation list */}
@@ -554,6 +684,22 @@ function MessagesInner() {
           <EmptyState />
         )}
       </div>
+
+      {/* New direct message modal */}
+      {showDirect && (
+        <NewDirectModal
+          clubMembers={(clubMembers ?? []) as Array<{ userId: string; displayName: string; avatarUrl?: string }>}
+          myUserId={user.id}
+          myDisplayName={userDisplayName}
+          myAvatarUrl={userAvatarUrl}
+          conversations={conversations ?? []}
+          onClose={() => setShowDirect(false)}
+          onCreated={id => {
+            setShowDirect(false);
+            selectConv(id);
+          }}
+        />
+      )}
 
       {/* New group modal */}
       {showGroup && club && (
