@@ -187,6 +187,14 @@ export default function RoundDetailScreen() {
     );
   }
 
+  // Auto-navigate back if round doesn't exist (e.g. tab restored stale route)
+  // Must be before any early returns to satisfy Rules of Hooks
+  React.useEffect(() => {
+    if (round === null && !deleting) {
+      router.replace("/(app)/rounds");
+    }
+  }, [round, deleting]);
+
   if (round === undefined) {
     return (
       <>
@@ -195,13 +203,6 @@ export default function RoundDetailScreen() {
       </>
     );
   }
-
-  // Auto-navigate back if round doesn't exist (e.g. tab restored stale route)
-  React.useEffect(() => {
-    if (round === null && !deleting) {
-      router.replace("/(app)/rounds");
-    }
-  }, [round, deleting]);
 
   if (round === null) {
     // Show spinner while useEffect redirect fires — don't flash error screen
