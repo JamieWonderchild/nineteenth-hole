@@ -4,17 +4,75 @@
  * Works in both the Convex runtime (queries/mutations) and Node.js (actions)
  * — no Node-specific imports required.
  *
- * Required environment variables (set in the Convex dashboard):
- *   MESSAGING_ENCRYPTION_KEYS         JSON map of version → 64-char hex key
- *                                     e.g. {"1":"<64 hex chars>"}
- *   MESSAGING_ENCRYPTION_KEY_CURRENT  Active version string, e.g. "1"
+ * ── Environment variables (set in Convex dashboard → Settings → Env Vars) ──
  *
- * Ciphertext format: `v{version}:<base64(iv[12] + ciphertext+tag)>`
- * The 16-byte GCM authentication tag is appended to the ciphertext by the
- * Web Crypto API automatically and verified on decryption.
+ *   MESSAGING_ENCRYPTION_KEYS
+ *     A JSON object mapping version strings to 64-character hex keys (32 bytes).
+ *     Multiple versions can coexist so old messages remain decryptable during
+ *     and after a rotation.
+ *     Example value:  {"1":"a3f8c2...64hexchars..."}
  *
- * Legacy messages (stored before encryption was enabled) have no `v{n}:` prefix
- * and are returned as-is by decrypt() so they remain readable after rollout.
+ *   MESSAGING_ENCRYPTION_KEY_CURRENT
+ *     The version string that new messages are encrypted with.
+ *     Example value:  1
+ *
+ * ── First-time setup ────────────────────────────────────────────────────────
+ *
+ *   1. Generate a 32-byte key:
+ *        node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ *
+ *   2. Set env vars in the Convex dashboard:
+ *        MESSAGING_ENCRYPTION_KEYS        {"1":"<output from step 1>"}
+ *        MESSAGING_ENCRYPTION_KEY_CURRENT 1
+ *
+ *   3. Deploy:  npx convex deploy  (run from the project root, not mobile/)
+ *
+ *   New messages are now encrypted. Existing plaintext messages are still
+ *   readable — decrypt() passes through anything without a v{n}: prefix.
+ *   Run the rotateEncryption action (see below) to encrypt legacy messages.
+ *
+ * ── Key rotation procedure ───────────────────────────────────────────────────
+ *
+ *   Rotation re-encrypts all messages with a new key without downtime.
+ *   The old key stays in MESSAGING_ENCRYPTION_KEYS until migration is complete
+ *   so messages written during the transition can still be decrypted.
+ *
+ *   Step 1 — Generate a new key:
+ *     node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ *
+ *   Step 2 — Add the new key alongside the old one in the dashboard:
+ *     MESSAGING_ENCRYPTION_KEYS        {"1":"<old key>","2":"<new key>"}
+ *     MESSAGING_ENCRYPTION_KEY_CURRENT 2
+ *
+ *   Step 3 — Deploy so new messages start using key 2 immediately:
+ *     npx convex deploy
+ *
+ *   Step 4 — Re-encrypt all messages that are still on key 1 (or plaintext):
+ *     Convex dashboard → Functions → messaging:rotateEncryption → Run Function
+ *     Args: {}
+ *     The function logs how many messages were rotated and the target version.
+ *     It is idempotent — safe to run multiple times.
+ *
+ *   Step 5 — Once rotateEncryption reports 0 messages remaining on the old
+ *     version, remove key 1 from MESSAGING_ENCRYPTION_KEYS and redeploy:
+ *     MESSAGING_ENCRYPTION_KEYS        {"2":"<new key>"}
+ *     MESSAGING_ENCRYPTION_KEY_CURRENT 2
+ *
+ * ── Ciphertext format ────────────────────────────────────────────────────────
+ *
+ *   v{version}:<base64(iv[12 bytes] + ciphertext + auth_tag[16 bytes])>
+ *
+ *   The 16-byte GCM authentication tag is appended to the ciphertext by the
+ *   Web Crypto API automatically and verified on decryption, providing
+ *   both confidentiality and integrity.
+ *
+ * ── What this protects ───────────────────────────────────────────────────────
+ *
+ *   - Database dumps / storage-layer access: message bodies are ciphertext.
+ *   - Push notification previews remain plaintext (sent by the Expo push
+ *     service but never stored in the DB).
+ *   - This is NOT end-to-end encryption — the Convex server holds the key
+ *     and decrypts on read. Protects against DB leaks, not server compromise.
  */
 
 // ── Byte / base64 helpers ─────────────────────────────────────────────────────
